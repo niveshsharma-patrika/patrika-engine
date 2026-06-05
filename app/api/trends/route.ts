@@ -82,25 +82,28 @@ export async function GET(req: Request) {
 
   let query;
   if (windowParam === "breaking") {
+    // 3+ publishers and the story itself is < 30 min old (its earliest
+    // article is recent) — a genuine fast-breaking event, not an old topic
+    // that only just picked up a 3rd outlet.
     query = supabase
       .from("trends")
       .select(baseSelect)
       .eq("status", "active")
       .gte("publisher_count", NEWS_PUBLISHER_BAR)
-      .gte("broke_at", isoMinAgo(BREAKING_MAX_MIN))
-      .order("broke_at", { ascending: false })
+      .gte("first_seen", isoMinAgo(BREAKING_MAX_MIN))
+      .order("first_seen", { ascending: false })
       .limit(40);
   } else if (windowParam === "trending") {
-    // Broke between 30 min and 4 h ago — past the initial burst, still current.
+    // Story is 30 min – 4 h old — past the initial burst, still current.
     query = supabase
       .from("trends")
       .select(baseSelect)
       .eq("status", "active")
       .gte("publisher_count", NEWS_PUBLISHER_BAR)
-      .gte("broke_at", isoMinAgo(TRENDING_MAX_MIN))
-      .lt("broke_at", isoMinAgo(BREAKING_MAX_MIN))
+      .gte("first_seen", isoMinAgo(TRENDING_MAX_MIN))
+      .lt("first_seen", isoMinAgo(BREAKING_MAX_MIN))
       .order("publisher_count", { ascending: false })
-      .order("broke_at", { ascending: false })
+      .order("first_seen", { ascending: false })
       .limit(80);
   } else if (windowParam === "watching") {
     // watching — exactly 2 publishers (broke_at is null until 3 is reached).

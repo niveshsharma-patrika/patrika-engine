@@ -447,6 +447,19 @@ function brokeAtFromSignals(sigs: SigJoin[]): string | null {
   return null;
 }
 
+/** first_seen = the earliest article in the story (its age). Future times
+ * are clamped to now. */
+function firstSeenFromSignals(sigs: SigJoin[]): string | null {
+  const nowMs = Date.now();
+  let firstMs = Infinity;
+  for (const s of sigs) {
+    if (!s.published_at) continue;
+    const t = Math.min(new Date(s.published_at).getTime(), nowMs);
+    if (Number.isFinite(t) && t < firstMs) firstMs = t;
+  }
+  return Number.isFinite(firstMs) ? new Date(firstMs).toISOString() : null;
+}
+
 /**
  * Recompute signal_count / publisher_count / trust / broke_at from what's
  * actually linked, and archive any trend that ended up with zero signals
@@ -457,7 +470,7 @@ async function reconcileTrendCounts(
 ): Promise<{ reconciled: number; archived: number }> {
   const { data: trends, error } = await supabase
     .from("trends")
-    .select("id, signal_count, publisher_count, status, trust_score, broke_at")
+    .select("id, signal_count, publisher_count, status, trust_score, broke_at, first_seen")
     .neq("status", "archived");
 
   if (error || !trends) return { reconciled: 0, archived: 0 };
@@ -469,6 +482,7 @@ async function reconcileTrendCounts(
     status: string;
     trust_score: number | null;
     broke_at: string | null;
+    first_seen: string | null;
   };
   const rows = trends as Row[];
 
@@ -497,23 +511,24 @@ async function reconcileTrendCounts(
 
         const newStatus = actual === 0 ? "archived" : "active";
         const trust = computeTrust(publishers.size, languages);
-        // Authoritative broke_at: the moment the story reached 3 distinct
-        // publishers, derived from ALL its signals' publish times (not frozen
-        // at the in-system crossing, which depends on ingestion order).
+        // Authoritative timeline from ALL the story's signals (not frozen at
+        // creation, which depends on the order we ingested the articles):
+        //   first_seen — earliest article = the story's age (drives buckets)
+        //   broke_at   — when it reached 3 distinct publishers
+        const newFirstSeen = firstSeenFromSignals(sigs) ?? t.first_seen;
         const newBrokeAt =
           publishers.size >= NEWS_PUBLISHER_BAR ? brokeAtFromSignals(sigs) : null;
-        const brokeChanged =
-          (newBrokeAt == null) !== (t.broke_at == null) ||
-          (newBrokeAt != null &&
-            t.broke_at != null &&
-            new Date(newBrokeAt).getTime() !== new Date(t.broke_at).getTime());
+        const iso = (v: string | null) => (v ? new Date(v).getTime() : null);
+        const brokeChanged = iso(newBrokeAt) !== iso(t.broke_at);
+        const firstChanged = iso(newFirstSeen) !== iso(t.first_seen);
 
         const needsUpdate =
           actual !== (t.signal_count ?? -1) ||
           publishers.size !== (t.publisher_count ?? -1) ||
           newStatus !== t.status ||
           trust !== (t.trust_score ?? 0) ||
-          brokeChanged;
+          brokeChanged ||
+          firstChanged;
         if (!needsUpdate) return;
 
         const { error: uErr } = await supabase
@@ -524,6 +539,7 @@ async function reconcileTrendCounts(
             status: newStatus,
             trust_score: trust,
             broke_at: newBrokeAt,
+            first_seen: newFirstSeen,
           })
           .eq("id", t.id);
         if (uErr) return;
