@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* ─── Design tokens ─────────────────────────────────────────── */
+:root {
+  --bg:          #f6f7f8;
+  --surface:     #ffffff;
+  --surface-2:   #fafbfc;
+  --text:        #1f1f1f;
+  --text-2:      #5f6368;
+  --text-3:      #80868b;
+  --border:      #e0e0e0;
+  --border-2:    #c4c7c5;
+  --red:         #d93025;
+  --red-hover:   #b3261c;
+  --red-soft:    #fce8e6;
+  --blue:        #1a73e8;
+  --blue-soft:   #e8f0fe;
+  --green:       #1e8e3e;
+  --green-soft:  #e6f4ea;
+  --orange:      #e8710a;
+  --orange-soft: #fef7e0;
+  --amber:       #f9ab00;
+  --purple:      #9334e6;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--text);
+  --color-ink-soft: var(--text-2);
+  --color-ink-faint: var(--text-3);
+  --color-rule: var(--border);
+  --color-rule-strong: var(--border-2);
+  --color-red: var(--red);
+  --color-red-hover: var(--red-hover);
+  --color-red-soft: var(--red-soft);
+  --color-blue: var(--blue);
+  --color-green: var(--green);
+  --color-orange: var(--orange);
+  --color-amber: var(--amber);
+  --color-purple: var(--purple);
+  --font-sans: var(--font-roboto);
+  --font-mono: var(--font-roboto-mono);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-roboto), Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Animations */
+@keyframes pulse-dot {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+@keyframes scroll-x {
+  to { transform: translateX(-50%); }
+}
+
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

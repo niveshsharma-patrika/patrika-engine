@@ -1,0 +1,2585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>Patrika Engine — Editorial Command</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23d93025'/%3E%3Ctext x='50%25' y='52%25' text-anchor='middle' dy='.35em' font-family='Roboto,Arial' font-size='20' fill='%23fff' font-weight='700'%3EP%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:            #f6f7f8;
+    --surface:       #ffffff;
+    --surface-2:     #fafbfc;
+    --text:          #1f1f1f;
+    --text-2:        #5f6368;
+    --text-3:        #80868b;
+    --border:        #e0e0e0;
+    --border-2:      #c4c7c5;
+    --red:           #d93025;
+    --red-hover:     #b3261c;
+    --red-soft:      #fce8e6;
+    --blue:          #1a73e8;
+    --blue-soft:     #e8f0fe;
+    --green:         #1e8e3e;
+    --green-soft:    #e6f4ea;
+    --orange:        #e8710a;
+    --orange-soft:   #fef7e0;
+    --amber:         #f9ab00;
+    --purple:        #9334e6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); }
+  body { font-family: 'Roboto', Arial, sans-serif; font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+  /* Masthead */
+  .masthead { display: flex; justify-content: space-between; align-items: center; gap: 32px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand__mark { width: 36px; height: 36px; background: var(--red); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 18px; border-radius: 4px; }
+  .brand__text h1 { font-weight: 500; font-size: 18px; color: var(--text); line-height: 1.2; }
+  .brand__text p { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .masthead__meta { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-2); display: flex; gap: 10px; justify-content: center; }
+  .masthead__meta .sep { color: var(--border-2); }
+  .masthead__meta .now { color: var(--text); font-weight: 500; }
+  .masthead__tools { display: flex; align-items: center; gap: 14px; }
+  .search { position: relative; }
+  .search input { background: var(--surface-2); border: 1px solid var(--border); padding: 7px 12px 7px 32px; font-family: inherit; font-size: 13px; color: var(--text); width: 240px; border-radius: 4px; outline: none; transition: border-color 0.15s; }
+  .search input::placeholder { color: var(--text-3); }
+  .search input:focus { border-color: var(--blue); background: var(--surface); }
+  .search svg { position: absolute; left: 10px; top: 9px; color: var(--text-3); }
+  .live-tag { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--green); font-weight: 500; }
+  .live-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; position: relative; }
+  .live-dot::after { content: ''; position: absolute; inset: 0; background: var(--green); border-radius: 50%; animation: pulse 2s ease-out infinite; }
+  @keyframes pulse { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(3); opacity: 0; } }
+  .user { display: flex; align-items: center; gap: 10px; padding-left: 14px; border-left: 1px solid var(--border); }
+  .user__avatar { width: 32px; height: 32px; background: var(--text); color: var(--surface); display: grid; place-items: center; font-weight: 500; font-size: 13px; border-radius: 50%; }
+  .user__data b { font-size: 13px; font-weight: 500; display: block; }
+  .user__data span { font-size: 11px; color: var(--text-3); }
+
+  /* Ticker */
+  .ticker { background: var(--text); color: var(--surface); display: flex; align-items: center; height: 36px; overflow: hidden; }
+  .ticker__label { background: var(--red); color: #fff; padding: 0 14px; height: 36px; display: grid; place-items: center; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; flex-shrink: 0; }
+  .ticker__wrap { overflow: hidden; flex: 1; height: 36px; display: flex; align-items: center; }
+  .ticker__items { display: flex; gap: 48px; white-space: nowrap; padding-left: 32px; animation: scroll 90s linear infinite; font-size: 13px; }
+  .ticker__items .item { display: inline-flex; align-items: center; gap: 10px; color: rgba(255, 255, 255, 0.85); }
+  .ticker__items .item b { font-weight: 500; color: #fff; }
+  .ticker__items .item time { color: rgba(255, 255, 255, 0.5); font-family: 'Roboto Mono', monospace; font-size: 11px; }
+  .ticker__items .item.watchlist::before { content: 'WATCH'; font-family: 'Roboto Mono', monospace; font-size: 10px; background: var(--red); color: #fff; padding: 2px 6px; border-radius: 3px; }
+  @keyframes scroll { to { transform: translateX(-50%); } }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 232px 1fr; min-height: calc(100vh - 96px); }
+
+  /* Sidebar */
+  .sidebar { border-right: 1px solid var(--border); background: var(--surface); padding: 16px 0; display: flex; flex-direction: column; gap: 16px; }
+  .nav-section { padding: 8px 12px; }
+  .nav-section h4 { font-size: 11px; color: var(--text-3); margin: 8px 12px 8px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+  .nav { list-style: none; }
+  .nav li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; font-size: 14px; color: var(--text-2); cursor: pointer; border-radius: 4px; transition: background 0.15s; }
+  .nav li svg { color: var(--text-3); flex-shrink: 0; }
+  .nav li.active { color: var(--red); background: var(--red-soft); font-weight: 500; }
+  .nav li.active svg { color: var(--red); }
+  .nav li:not(.active):hover { background: var(--surface-2); color: var(--text); }
+  .nav li .badge { margin-left: auto; background: var(--text); color: var(--surface); padding: 1px 7px; font-size: 11px; font-weight: 500; border-radius: 10px; font-family: 'Roboto Mono', monospace; }
+  .nav li.active .badge { background: var(--red); }
+  .status-list { list-style: none; display: grid; gap: 8px; padding: 0 12px; }
+  .status-list li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); }
+  .status-list li .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .status-list li .dot.warn { background: var(--amber); }
+  .status-list li .count { margin-left: auto; font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-3); }
+  .watchlist-mini { padding: 0 12px; display: grid; gap: 8px; list-style: none; }
+  .watch-chip { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); }
+  .watch-chip .who { font-weight: 500; color: var(--text); }
+  .watch-chip .badge-mini { margin-left: auto; font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--red); font-weight: 500; }
+
+  /* Main */
+  .main { padding: 28px 32px 80px; min-width: 0; }
+  .view { display: none; }
+  .view.active { display: block; animation: viewIn 0.2s ease; }
+  @keyframes viewIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Page head */
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .page-head h2 { font-size: 24px; font-weight: 500; color: var(--text); line-height: 1.2; }
+  .page-head__sub { font-size: 13px; color: var(--text-3); margin-top: 6px; }
+  .page-head__actions { display: flex; gap: 10px; align-items: center; }
+
+  /* Buttons */
+  .ab { display: inline-flex; align-items: center; gap: 6px; background: var(--text); color: #fff; border: none; padding: 8px 16px; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 4px; transition: background 0.15s; }
+  .ab:hover { background: #000; }
+  .ab--red { background: var(--red); }
+  .ab--red:hover { background: var(--red-hover); }
+  .ab--ghost { background: var(--surface); color: var(--text-2); border: 1px solid var(--border); }
+  .ab--ghost:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-2); }
+
+  /* Filter chips */
+  .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .chip { background: var(--surface); border: 1px solid var(--border); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; color: var(--text-2); cursor: pointer; transition: all 0.15s; font-family: inherit; }
+  .chip:hover { border-color: var(--border-2); color: var(--text); }
+  .chip.active { background: var(--text); border-color: var(--text); color: var(--surface); }
+  .chip .count { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text-3); margin-left: 6px; }
+  .chip.active .count { color: rgba(255,255,255,0.65); }
+
+  /* Section column heads (reused) */
+  .col-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .col-head__label { font-size: 14px; font-weight: 500; color: var(--text); }
+  .col-head__meta { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-3); }
+  .col-head__meta b { color: var(--text); font-weight: 500; }
+  .section { margin-bottom: 36px; }
+
+  /* Trending cards (dashboard) */
+  .trend-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .t-card { position: relative; background: var(--surface); border: 1px solid var(--border); padding: 22px 20px 16px; cursor: pointer; text-align: left; font-family: inherit; color: inherit; display: flex; flex-direction: column; gap: 14px; min-height: 168px; transition: all 0.15s ease; border-radius: 6px; overflow: hidden; }
+  .t-card:hover { border-color: var(--border-2); box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04); }
+  .t-card__stripe { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--red); }
+  .t-card[data-section="city"]      .t-card__stripe { background: var(--red); }
+  .t-card[data-section="business"]  .t-card__stripe { background: var(--blue); }
+  .t-card[data-section="sports"]    .t-card__stripe { background: var(--green); }
+  .t-card[data-section="politics"]  .t-card__stripe { background: var(--orange); }
+  .t-card[data-section="weather"]   .t-card__stripe { background: var(--amber); }
+  .t-card[data-section="enter"]     .t-card__stripe { background: var(--purple); }
+  .t-card[data-section="tech"]      .t-card__stripe { background: var(--blue); }
+  .t-card[data-section="national"]  .t-card__stripe { background: var(--text); }
+  .t-card[data-section="travel"]    .t-card__stripe { background: var(--green); }
+  .t-card__tag { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+  .t-card__title { font-weight: 500; font-size: 17px; color: var(--text); line-height: 1.35; flex: 1; }
+  .t-card__foot { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--border); }
+  .t-card__vel-wrap { display: flex; align-items: baseline; gap: 8px; }
+  .t-card__vel { font-family: 'Roboto Mono', monospace; font-weight: 500; font-size: 15px; color: var(--red); }
+  .t-card__window { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-3); }
+  .t-card__chev { color: var(--text-3); transition: transform 0.15s; }
+  .t-card:hover .t-card__chev { transform: translateX(3px); color: var(--text); }
+
+  /* Data table (reused for trending list, sources, watchlist, drafts list) */
+  .dt { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .dt .row { display: grid; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); gap: 14px; transition: background 0.15s; }
+  .dt .row:last-child { border-bottom: none; }
+  .dt .row:not(.row--head):hover { background: var(--surface-2); cursor: pointer; }
+  .dt .row--head { background: var(--surface-2); font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; padding: 10px 18px; }
+  .dt .topic { font-weight: 500; color: var(--text); font-size: 14px; }
+  .dt .mono { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-2); }
+  .dt .vel-cell { font-family: 'Roboto Mono', monospace; font-weight: 500; font-size: 14px; color: var(--red); }
+  .dt .sub-cell { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+  /* row variants */
+  .row--trending { grid-template-columns: 32px 1fr 130px 100px 90px 80px 80px 28px; }
+  .row--sources  { grid-template-columns: 36px 1fr 90px 200px 100px 100px 80px 80px; }
+  .row--watchlist{ grid-template-columns: 36px 1fr 100px 1fr 90px 80px 80px 80px; }
+
+  /* Source pills */
+  .src-pills { display: flex; gap: 4px; }
+  .src-pills span { font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 3px; color: var(--text-2); background: var(--surface-2); }
+  .src-pills span.x { background: var(--text); color: #fff; }
+  .src-pills span.rss { background: var(--orange); color: #fff; }
+  .src-pills span.gn { background: var(--blue); color: #fff; }
+
+  /* Status chip (inline) */
+  .stchip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 12px; }
+  .stchip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .stchip.live { background: var(--green-soft); color: var(--green); }
+  .stchip.paused { background: var(--surface-2); color: var(--text-3); }
+  .stchip.error { background: var(--red-soft); color: var(--red); }
+  .stchip.warn { background: var(--orange-soft); color: var(--orange); }
+
+  /* Avatar */
+  .av { width: 32px; height: 32px; background: var(--surface-2); border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 500; color: var(--text-2); flex-shrink: 0; }
+  .av.x { background: var(--text); color: #fff; }
+  .av.rss { background: var(--orange); color: #fff; }
+  .av.gn { background: var(--blue); color: #fff; }
+  .av.person { background: #6e2a4f; color: #fff; }
+  .av.org { background: var(--blue); color: #fff; }
+  .av.brand { background: var(--green); color: #fff; }
+
+  /* Row action */
+  .row-act { width: 28px; height: 28px; display: grid; place-items: center; background: transparent; border: none; cursor: pointer; color: var(--text-3); border-radius: 4px; }
+  .row-act:hover { background: var(--surface-2); color: var(--text); }
+
+  /* Suggestions */
+  .group-head { font-size: 13px; font-weight: 500; color: var(--text); margin: 20px 0 12px; display: flex; align-items: center; gap: 8px; }
+  .group-head .count { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-3); font-weight: 400; }
+  .sugg-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .sugg-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 18px; transition: all 0.15s; cursor: pointer; }
+  .sugg-card:hover { border-color: var(--border-2); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .sugg-card__type { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; margin-bottom: 8px; }
+  .sugg-card__type.watch { color: var(--red); }
+  .sugg-card__title { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.35; margin-bottom: 10px; }
+  .sugg-card__why { font-size: 12px; color: var(--text-2); line-height: 1.5; margin-bottom: 12px; }
+  .sugg-card__foot { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--border); }
+  .sugg-card__meta { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text-3); }
+  .sugg-card__cta { background: var(--red-soft); color: var(--red); border: none; padding: 6px 12px; font-family: inherit; font-size: 12px; font-weight: 500; border-radius: 4px; cursor: pointer; transition: background 0.15s; }
+  .sugg-card__cta:hover { background: var(--red); color: #fff; }
+
+  /* Drafts grid */
+  .drafts-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .draft { background: var(--surface); border: 1px solid var(--border); padding: 18px; cursor: pointer; border-radius: 6px; transition: all 0.15s; }
+  .draft:hover { border-color: var(--border-2); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .draft__status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; padding: 3px 8px; margin-bottom: 12px; background: var(--surface-2); color: var(--text-2); border-radius: 12px; font-weight: 500; }
+  .draft__status::before { content: ''; width: 6px; height: 6px; background: currentColor; border-radius: 50%; }
+  .draft__status.review { background: var(--orange-soft); color: #b06000; }
+  .draft__status.approved { background: var(--green-soft); color: #137333; }
+  .draft__status.in-prog { background: var(--blue-soft); color: #1967d2; }
+  .draft__title { font-weight: 500; font-size: 15px; color: var(--text); line-height: 1.35; margin-bottom: 12px; }
+  .draft__meta { display: flex; gap: 12px; font-size: 12px; color: var(--text-2); flex-wrap: wrap; }
+  .draft__meta b { color: var(--text); font-weight: 500; font-family: 'Roboto Mono', monospace; }
+  .draft__progress { height: 3px; background: var(--surface-2); margin-top: 14px; overflow: hidden; border-radius: 2px; }
+  .draft__progress span { display: block; height: 100%; background: var(--red); border-radius: 2px; }
+  .draft__progress.indet span { width: 30%; background: var(--blue); animation: indet 2s ease-in-out infinite; }
+  @keyframes indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
+
+  /* Panels (style module, settings) */
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 22px 24px; margin-bottom: 16px; }
+  .panel h3 { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .panel__sub { font-size: 12px; color: var(--text-3); margin-bottom: 18px; }
+  .panel__row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); gap: 16px; }
+  .panel__row:last-child { border-bottom: none; }
+  .panel__row .label { font-size: 13px; color: var(--text); font-weight: 500; }
+  .panel__row .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .panel__row .val { font-family: 'Roboto Mono', monospace; font-size: 13px; color: var(--text); }
+  .file-row { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .file-row:last-child { border-bottom: none; }
+  .file-icon { width: 36px; height: 36px; background: var(--red-soft); color: var(--red); border-radius: 6px; display: grid; place-items: center; font-size: 10px; font-weight: 700; font-family: 'Roboto Mono', monospace; }
+  .file-name { font-size: 14px; color: var(--text); font-weight: 500; }
+  .file-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .file-act { margin-left: auto; }
+
+  .slider-row { padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .slider-row:last-child { border-bottom: none; }
+  .slider-row__top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .slider-row__label { font-size: 13px; color: var(--text); font-weight: 500; }
+  .slider-row__val { font-family: 'Roboto Mono', monospace; font-size: 13px; color: var(--red); font-weight: 500; }
+  .slider { width: 100%; height: 4px; background: var(--surface-2); border-radius: 2px; position: relative; }
+  .slider .track { height: 100%; background: var(--red); border-radius: 2px; }
+  .slider .handle { width: 14px; height: 14px; background: var(--red); border: 3px solid #fff; border-radius: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+  .toggle { width: 36px; height: 20px; background: var(--surface-2); border-radius: 12px; position: relative; cursor: pointer; transition: background 0.15s; border: 1px solid var(--border); }
+  .toggle.on { background: var(--green); border-color: var(--green); }
+  .toggle::after { content: ''; position: absolute; width: 14px; height: 14px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: left 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+  .toggle.on::after { left: 19px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  .stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 18px 20px; }
+  .stat-tile b { display: block; font-size: 24px; font-weight: 500; color: var(--text); font-family: 'Roboto Mono', monospace; }
+  .stat-tile span { display: block; font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; margin-top: 4px; }
+
+  /* Settings tabs */
+  .stabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+  .stab { background: transparent; border: none; padding: 10px 16px; font-family: inherit; font-size: 13px; font-weight: 500; color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+  .stab.active { color: var(--red); border-bottom-color: var(--red); }
+  .stab:hover { color: var(--text); }
+
+  /* Sample box (style) */
+  .sample-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 18px; font-size: 13.5px; line-height: 1.65; color: var(--text); }
+  .sample-box .lede { color: var(--text-3); text-transform: uppercase; font-size: 11px; letter-spacing: 0.06em; font-weight: 500; margin-bottom: 8px; }
+
+  textarea.input { width: 100%; background: var(--surface-2); border: 1px solid var(--border); padding: 12px 14px; font-family: inherit; font-size: 13px; color: var(--text); border-radius: 4px; outline: none; resize: vertical; min-height: 70px; }
+  textarea.input:focus { border-color: var(--blue); background: var(--surface); }
+
+  /* FAB */
+  .fab { position: fixed; bottom: 28px; right: 28px; background: var(--red); color: #fff; border: none; padding: 14px 22px; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; box-shadow: 0 4px 12px rgba(217, 48, 37, 0.3); transition: all 0.15s; z-index: 100; display: inline-flex; align-items: center; gap: 10px; border-radius: 28px; }
+  .fab:hover { background: var(--red-hover); box-shadow: 0 6px 16px rgba(217, 48, 37, 0.4); }
+  .fab kbd { font-family: 'Roboto Mono', monospace; font-size: 11px; padding: 2px 6px; background: rgba(255, 255, 255, 0.18); border-radius: 3px; }
+
+  /* Drawer */
+  .drawer { position: fixed; inset: 0; pointer-events: none; z-index: 300; }
+  .drawer__bg { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.4); opacity: 0; transition: opacity 0.2s; }
+  .drawer__panel { position: absolute; top: 0; right: 0; bottom: 0; width: 560px; max-width: 92vw; background: var(--surface); box-shadow: -8px 0 24px rgba(0, 0, 0, 0); transform: translateX(100%); transition: transform 0.25s ease, box-shadow 0.25s; overflow-y: auto; }
+  .drawer.open { pointer-events: auto; }
+  .drawer.open .drawer__bg { opacity: 1; }
+  .drawer.open .drawer__panel { transform: translateX(0); box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18); }
+  .drawer__close { position: absolute; top: 16px; right: 16px; width: 36px; height: 36px; background: transparent; border: none; color: var(--text-2); cursor: pointer; display: grid; place-items: center; border-radius: 50%; transition: background 0.15s; z-index: 5; }
+  .drawer__close:hover { background: var(--surface-2); color: var(--text); }
+  .drawer__contents { padding: 28px 32px 32px; }
+  .topic-detail { display: none; }
+  .topic-detail.active { display: block; }
+  .td__head { margin-bottom: 20px; }
+  .td__tag { font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; font-weight: 500; }
+  .td__tag .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+  .td[data-section="city"]      .td__tag .pip { background: var(--red); }
+  .td[data-section="business"]  .td__tag .pip { background: var(--blue); }
+  .td[data-section="sports"]    .td__tag .pip { background: var(--green); }
+  .td[data-section="politics"]  .td__tag .pip { background: var(--orange); }
+  .td[data-section="weather"]   .td__tag .pip { background: var(--amber); }
+  .td[data-section="enter"]     .td__tag .pip { background: var(--purple); }
+  .td__title { font-weight: 500; font-size: 22px; color: var(--text); line-height: 1.3; margin-bottom: 14px; }
+  .td__vel { display: flex; align-items: baseline; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .td__vel .big { font-family: 'Roboto Mono', monospace; font-weight: 500; font-size: 24px; color: var(--red); }
+  .td__vel .window-l { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-3); }
+  .td__block { padding: 18px 0; border-bottom: 1px solid var(--border); }
+  .td__block:last-of-type { border-bottom: none; }
+  .td__block h5 { font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; margin-bottom: 12px; }
+  .src-full { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .src { display: flex; align-items: center; gap: 10px; }
+  .src__icon { width: 32px; height: 32px; background: var(--surface-2); color: var(--text); display: grid; place-items: center; font-size: 12px; font-weight: 500; border-radius: 4px; flex-shrink: 0; font-family: 'Roboto Mono', monospace; }
+  .src__icon.x { background: var(--text); color: #fff; }
+  .src__icon.rss { background: var(--orange); color: #fff; }
+  .src__icon.gn { background: var(--blue); color: #fff; }
+  .src__data b { font-family: 'Roboto Mono', monospace; font-size: 14px; font-weight: 500; color: var(--text); display: block; }
+  .src__data span { font-size: 11px; color: var(--text-3); }
+  .signal { padding: 8px 0; line-height: 1.5; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .signal:last-child { border-bottom: none; }
+  .signal .who { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text-3); font-weight: 500; margin-bottom: 2px; display: block; }
+  .signal .text { color: var(--text); }
+  .signal .stat-mini { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text-3); margin-top: 2px; display: block; }
+  .angle-box { background: var(--red-soft); padding: 12px 14px; border-radius: 6px; font-size: 13px; color: var(--text); line-height: 1.55; }
+  .angle-box b { color: var(--red); font-weight: 500; }
+  .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 24px; }
+  .meta-grid .m { display: flex; flex-direction: column; gap: 2px; }
+  .meta-grid .m .lbl { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; }
+  .meta-grid .m .v { font-size: 13px; color: var(--text); font-weight: 500; }
+  .trust { display: inline-flex; align-items: center; gap: 3px; }
+  .trust .d { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .trust .d.e { background: var(--border); }
+  .td__actions { display: flex; gap: 8px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border); justify-content: space-between; align-items: center; }
+  .td__actions-left { display: flex; gap: 8px; }
+  .btn { background: var(--red); color: #fff; border: none; padding: 10px 18px; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 4px; transition: background 0.15s; }
+  .btn:hover { background: var(--red-hover); }
+  .btn--ghost { background: var(--surface); color: var(--text-2); border: 1px solid var(--border); }
+  .btn--ghost:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-2); }
+
+  /* Admin: keys + users lists */
+  .panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+  .key-list, .user-list { display: grid; gap: 8px; }
+  .key-row, .user-row { display: grid; align-items: center; gap: 14px; padding: 12px 14px; background: var(--surface-2); border-radius: 6px; transition: background 0.15s; }
+  .key-row:hover, .user-row:hover { background: #f1f3f4; }
+  .key-row  { grid-template-columns: 36px 1fr 220px 80px 110px 36px; }
+  .user-row { grid-template-columns: 36px 1fr 110px 150px 76px 100px 36px; }
+  .key-icon { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; font-weight: 600; font-size: 14px; color: #fff; font-family: 'Roboto Mono', monospace; }
+  .key-icon.anthropic { background: #c96342; }
+  .key-icon.google { background: #1a73e8; }
+  .key-icon.openai { background: #10a37f; }
+  .key-icon.x { background: var(--text); }
+  .key-icon.imagen { background: var(--purple); }
+  .key-icon.telegram { background: #2aabee; }
+  .key-icon.wp { background: #21759b; }
+  .key-icon.off { background: var(--border-2); color: var(--text-3); }
+  .key-name, .user-name { font-size: 14px; font-weight: 500; color: var(--text); }
+  .key-sub, .user-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .key-val { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-2); background: var(--surface); padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border); display: inline-block; }
+  .key-date { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text-3); }
+  .tg-handle { font-family: 'Roboto Mono', monospace; font-size: 13px; color: var(--text); }
+  .tg-chat { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .tg-none { font-size: 12px; color: var(--text-3); font-style: italic; }
+  .mini-btn { background: var(--surface); border: 1px solid var(--border); padding: 6px 10px; font-family: inherit; font-size: 11px; font-weight: 500; color: var(--text-2); cursor: pointer; border-radius: 4px; }
+  .mini-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-2); }
+
+  /* Bar chart */
+  .bars { display: grid; gap: 10px; }
+  .bar { display: grid; grid-template-columns: 180px 1fr 70px 50px; align-items: center; gap: 14px; font-size: 13px; }
+  .bar__label { color: var(--text); }
+  .bar__track { background: var(--surface-2); height: 8px; border-radius: 4px; overflow: hidden; }
+  .bar__fill { height: 100%; background: var(--red); border-radius: 4px; }
+  .bar__fill.blue { background: var(--blue); }
+  .bar__fill.green { background: var(--green); }
+  .bar__fill.purple { background: var(--purple); }
+  .bar__fill.orange { background: var(--orange); }
+  .bar__fill.amber { background: var(--amber); }
+  .bar__val { font-family: 'Roboto Mono', monospace; color: var(--text); font-weight: 500; text-align: right; }
+  .bar__pct { font-family: 'Roboto Mono', monospace; color: var(--text-3); font-size: 11px; text-align: right; }
+  .subhead { font-size: 12px; color: var(--text); margin: 22px 0 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* Admin tabs panel switching */
+  .view--settings .panel[data-tab] { display: none; }
+  .view--settings .panel[data-tab].active { display: block; }
+
+  /* Select */
+  select.tg-select { background: var(--surface-2); border: 1px solid var(--border); padding: 8px 12px; font-family: inherit; font-size: 13px; color: var(--text); border-radius: 4px; outline: none; cursor: pointer; }
+  select.tg-select:focus { border-color: var(--blue); background: var(--surface); }
+
+  /* Hide drawer scrollbar */
+  .drawer__panel { scrollbar-width: none; }
+  .drawer__panel::-webkit-scrollbar { display: none; }
+
+  /* Article editor */
+  .editor { position: fixed; inset: 0; background: var(--bg); z-index: 400; display: none; flex-direction: column; }
+  .editor.open { display: flex; }
+  .editor__top { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; flex-shrink: 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
+  .editor__back { background: transparent; border: none; font-family: inherit; font-size: 13px; color: var(--text-2); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 4px; justify-self: start; }
+  .editor__back:hover { background: var(--surface-2); color: var(--text); }
+  .editor__title-bar { text-align: center; }
+  .editor__title-label { font-size: 14px; font-weight: 500; color: var(--text); }
+  .editor__title-status { font-size: 11px; color: var(--text-3); font-family: 'Roboto Mono', monospace; margin-top: 2px; }
+  .editor__top-actions { display: flex; gap: 8px; justify-self: end; }
+
+  .editor__scroll { flex: 1; overflow-y: auto; padding: 24px; }
+  .editor__layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; max-width: 1320px; margin: 0 auto; }
+  .editor__main { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 26px 30px; }
+  .editor__title-input { width: 100%; background: transparent; border: none; font-family: inherit; font-size: 24px; font-weight: 500; color: var(--text); outline: none; padding: 4px 0; margin-bottom: 12px; }
+  .editor__title-input::placeholder { color: var(--text-3); font-weight: 400; }
+  .editor__meta-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+  .editor__body-input { width: 100%; background: transparent; border: none; outline: none; font-family: inherit; font-size: 15px; line-height: 1.7; color: var(--text); resize: vertical; min-height: 380px; }
+  .editor__body-input::placeholder { color: var(--text-3); }
+  .editor__ai-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+  .ai-pill { background: var(--surface-2); border: 1px solid var(--border); padding: 8px 14px; font-family: inherit; font-size: 12px; color: var(--text-2); cursor: pointer; border-radius: 20px; font-weight: 500; transition: all 0.15s; }
+  .ai-pill:hover { background: var(--red-soft); color: var(--red); border-color: var(--red-soft); }
+  .ai-pill.primary { background: var(--red); color: #fff; border-color: var(--red); }
+  .ai-pill.primary:hover { background: var(--red-hover); }
+
+  .editor__side { display: grid; gap: 12px; align-content: start; }
+  .editor__panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; }
+  .editor__panel h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); font-weight: 500; margin-bottom: 12px; }
+
+  .ed-ctx { display: none; }
+  .ed-ctx.active { display: block; }
+  .ed-ctx__tag { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .ed-ctx__tag .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+  .ed-ctx[data-section="city"]      .ed-ctx__tag .pip { background: var(--red); }
+  .ed-ctx[data-section="business"]  .ed-ctx__tag .pip { background: var(--blue); }
+  .ed-ctx[data-section="sports"]    .ed-ctx__tag .pip { background: var(--green); }
+  .ed-ctx[data-section="politics"]  .ed-ctx__tag .pip { background: var(--orange); }
+  .ed-ctx[data-section="weather"]   .ed-ctx__tag .pip { background: var(--amber); }
+  .ed-ctx[data-section="enter"]     .ed-ctx__tag .pip { background: var(--purple); }
+  .ed-ctx[data-section="tech"]      .ed-ctx__tag .pip { background: var(--blue); }
+  .ed-ctx[data-section="national"]  .ed-ctx__tag .pip { background: var(--text); }
+  .ed-ctx__vel { font-family: 'Roboto Mono', monospace; font-size: 14px; color: var(--red); font-weight: 500; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .ed-ctx__block { margin-bottom: 12px; }
+  .ed-ctx__block:last-child { margin-bottom: 0; }
+  .ed-ctx__block strong { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); font-weight: 500; display: block; margin-bottom: 6px; }
+  .ed-ctx__src { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text); }
+  .ed-ctx__signal { font-size: 12px; color: var(--text-2); padding: 5px 0; border-bottom: 1px dashed var(--border); line-height: 1.45; }
+  .ed-ctx__signal:last-child { border-bottom: none; }
+  .ed-ctx__signal em { font-style: italic; color: var(--text); }
+  .ed-ctx__angle { background: var(--red-soft); padding: 10px 12px; border-radius: 4px; font-size: 12.5px; color: var(--text); line-height: 1.5; }
+  .ed-ctx__angle b { color: var(--red); font-weight: 500; }
+  .ed-ctx-empty { font-size: 13px; color: var(--text-3); padding: 8px 0; line-height: 1.5; }
+
+  .img-ph { background: var(--surface-2); border: 1px dashed var(--border); border-radius: 6px; height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-3); gap: 6px; font-size: 12px; margin-bottom: 10px; }
+  .img-prompt { width: 100%; background: var(--surface-2); border: 1px solid var(--border); padding: 8px 10px; font-family: inherit; font-size: 12px; color: var(--text); border-radius: 4px; outline: none; resize: vertical; min-height: 50px; margin-bottom: 8px; }
+  .img-prompt:focus { border-color: var(--blue); background: var(--surface); }
+
+  .ed-stat-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12px; color: var(--text-2); }
+  .ed-stat-row b { color: var(--text); font-weight: 500; font-family: 'Roboto Mono', monospace; }
+
+  /* Hero trend card */
+  .t-card--hero { grid-column: 1 / -1; min-height: auto; padding: 28px 32px 22px; gap: 0; }
+  .t-card--hero .t-card__stripe { height: 4px; }
+  .hero__body { display: grid; grid-template-columns: 1fr 200px; gap: 32px; align-items: stretch; }
+  .hero__main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .hero__tag { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; display: flex; align-items: center; gap: 10px; }
+  .hero__lead-flag { background: var(--red); color: #fff; font-family: 'Roboto Mono', monospace; font-size: 9px; font-weight: 600; padding: 2px 8px; border-radius: 10px; letter-spacing: 0.08em; }
+  .hero__title { font-size: 26px; font-weight: 500; color: var(--text); line-height: 1.22; letter-spacing: -0.01em; margin: 2px 0 0; }
+  .hero__dek { font-size: 14px; color: var(--text-2); line-height: 1.55; max-width: 600px; }
+  .hero__sources { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-2); display: flex; gap: 18px; margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .hero__sources b { color: var(--text); font-weight: 500; }
+  .hero__right { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; text-align: right; padding: 4px 0; gap: 14px; }
+  .hero__vel { font-family: 'Roboto Mono', monospace; font-weight: 500; font-size: 38px; color: var(--red); line-height: 1; letter-spacing: -0.02em; }
+  .hero__window { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; }
+  .hero__trust { display: inline-flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .hero__trust .pips { display: inline-flex; gap: 3px; }
+  .hero__trust .pips span { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .hero__trust .pips span.e { background: var(--border); }
+  .hero__open { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; transition: color 0.15s, gap 0.15s; }
+  .t-card--hero:hover .hero__open { color: var(--red); gap: 10px; }
+
+  /* Refined card design */
+  .t-card { padding: 16px 20px 14px; gap: 10px; min-height: 168px; }
+  .t-card__top { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; gap: 12px; }
+  .t-card__tag { font-size: 10.5px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+  .t-card__vel-inline { font-family: 'Roboto Mono', monospace; font-weight: 500; font-size: 13px; color: var(--red); white-space: nowrap; }
+  .t-card__vel-inline .w { color: var(--text-3); margin-left: 6px; font-weight: 400; }
+  .t-card__title { font-size: 18px; line-height: 1.32; letter-spacing: -0.005em; flex: 1; padding-right: 4px; }
+  .t-card__foot { padding-top: 12px; gap: 10px; }
+  .t-card__src-pills { display: flex; gap: 4px; }
+  .t-card__src-pills .sp { font-family: 'Roboto Mono', monospace; font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: 3px; color: var(--text-2); background: var(--surface-2); letter-spacing: 0.04em; line-height: 1.5; }
+  .t-card__src-pills .sp.x { background: var(--text); color: #fff; }
+  .t-card__src-pills .sp.rss { background: var(--orange); color: #fff; }
+  .t-card__src-pills .sp.gn { background: var(--blue); color: #fff; }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="brand">
+    <div class="brand__mark">P</div>
+    <div class="brand__text">
+      <h1>Patrika Engine</h1>
+      <p>Editorial Command</p>
+    </div>
+  </div>
+  <div class="masthead__tools">
+    <div class="live-tag"><span class="live-dot"></span><span>All sources live</span></div>
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+      <input type="text" placeholder="Search topics, people, sources…" />
+    </div>
+  </div>
+</header>
+
+<div class="ticker">
+  <div class="ticker__label">On the wire</div>
+  <div class="ticker__wrap">
+    <div class="ticker__items">
+      <span class="item"><b>@MumbaiPolice</b> flags Andheri subway flooding <time>2m</time></span>
+      <span class="item watchlist"><b>@elonmusk</b> "Excited about Tesla India launch in 2027" <time>4m</time></span>
+      <span class="item"><b>TOI</b> BMC pumps fail in 3 wards, schools shut tomorrow <time>8m</time></span>
+      <span class="item"><b>@RBI</b> Policy review tomorrow, repo cut likely <time>14m</time></span>
+      <span class="item"><b>NDTV</b> Ranveer Singh lands Spielberg-style epic <time>22m</time></span>
+      <span class="item"><b>Reuters</b> Modi addresses Jhansi rally, 50k crowd <time>31m</time></span>
+      <span class="item watchlist"><b>@nitin_gadkari</b> announces 12 new highway projects <time>38m</time></span>
+      <span class="item"><b>ANI</b> Heatwave warning issued for Delhi NCR <time>45m</time></span>
+      <span class="item"><b>@MumbaiPolice</b> flags Andheri subway flooding <time>2m</time></span>
+      <span class="item watchlist"><b>@elonmusk</b> "Excited about Tesla India launch in 2027" <time>4m</time></span>
+      <span class="item"><b>TOI</b> BMC pumps fail in 3 wards, schools shut tomorrow <time>8m</time></span>
+      <span class="item"><b>@RBI</b> Policy review tomorrow, repo cut likely <time>14m</time></span>
+      <span class="item"><b>NDTV</b> Ranveer Singh lands Spielberg-style epic <time>22m</time></span>
+      <span class="item"><b>Reuters</b> Modi addresses Jhansi rally, 50k crowd <time>31m</time></span>
+      <span class="item watchlist"><b>@nitin_gadkari</b> announces 12 new highway projects <time>38m</time></span>
+      <span class="item"><b>ANI</b> Heatwave warning issued for Delhi NCR <time>45m</time></span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="nav-section">
+      <ul class="nav">
+        <li class="active" data-view="dashboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </li>
+        <li data-view="suggestions">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v3M5.6 5.6l2.1 2.1M2 12h3M18.4 5.6l-2.1 2.1M9 16.5A5 5 0 1 1 15 16.5"/><path d="M10 21h4M10 18h4"/></svg>
+          Suggestions
+        </li>
+        <li data-view="drafts">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>
+          Drafts
+          <span class="badge">7</span>
+        </li>
+        <li data-view="sources">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5"/></svg>
+          Sources
+        </li>
+        <li data-view="style">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7V5h16v2M9 5v14M5 19h8"/><path d="m15 11 5 9M19 11l-4 9"/></svg>
+          Style module
+        </li>
+        <li data-view="watchlist">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          Watchlist
+          <span class="badge">42</span>
+        </li>
+        <li data-view="settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-4Z"/><path d="m9 12 2 2 4-4"/></svg>
+          Admin
+        </li>
+      </ul>
+    </div>
+
+    <div class="nav-section">
+      <h4>System</h4>
+      <ul class="status-list">
+        <li><span class="dot"></span> Twitter / X <span class="count">12</span></li>
+        <li><span class="dot"></span> RSS feeds <span class="count">47</span></li>
+        <li><span class="dot"></span> Google News <span class="count">live</span></li>
+        <li><span class="dot warn"></span> Google Trends <span class="count">phase 4</span></li>
+        <li><span class="dot"></span> Style module <span class="count">v2.4</span></li>
+        <li><span class="dot"></span> Image gen <span class="count">Imagen 3</span></li>
+      </ul>
+    </div>
+
+    <div class="nav-section">
+      <h4>Watchlist hits</h4>
+      <ul class="watchlist-mini">
+        <li class="watch-chip"><span class="who">@elonmusk</span><span>Tesla India</span><span class="badge-mini">NEW</span></li>
+        <li class="watch-chip"><span class="who">@nitin_gadkari</span><span>highways</span><span class="badge-mini">+2</span></li>
+        <li class="watch-chip"><span class="who">@RBI</span><span>repo cut</span><span class="badge-mini">+5</span></li>
+        <li class="watch-chip"><span class="who">Adani Group</span><span>press</span><span class="badge-mini">+1</span></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- ═══════ DASHBOARD ═══════ -->
+    <div class="view view--dashboard active">
+
+      <section class="section">
+        <div class="col-head">
+          <span class="col-head__label">Trending now</span>
+          <span class="col-head__meta">Live · <b>14 topics</b></span>
+        </div>
+
+        <div class="filter-bar" id="trendFilter">
+          <button class="chip active" data-filter="all">All <span class="count">14</span></button>
+          <button class="chip" data-filter="city">City <span class="count">2</span></button>
+          <button class="chip" data-filter="business">Business <span class="count">4</span></button>
+          <button class="chip" data-filter="sports">Sports <span class="count">2</span></button>
+          <button class="chip" data-filter="politics">Politics <span class="count">2</span></button>
+          <button class="chip" data-filter="weather">Weather <span class="count">1</span></button>
+          <button class="chip" data-filter="tech">Tech <span class="count">1</span></button>
+          <button class="chip" data-filter="enter">Entertainment <span class="count">1</span></button>
+          <button class="chip" data-filter="national">National <span class="count">1</span></button>
+        </div>
+
+        <div class="trend-grid">
+
+          <button class="t-card" data-section="city" data-id="1">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Maharashtra · City</div>
+              <div class="t-card__vel-inline">↑ 312%<span class="w">· 2h</span></div>
+            </div>
+            <h3 class="t-card__title">Mumbai monsoon hits early, civic systems strain</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp rss">RSS</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="business" data-id="2">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Business · Policy</div>
+              <div class="t-card__vel-inline">↑ 180%<span class="w">· 1h</span></div>
+            </div>
+            <h3 class="t-card__title">RBI signals repo rate cut in tomorrow's MPC review</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp rss">RSS</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="sports" data-id="3">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Sports · Cricket</div>
+              <div class="t-card__vel-inline">↑ 145%<span class="w">· 3h</span></div>
+            </div>
+            <h3 class="t-card__title">Mumbai Indians clinch sixth IPL crown over Chennai</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp rss">RSS</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="politics" data-id="4">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Politics · National</div>
+              <div class="t-card__vel-inline">↑ 98%<span class="w">· 4h</span></div>
+            </div>
+            <h3 class="t-card__title">Modi's Jhansi rally draws 50,000, focus on UP polls</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp rss">RSS</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="weather" data-id="5">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Weather · National</div>
+              <div class="t-card__vel-inline">↑ 64%<span class="w">· 6h</span></div>
+            </div>
+            <h3 class="t-card__title">Heatwave warning for Delhi NCR tomorrow, 46°C expected</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp rss">RSS</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="enter" data-id="6">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Entertainment · Bollywood</div>
+              <div class="t-card__vel-inline">↑ 52%<span class="w">· 5h</span></div>
+            </div>
+            <h3 class="t-card__title">Ranveer Singh lands Spielberg-style epic, report says</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="tech" data-id="7">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Tech · Auto</div>
+              <div class="t-card__vel-inline">↑ 47%<span class="w">· 30m</span></div>
+            </div>
+            <h3 class="t-card__title">Tesla India 2027 — Musk tease shifts auto stocks</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp rss">RSS</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="business" data-id="8">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Business · Tech</div>
+              <div class="t-card__vel-inline">↑ 38%<span class="w">· 4h</span></div>
+            </div>
+            <h3 class="t-card__title">Bengaluru tech layoffs: 1,200 jobs at three startups</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp rss">RSS</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="politics" data-id="9">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Politics · Karnataka</div>
+              <div class="t-card__vel-inline">↑ 34%<span class="w">· 8h</span></div>
+            </div>
+            <h3 class="t-card__title">Karnataka cabinet reshuffle: 4 new ministers sworn in</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp rss">RSS</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="sports" data-id="10">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Sports · WPL</div>
+              <div class="t-card__vel-inline">↑ 28%<span class="w">· 6h</span></div>
+            </div>
+            <h3 class="t-card__title">WPL 2026: 5 trade rumors before the window closes</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp rss">RSS</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="business" data-id="11">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Business · Markets</div>
+              <div class="t-card__vel-inline">↑ 24%<span class="w">· 2h</span></div>
+            </div>
+            <h3 class="t-card__title">Nifty closes at record 28,440, Bank Nifty hits all-time high</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp rss">RSS</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="city" data-id="12">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">City · Chennai</div>
+              <div class="t-card__vel-inline">↑ 22%<span class="w">· 12h</span></div>
+            </div>
+            <h3 class="t-card__title">Chennai water crisis worsens — Cauvery at 4-year low</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp rss">RSS</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="national" data-id="13">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">National · Exams</div>
+              <div class="t-card__vel-inline">↑ 18%<span class="w">· 10h</span></div>
+            </div>
+            <h3 class="t-card__title">UPSC Civil Services 2025 results — toppers list released</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp x">X</span><span class="sp rss">RSS</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+          <button class="t-card" data-section="business" data-id="14">
+            <div class="t-card__stripe"></div>
+            <div class="t-card__top">
+              <div class="t-card__tag">Business · Travel</div>
+              <div class="t-card__vel-inline">↑ 14%<span class="w">· 8h</span></div>
+            </div>
+            <h3 class="t-card__title">Air India hikes domestic fares 8% for summer season</h3>
+            <div class="t-card__foot">
+              <div class="t-card__src-pills"><span class="sp rss">RSS</span><span class="sp gn">GN</span></div>
+              <svg class="t-card__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+            </div>
+          </button>
+
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="col-head">
+          <span class="col-head__label">Draft queue</span>
+          <span class="col-head__meta"><b>3</b> awaiting review · <b>1</b> in progress · <b>3</b> approved today</span>
+        </div>
+        <div class="drafts-grid">
+          <article class="draft">
+            <span class="draft__status review">Awaiting review</span>
+            <h4 class="draft__title">Mumbai monsoon hits early, civic systems strain</h4>
+            <div class="draft__meta"><span><b>Engine</b> v2.4</span><span><b>620</b> w</span><span><b>78%</b></span></div>
+            <div class="draft__progress"><span style="width: 78%;"></span></div>
+          </article>
+          <article class="draft">
+            <span class="draft__status review">Awaiting approval</span>
+            <h4 class="draft__title">RBI MPC: what to watch tomorrow</h4>
+            <div class="draft__meta"><span><b>Vikram</b></span><span><b>480</b> w</span><span><b>92%</b></span></div>
+            <div class="draft__progress"><span style="width: 92%;"></span></div>
+          </article>
+          <article class="draft">
+            <span class="draft__status approved">Approved · 16:00</span>
+            <h4 class="draft__title">Modi rally recap: Jhansi crowd, UP poll signals</h4>
+            <div class="draft__meta"><span><b>Anita K.</b></span><span><b>540</b> w</span><span><b>96%</b></span></div>
+            <div class="draft__progress"><span style="width: 100%;"></span></div>
+          </article>
+          <article class="draft">
+            <span class="draft__status in-prog">Generating</span>
+            <h4 class="draft__title">Post-match: MI's bowling masterclass</h4>
+            <div class="draft__meta"><span><b>Engine</b> v2.4</span><span><b>700</b> tgt</span><span><b>~45s</b></span></div>
+            <div class="draft__progress indet"><span></span></div>
+          </article>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ═══════ SUGGESTIONS ═══════ -->
+    <div class="view view--suggestions">
+      <div class="page-head">
+        <div>
+          <h2>Editorial Suggestions</h2>
+          <div class="page-head__sub">11 fresh suggestions · grouped by type</div>
+        </div>
+      </div>
+
+      <h4 class="group-head">Watchlist hits <span class="count">2</span></h4>
+      <div class="sugg-grid">
+        <div class="sugg-card">
+          <div class="sugg-card__type watch">Tech / Auto · @elonmusk</div>
+          <h4 class="sugg-card__title">Musk teases Tesla India for 2027 — what changed?</h4>
+          <p class="sugg-card__why">Posted 4m ago. 8.1k retweets in 12 min. Tesla India has been on/off since 2021.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~20m · 400w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+        <div class="sugg-card">
+          <div class="sugg-card__type watch">Politics · @nitin_gadkari</div>
+          <h4 class="sugg-card__title">Gadkari announces 12 new highway projects worth ₹2.4 lakh cr</h4>
+          <p class="sugg-card__why">Press conference 38m ago. State-wise breakdown attached. UP and MH biggest beneficiaries.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~35m · 550w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+      </div>
+
+      <h4 class="group-head">Companion pieces <span class="count">3</span></h4>
+      <div class="sugg-grid">
+        <div class="sugg-card">
+          <div class="sugg-card__type">Maharashtra · for trending #1</div>
+          <h4 class="sugg-card__title">Why Mumbai's pumps fail every June</h4>
+          <p class="sugg-card__why">Companion to lead trending. Public anger spike on civic infrastructure.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~45m · 620w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+        <div class="sugg-card">
+          <div class="sugg-card__type">Investigation · for trending #1</div>
+          <h4 class="sugg-card__title">Inside the BMC's ₹430cr pump tender — a 6-month follow-up</h4>
+          <p class="sugg-card__why">Earlier reporting in our archive (Aug 2025). Worth revisiting given the failures today.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~90m · 900w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+        <div class="sugg-card">
+          <div class="sugg-card__type">Politics · for trending #9</div>
+          <h4 class="sugg-card__title">Karnataka cabinet reshuffle: the new equations</h4>
+          <p class="sugg-card__why">Power dynamics after 4 swaps. Backstory on each new minister's constituency.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~50m · 700w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+      </div>
+
+      <h4 class="group-head">Service pieces <span class="count">2</span></h4>
+      <div class="sugg-grid">
+        <div class="sugg-card">
+          <div class="sugg-card__type">Business · for trending #2</div>
+          <h4 class="sugg-card__title">What a repo rate cut means for your home loan</h4>
+          <p class="sugg-card__why">RBI MPC tomorrow. Reader interest 3.8x normal pre-decision.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~30m · 500w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+        <div class="sugg-card">
+          <div class="sugg-card__type">Weather · for trending #5</div>
+          <h4 class="sugg-card__title">Delhi heatwave: helplines, advisories, and what to do</h4>
+          <p class="sugg-card__why">46°C tomorrow. Push notification candidate. Compile relief shelter list.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~25m · 400w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+      </div>
+
+      <h4 class="group-head">Story gaps <span class="count">4</span></h4>
+      <div class="sugg-grid">
+        <div class="sugg-card">
+          <div class="sugg-card__type">Sports · gap analysis</div>
+          <h4 class="sugg-card__title">MI's spin trio — the unsung story of this IPL</h4>
+          <p class="sugg-card__why">Post-match coverage dominated by Rohit. Spinner economy data is under-told.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~40m · 700w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+        <div class="sugg-card">
+          <div class="sugg-card__type">Business · gap analysis</div>
+          <h4 class="sugg-card__title">Nifty record close: who benefits, who's exposed?</h4>
+          <p class="sugg-card__why">Sector rotation angle missing from headlines. Retail vs FII flows.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~45m · 650w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+        <div class="sugg-card">
+          <div class="sugg-card__type">Sports · gap analysis</div>
+          <h4 class="sugg-card__title">WPL trade window: 5 names to watch before close</h4>
+          <p class="sugg-card__why">No mainstream preview yet. Original take possible from our archive sources.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~35m · 500w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+        <div class="sugg-card">
+          <div class="sugg-card__type">Travel · gap analysis</div>
+          <h4 class="sugg-card__title">Air India price hike: route-wise impact for travelers</h4>
+          <p class="sugg-card__why">Headlines are 8% averaged. Real impact varies wildly by route.</p>
+          <div class="sugg-card__foot">
+            <span class="sugg-card__meta">~30m · 450w</span>
+            <button class="sugg-card__cta">Generate</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ DRAFTS ═══════ -->
+    <div class="view view--drafts">
+      <div class="page-head">
+        <div>
+          <h2>Drafts</h2>
+          <div class="page-head__sub">8 drafts · 3 awaiting review · 1 generating · last activity 14m ago</div>
+        </div>
+        <div class="page-head__actions">
+          <button class="ab ab--red">+ New draft</button>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <button class="chip active">All <span class="count">8</span></button>
+        <button class="chip">Awaiting review <span class="count">3</span></button>
+        <button class="chip">Awaiting approval <span class="count">1</span></button>
+        <button class="chip">In progress <span class="count">2</span></button>
+        <button class="chip">Approved <span class="count">2</span></button>
+      </div>
+
+      <div class="drafts-grid">
+        <article class="draft">
+          <span class="draft__status review">Awaiting review</span>
+          <h4 class="draft__title">Mumbai monsoon hits early, civic systems strain</h4>
+          <div class="draft__meta"><span><b>Engine</b> v2.4</span><span><b>620</b> w</span><span><b>78%</b> match</span></div>
+          <div class="draft__progress"><span style="width: 78%;"></span></div>
+        </article>
+        <article class="draft">
+          <span class="draft__status review">Awaiting approval</span>
+          <h4 class="draft__title">RBI MPC: what to watch tomorrow</h4>
+          <div class="draft__meta"><span><b>Vikram</b></span><span><b>480</b> w</span><span><b>92%</b></span></div>
+          <div class="draft__progress"><span style="width: 92%;"></span></div>
+        </article>
+        <article class="draft">
+          <span class="draft__status approved">Approved · 16:00</span>
+          <h4 class="draft__title">Modi rally recap: Jhansi crowd, UP poll signals</h4>
+          <div class="draft__meta"><span><b>Anita K.</b></span><span><b>540</b> w</span><span><b>96%</b></span></div>
+          <div class="draft__progress"><span style="width: 100%;"></span></div>
+        </article>
+        <article class="draft">
+          <span class="draft__status in-prog">Generating</span>
+          <h4 class="draft__title">Post-match: MI's bowling masterclass</h4>
+          <div class="draft__meta"><span><b>Engine</b> v2.4</span><span><b>700</b> tgt</span><span><b>~45s</b></span></div>
+          <div class="draft__progress indet"><span></span></div>
+        </article>
+        <article class="draft">
+          <span class="draft__status review">Awaiting review</span>
+          <h4 class="draft__title">Delhi heatwave advisory and helplines</h4>
+          <div class="draft__meta"><span><b>Anita K.</b></span><span><b>320</b> w</span><span><b>88%</b></span></div>
+          <div class="draft__progress"><span style="width: 88%;"></span></div>
+        </article>
+        <article class="draft">
+          <span class="draft__status review">Awaiting review</span>
+          <h4 class="draft__title">Nifty record close — sector rotation explainer</h4>
+          <div class="draft__meta"><span><b>Engine</b> v2.4</span><span><b>540</b> w</span><span><b>85%</b></span></div>
+          <div class="draft__progress"><span style="width: 85%;"></span></div>
+        </article>
+        <article class="draft">
+          <span class="draft__status in-prog">Drafting</span>
+          <h4 class="draft__title">UPSC results 2025 — toppers and trends</h4>
+          <div class="draft__meta"><span><b>Vikram</b></span><span><b>520</b> w</span><span><b>—</b></span></div>
+          <div class="draft__progress"><span style="width: 65%;"></span></div>
+        </article>
+        <article class="draft">
+          <span class="draft__status approved">Approved · 18:30</span>
+          <h4 class="draft__title">Tesla India 2027 — policy and tariff context</h4>
+          <div class="draft__meta"><span><b>Engine</b> v2.4</span><span><b>410</b> w</span><span><b>81%</b></span></div>
+          <div class="draft__progress"><span style="width: 100%;"></span></div>
+        </article>
+      </div>
+    </div>
+
+    <!-- ═══════ SOURCES ═══════ -->
+    <div class="view view--sources">
+      <div class="page-head">
+        <div>
+          <h2>Sources</h2>
+          <div class="page-head__sub">60 sources · 47 RSS · 12 Twitter · 1 Google News · last sync 1m ago</div>
+        </div>
+        <div class="page-head__actions">
+          <button class="ab ab--ghost">Sync all</button>
+          <button class="ab ab--red">+ Add source</button>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <button class="chip active">All <span class="count">60</span></button>
+        <button class="chip">Twitter / X <span class="count">12</span></button>
+        <button class="chip">RSS <span class="count">47</span></button>
+        <button class="chip">Google News <span class="count">1</span></button>
+        <button class="chip">Paused <span class="count">2</span></button>
+      </div>
+
+      <div class="dt">
+        <div class="row row--head row--sources">
+          <div></div><div>Source</div><div>Type</div><div>Handle / URL</div><div>Status</div><div>Last sync</div><div>24h signals</div><div></div>
+        </div>
+
+        <div class="row row--sources">
+          <div class="av rss">RSS</div>
+          <div><div class="topic">Times of India</div><div class="sub-cell">Lead RSS source · since 2024</div></div>
+          <div class="mono">RSS</div>
+          <div class="mono">feeds.timesofindia.com/news</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">2m ago</div>
+          <div class="mono">247</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av rss">RSS</div>
+          <div><div class="topic">NDTV</div><div class="sub-cell">National news</div></div>
+          <div class="mono">RSS</div>
+          <div class="mono">feeds.ndtv.com/national</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">1m ago</div>
+          <div class="mono">189</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av rss">RSS</div>
+          <div><div class="topic">Hindustan Times</div><div class="sub-cell">National + Hindi belt</div></div>
+          <div class="mono">RSS</div>
+          <div class="mono">feeds.hindustantimes.com</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">3m ago</div>
+          <div class="mono">156</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av rss">RSS</div>
+          <div><div class="topic">Economic Times</div><div class="sub-cell">Business · markets</div></div>
+          <div class="mono">RSS</div>
+          <div class="mono">economictimes.indiatimes.com</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">2m ago</div>
+          <div class="mono">124</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av rss">RSS</div>
+          <div><div class="topic">Mint</div><div class="sub-cell">Business</div></div>
+          <div class="mono">RSS</div>
+          <div class="mono">livemint.com/rss/news</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">4m ago</div>
+          <div class="mono">67</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av rss">RSS</div>
+          <div><div class="topic">ESPN Cricinfo</div><div class="sub-cell">Sports · cricket</div></div>
+          <div class="mono">RSS</div>
+          <div class="mono">espncricinfo.com/rss</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">1m ago</div>
+          <div class="mono">38</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av x">X</div>
+          <div><div class="topic">@MumbaiPolice</div><div class="sub-cell">Verified · 8.4M followers</div></div>
+          <div class="mono">Twitter</div>
+          <div class="mono">@MumbaiPolice</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">12m ago</div>
+          <div class="mono">8</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av x">X</div>
+          <div><div class="topic">@RBI</div><div class="sub-cell">Reserve Bank of India · official</div></div>
+          <div class="mono">Twitter</div>
+          <div class="mono">@RBI</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">14m ago</div>
+          <div class="mono">5</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av x">X</div>
+          <div><div class="topic">@ndtv</div><div class="sub-cell">NDTV official</div></div>
+          <div class="mono">Twitter</div>
+          <div class="mono">@ndtv</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">2m ago</div>
+          <div class="mono">89</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av x">X</div>
+          <div><div class="topic">@PIB_India</div><div class="sub-cell">Press Information Bureau</div></div>
+          <div class="mono">Twitter</div>
+          <div class="mono">@PIB_India</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">8m ago</div>
+          <div class="mono">34</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av gn">GN</div>
+          <div><div class="topic">Google News — India</div><div class="sub-cell">Top stories aggregator</div></div>
+          <div class="mono">Google News</div>
+          <div class="mono">news.google.com/topstories?gl=IN</div>
+          <div><span class="stchip live">Live</span></div>
+          <div class="mono">4m ago</div>
+          <div class="mono">312</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--sources">
+          <div class="av rss">RSS</div>
+          <div><div class="topic">Aaj Tak (Hindi)</div><div class="sub-cell">Auth refresh required</div></div>
+          <div class="mono">RSS</div>
+          <div class="mono">aajtak.intoday.in/rss</div>
+          <div><span class="stchip paused">Paused</span></div>
+          <div class="mono">3d ago</div>
+          <div class="mono">0</div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ STYLE MODULE ═══════ -->
+    <div class="view view--style">
+      <div class="page-head">
+        <div>
+          <h2>Style Module</h2>
+          <div class="page-head__sub">AI training · v2.4 · 3,247 articles indexed · 87% avg style match · last train 12 days ago</div>
+        </div>
+        <div class="page-head__actions">
+          <button class="ab ab--ghost">View training log</button>
+          <button class="ab ab--red">Retrain model</button>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom: 16px;">
+        <div class="stat-tile"><b>3,247</b><span>Articles indexed</span></div>
+        <div class="stat-tile"><b>87%</b><span>Avg style match</span></div>
+        <div class="stat-tile"><b>18</b><span>Desks covered</span></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <h3>Style guides</h3>
+          <div class="panel__sub">Reference documents the model treats as authoritative.</div>
+          <div class="file-row">
+            <div class="file-icon">PDF</div>
+            <div>
+              <div class="file-name">Patrika Editorial Manual 2024</div>
+              <div class="file-meta">142 pages · uploaded 10 Dec 2024</div>
+            </div>
+            <div class="file-act"><button class="ab ab--ghost">Replace</button></div>
+          </div>
+          <div class="file-row">
+            <div class="file-icon">PDF</div>
+            <div>
+              <div class="file-name">Hindi style guide</div>
+              <div class="file-meta">87 pages · uploaded 2 Jan 2025</div>
+            </div>
+            <div class="file-act"><button class="ab ab--ghost">Replace</button></div>
+          </div>
+          <div class="file-row">
+            <div class="file-icon">PDF</div>
+            <div>
+              <div class="file-name">Headlines bible</div>
+              <div class="file-meta">32 pages · uploaded 14 Feb 2025</div>
+            </div>
+            <div class="file-act"><button class="ab ab--ghost">Replace</button></div>
+          </div>
+          <div class="file-row">
+            <div class="file-icon">DOC</div>
+            <div>
+              <div class="file-name">Banned phrases &amp; bias guide</div>
+              <div class="file-meta">12 pages · uploaded 3 Mar 2026</div>
+            </div>
+            <div class="file-act"><button class="ab ab--ghost">Replace</button></div>
+          </div>
+          <div style="margin-top: 16px;">
+            <button class="ab ab--ghost">+ Upload guide</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Voice tuning</h3>
+          <div class="panel__sub">Calibrate how closely generated drafts hew to Patrika's house voice.</div>
+          <div class="slider-row">
+            <div class="slider-row__top"><span class="slider-row__label">Formality</span><span class="slider-row__val">70</span></div>
+            <div class="slider"><div class="track" style="width: 70%;"></div><div class="handle" style="left: 70%;"></div></div>
+          </div>
+          <div class="slider-row">
+            <div class="slider-row__top"><span class="slider-row__label">Local language flavor</span><span class="slider-row__val">60</span></div>
+            <div class="slider"><div class="track" style="width: 60%;"></div><div class="handle" style="left: 60%;"></div></div>
+          </div>
+          <div class="slider-row">
+            <div class="slider-row__top"><span class="slider-row__label">Quote density</span><span class="slider-row__val">75</span></div>
+            <div class="slider"><div class="track" style="width: 75%;"></div><div class="handle" style="left: 75%;"></div></div>
+          </div>
+          <div class="slider-row">
+            <div class="slider-row__top"><span class="slider-row__label">Dateline strictness</span><span class="slider-row__val">100</span></div>
+            <div class="slider"><div class="track" style="width: 100%;"></div><div class="handle" style="left: 100%;"></div></div>
+          </div>
+          <div class="slider-row">
+            <div class="slider-row__top"><span class="slider-row__label">Editorial punch</span><span class="slider-row__val">55</span></div>
+            <div class="slider"><div class="track" style="width: 55%;"></div><div class="handle" style="left: 55%;"></div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Indexed articles</h3>
+          <div class="panel__sub">RAG corpus the model retrieves from.</div>
+          <div class="panel__row"><div><div class="label">Maharashtra desk</div><div class="sub">latest index 12h ago</div></div><div class="val">412</div></div>
+          <div class="panel__row"><div><div class="label">Business desk</div><div class="sub">latest index 12h ago</div></div><div class="val">387</div></div>
+          <div class="panel__row"><div><div class="label">National politics</div><div class="sub">latest index 12h ago</div></div><div class="val">354</div></div>
+          <div class="panel__row"><div><div class="label">Sports desk</div><div class="sub">latest index 12h ago</div></div><div class="val">298</div></div>
+          <div class="panel__row"><div><div class="label">Entertainment</div><div class="sub">latest index 12h ago</div></div><div class="val">241</div></div>
+          <div class="panel__row"><div><div class="label">15 more desks</div><div class="sub">summed</div></div><div class="val">1,555</div></div>
+        </div>
+
+        <div class="panel">
+          <h3>Test generation</h3>
+          <div class="panel__sub">Run a prompt through the current model. Compare with archive samples.</div>
+          <textarea class="input" placeholder="Type a topic: e.g. 'monsoon flooding in Mumbai's Andheri area'">monsoon flooding in Mumbai's Andheri area</textarea>
+          <div style="display:flex; gap:8px; margin: 12px 0;">
+            <button class="ab ab--red">Generate</button>
+            <button class="ab ab--ghost">Compare vs archive</button>
+          </div>
+          <div class="sample-box">
+            <div class="lede">Sample output · style match 84%</div>
+            MUMBAI: Heavy pre-monsoon showers brought parts of Andheri's commuter belt to a standstill on Monday, with stormwater drains overwhelmed within two hours of the downpour. By afternoon, the Andheri subway had four feet of standing water, and Mumbai Police asked motorists to use the SV Road alternative.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ WATCHLIST ═══════ -->
+    <div class="view view--watchlist">
+      <div class="page-head">
+        <div>
+          <h2>Watchlist</h2>
+          <div class="page-head__sub">42 people, brands &amp; organizations · 312 hits in 30 days · 8 hits today</div>
+        </div>
+        <div class="page-head__actions">
+          <button class="ab ab--ghost">Import CSV</button>
+          <button class="ab ab--red">+ Add to watchlist</button>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <button class="chip active">All <span class="count">42</span></button>
+        <button class="chip">Persons <span class="count">24</span></button>
+        <button class="chip">Organizations <span class="count">11</span></button>
+        <button class="chip">Brands <span class="count">7</span></button>
+      </div>
+
+      <div class="dt">
+        <div class="row row--head row--watchlist">
+          <div></div><div>Name</div><div>Type</div><div>Handles</div><div>Hits / 30d</div><div>Last hit</div><div>Alerts</div><div></div>
+        </div>
+
+        <div class="row row--watchlist">
+          <div class="av person">EM</div>
+          <div><div class="topic">Elon Musk</div><div class="sub-cell">Tesla, X · global tech</div></div>
+          <div class="mono">Person</div>
+          <div class="mono">@elonmusk, @teslaowners</div>
+          <div class="mono">142</div>
+          <div class="mono">4m ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av person">NM</div>
+          <div><div class="topic">Narendra Modi</div><div class="sub-cell">PM India · @PMOIndia mirror</div></div>
+          <div class="mono">Person</div>
+          <div class="mono">@narendramodi, @PMOIndia</div>
+          <div class="mono">312</div>
+          <div class="mono">31m ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av org">RB</div>
+          <div><div class="topic">RBI</div><div class="sub-cell">Reserve Bank of India</div></div>
+          <div class="mono">Organization</div>
+          <div class="mono">@RBI, rbi.org.in</div>
+          <div class="mono">89</div>
+          <div class="mono">14m ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av person">NG</div>
+          <div><div class="topic">Nitin Gadkari</div><div class="sub-cell">Union Minister · highways</div></div>
+          <div class="mono">Person</div>
+          <div class="mono">@nitin_gadkari</div>
+          <div class="mono">67</div>
+          <div class="mono">38m ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av person">GA</div>
+          <div><div class="topic">Gautam Adani</div><div class="sub-cell">Adani Group chairman</div></div>
+          <div class="mono">Person</div>
+          <div class="mono">@gautam_adani, Adani PR</div>
+          <div class="mono">47</div>
+          <div class="mono">2h ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av person">MA</div>
+          <div><div class="topic">Mukesh Ambani</div><div class="sub-cell">Reliance · via comms team</div></div>
+          <div class="mono">Person</div>
+          <div class="mono">Reliance PR feed</div>
+          <div class="mono">38</div>
+          <div class="mono">4h ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av person">VK</div>
+          <div><div class="topic">Virat Kohli</div><div class="sub-cell">Cricketer · RCB</div></div>
+          <div class="mono">Person</div>
+          <div class="mono">@imVkohli</div>
+          <div class="mono">142</div>
+          <div class="mono">6h ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av person">RS</div>
+          <div><div class="topic">Rohit Sharma</div><div class="sub-cell">Captain · Mumbai Indians</div></div>
+          <div class="mono">Person</div>
+          <div class="mono">@ImRo45</div>
+          <div class="mono">89</div>
+          <div class="mono">3h ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av brand">TT</div>
+          <div><div class="topic">TATA Group</div><div class="sub-cell">All subsidiaries</div></div>
+          <div class="mono">Brand</div>
+          <div class="mono">@TataCompanies, PR feed</div>
+          <div class="mono">28</div>
+          <div class="mono">1d ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av org">SE</div>
+          <div><div class="topic">SEBI</div><div class="sub-cell">Securities and Exchange Board</div></div>
+          <div class="mono">Organization</div>
+          <div class="mono">@SEBI_India</div>
+          <div class="mono">21</div>
+          <div class="mono">2d ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av brand">OE</div>
+          <div><div class="topic">Ola Electric</div><div class="sub-cell">EV scooters · S1 line</div></div>
+          <div class="mono">Brand</div>
+          <div class="mono">@OlaElectric</div>
+          <div class="mono">18</div>
+          <div class="mono">5h ago</div>
+          <div><span class="stchip paused">Quiet</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+        <div class="row row--watchlist">
+          <div class="av person">SP</div>
+          <div><div class="topic">Sundar Pichai</div><div class="sub-cell">Alphabet · Google India angle</div></div>
+          <div class="mono">Person</div>
+          <div class="mono">@sundarpichai</div>
+          <div class="mono">12</div>
+          <div class="mono">1w ago</div>
+          <div><span class="stchip live">On</span></div>
+          <div><button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ ADMIN ═══════ -->
+    <div class="view view--settings">
+      <div class="page-head">
+        <div>
+          <h2>Admin</h2>
+          <div class="page-head__sub">API keys, users, AI usage &amp; cost, Telegram bot</div>
+        </div>
+      </div>
+
+      <div class="stabs">
+        <button class="stab active" data-tab="keys">API Keys</button>
+        <button class="stab" data-tab="users">Users</button>
+        <button class="stab" data-tab="usage">AI Usage &amp; Cost</button>
+        <button class="stab" data-tab="telegram">Telegram Bot</button>
+      </div>
+
+      <!-- ── API KEYS ── -->
+      <div class="panel active" data-tab="keys">
+        <div class="panel__head">
+          <div>
+            <h3>API Keys</h3>
+            <div class="panel__sub">All third-party credentials in one place. Keys are encrypted at rest.</div>
+          </div>
+          <button class="ab ab--red">+ Add API key</button>
+        </div>
+        <div class="key-list">
+          <div class="key-row">
+            <div class="key-icon anthropic">A</div>
+            <div><div class="key-name">Anthropic Claude</div><div class="key-sub">Drafting engine · sonnet 4.6, opus 4.7</div></div>
+            <div class="key-val">sk-ant-api03-•••••8f2x</div>
+            <span class="stchip live">Active</span>
+            <div class="key-date">12 Dec 2024</div>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="key-row">
+            <div class="key-icon google">G</div>
+            <div><div class="key-name">Google Gemini</div><div class="key-sub">Backup drafting · flash 2.0</div></div>
+            <div class="key-val">AIzaSy•••••••7k4Q</div>
+            <span class="stchip live">Active</span>
+            <div class="key-date">12 Dec 2024</div>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="key-row">
+            <div class="key-icon imagen">I</div>
+            <div><div class="key-name">Google Imagen 3</div><div class="key-sub">Image generation</div></div>
+            <div class="key-val">AIzaSy•••••••2pX9</div>
+            <span class="stchip live">Active</span>
+            <div class="key-date">12 Dec 2024</div>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="key-row">
+            <div class="key-icon x">X</div>
+            <div><div class="key-name">Twitter / X API</div><div class="key-sub">Source ingestion · v2 bearer</div></div>
+            <div class="key-val">Bearer •••••••AAEm5J</div>
+            <span class="stchip live">Active</span>
+            <div class="key-date">14 Jan 2025</div>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="key-row">
+            <div class="key-icon google">N</div>
+            <div><div class="key-name">Google News API</div><div class="key-sub">Source · top stories India</div></div>
+            <div class="key-val">AIzaSy•••••••9mZ2</div>
+            <span class="stchip live">Active</span>
+            <div class="key-date">12 Dec 2024</div>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="key-row">
+            <div class="key-icon telegram">T</div>
+            <div><div class="key-name">Telegram Bot Token</div><div class="key-sub">@patrika_engine_bot · BotFather</div></div>
+            <div class="key-val">8284:•••••••3f7x</div>
+            <span class="stchip live">Active</span>
+            <div class="key-date">22 Mar 2025</div>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="key-row">
+            <div class="key-icon wp">W</div>
+            <div><div class="key-name">WordPress CMS</div><div class="key-sub">Publishing target · patrika.com</div></div>
+            <div class="key-val">app:•••••••L9pQ</div>
+            <span class="stchip live">Active</span>
+            <div class="key-date">04 Feb 2025</div>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="key-row">
+            <div class="key-icon off">O</div>
+            <div><div class="key-name">OpenAI</div><div class="key-sub">Not configured · click to set up</div></div>
+            <div class="key-val" style="color: var(--text-3);">not set</div>
+            <span class="stchip paused">Off</span>
+            <div class="key-date">—</div>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── USERS ── -->
+      <div class="panel" data-tab="users">
+        <div class="panel__head">
+          <div>
+            <h3>Users</h3>
+            <div class="panel__sub">8 users in Mumbai bureau · 6 with Telegram alerts enabled · 2 seats available</div>
+          </div>
+          <button class="ab ab--red">+ Add user</button>
+        </div>
+        <div class="user-list">
+          <div class="user-row">
+            <div class="av person">VS</div>
+            <div><div class="user-name">Vikram Singh</div><div class="user-sub">vikram@patrika.com</div></div>
+            <div class="mono">Desk Head</div>
+            <div><div class="tg-handle">@vikram_p</div><div class="tg-chat">chat 5872934</div></div>
+            <span class="stchip live">Active</span>
+            <button class="mini-btn">Send test</button>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="user-row">
+            <div class="av person">AK</div>
+            <div><div class="user-name">Anita Kapoor</div><div class="user-sub">anita@patrika.com</div></div>
+            <div class="mono">Reporter</div>
+            <div><div class="tg-handle">@anita_k</div><div class="tg-chat">chat 4738291</div></div>
+            <span class="stchip live">Active</span>
+            <button class="mini-btn">Send test</button>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="user-row">
+            <div class="av person">SR</div>
+            <div><div class="user-name">Sanjay R.</div><div class="user-sub">sanjay@patrika.com</div></div>
+            <div class="mono">Sub-editor</div>
+            <div><div class="tg-handle">@sanjay_r</div><div class="tg-chat">chat 6182746</div></div>
+            <span class="stchip live">Active</span>
+            <button class="mini-btn">Send test</button>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="user-row">
+            <div class="av person">PM</div>
+            <div><div class="user-name">Priya Mehta</div><div class="user-sub">priya@patrika.com</div></div>
+            <div class="mono">Politics desk</div>
+            <div><div class="tg-handle">@priya_m</div><div class="tg-chat">chat 8273645</div></div>
+            <span class="stchip live">Active</span>
+            <button class="mini-btn">Send test</button>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="user-row">
+            <div class="av person">RD</div>
+            <div><div class="user-name">Rahul Desai</div><div class="user-sub">rahul@patrika.com</div></div>
+            <div class="mono">Sports desk</div>
+            <div><div class="tg-handle">@rahuld</div><div class="tg-chat">chat 9384726</div></div>
+            <span class="stchip live">Active</span>
+            <button class="mini-btn">Send test</button>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="user-row">
+            <div class="av person">AK</div>
+            <div><div class="user-name">Arjun Khanna</div><div class="user-sub">arjun@patrika.com</div></div>
+            <div class="mono">Photo desk</div>
+            <div><div class="tg-handle">@arjun_k</div><div class="tg-chat">chat 7263849</div></div>
+            <span class="stchip live">Active</span>
+            <button class="mini-btn">Send test</button>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="user-row">
+            <div class="av person">SJ</div>
+            <div><div class="user-name">Sneha Joshi</div><div class="user-sub">sneha@patrika.com</div></div>
+            <div class="mono">Sub-editor</div>
+            <div><div class="tg-none">not linked</div></div>
+            <span class="stchip warn">No TG</span>
+            <button class="mini-btn">Connect</button>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+          <div class="user-row">
+            <div class="av person">MI</div>
+            <div><div class="user-name">Meera Iyer</div><div class="user-sub">meera@patrika.com</div></div>
+            <div class="mono">Business desk</div>
+            <div><div class="tg-none">not linked</div></div>
+            <span class="stchip warn">No TG</span>
+            <button class="mini-btn">Connect</button>
+            <button class="row-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── AI USAGE ── -->
+      <div class="panel" data-tab="usage">
+        <div class="panel__head">
+          <div>
+            <h3>AI Usage &amp; Cost</h3>
+            <div class="panel__sub">May 2026 · 18 days in · enterprise plan · invoices billed monthly</div>
+          </div>
+          <button class="ab ab--ghost">Download CSV</button>
+        </div>
+
+        <div class="grid-3" style="margin-bottom: 8px;">
+          <div class="stat-tile"><b>$284.30</b><span>Used this month</span></div>
+          <div class="stat-tile"><b>$432</b><span>Projected monthly</span></div>
+          <div class="stat-tile"><b>14.2M</b><span>Tokens · all providers</span></div>
+        </div>
+
+        <div class="subhead">Spend by provider</div>
+        <div class="bars">
+          <div class="bar">
+            <div class="bar__label">Anthropic Claude 4.6</div>
+            <div class="bar__track"><div class="bar__fill purple" style="width: 66%;"></div></div>
+            <div class="bar__val">$189.40</div>
+            <div class="bar__pct">66%</div>
+          </div>
+          <div class="bar">
+            <div class="bar__label">Google Imagen 3</div>
+            <div class="bar__track"><div class="bar__fill" style="width: 17%;"></div></div>
+            <div class="bar__val">$48.20</div>
+            <div class="bar__pct">17%</div>
+          </div>
+          <div class="bar">
+            <div class="bar__label">Google Gemini 2.0</div>
+            <div class="bar__track"><div class="bar__fill blue" style="width: 15%;"></div></div>
+            <div class="bar__val">$42.10</div>
+            <div class="bar__pct">15%</div>
+          </div>
+          <div class="bar">
+            <div class="bar__label">Embeddings (RAG)</div>
+            <div class="bar__track"><div class="bar__fill green" style="width: 2%;"></div></div>
+            <div class="bar__val">$4.60</div>
+            <div class="bar__pct">2%</div>
+          </div>
+          <div class="bar">
+            <div class="bar__label">OpenAI</div>
+            <div class="bar__track"><div class="bar__fill" style="width: 0%; background: var(--border-2);"></div></div>
+            <div class="bar__val">$0.00</div>
+            <div class="bar__pct">—</div>
+          </div>
+        </div>
+
+        <div class="subhead">Spend by feature</div>
+        <div class="bars">
+          <div class="bar">
+            <div class="bar__label">Article drafting</div>
+            <div class="bar__track"><div class="bar__fill" style="width: 61%;"></div></div>
+            <div class="bar__val">$172.60</div>
+            <div class="bar__pct">61%</div>
+          </div>
+          <div class="bar">
+            <div class="bar__label">Image generation</div>
+            <div class="bar__track"><div class="bar__fill purple" style="width: 17%;"></div></div>
+            <div class="bar__val">$48.20</div>
+            <div class="bar__pct">17%</div>
+          </div>
+          <div class="bar">
+            <div class="bar__label">Style RAG retrieval</div>
+            <div class="bar__track"><div class="bar__fill blue" style="width: 12%;"></div></div>
+            <div class="bar__val">$34.10</div>
+            <div class="bar__pct">12%</div>
+          </div>
+          <div class="bar">
+            <div class="bar__label">Source analysis</div>
+            <div class="bar__track"><div class="bar__fill orange" style="width: 8%;"></div></div>
+            <div class="bar__val">$23.80</div>
+            <div class="bar__pct">8%</div>
+          </div>
+          <div class="bar">
+            <div class="bar__label">Suggestions engine</div>
+            <div class="bar__track"><div class="bar__fill amber" style="width: 2%;"></div></div>
+            <div class="bar__val">$5.60</div>
+            <div class="bar__pct">2%</div>
+          </div>
+        </div>
+
+        <div class="subhead">Token detail (this month)</div>
+        <div class="panel__row"><div><div class="label">Anthropic input tokens</div></div><div class="val">8.42M</div></div>
+        <div class="panel__row"><div><div class="label">Anthropic output tokens</div></div><div class="val">2.14M</div></div>
+        <div class="panel__row"><div><div class="label">Gemini input tokens</div></div><div class="val">4.18M</div></div>
+        <div class="panel__row"><div><div class="label">Gemini output tokens</div></div><div class="val">0.82M</div></div>
+        <div class="panel__row"><div><div class="label">Imagen 3 generations</div></div><div class="val">487 images</div></div>
+        <div class="panel__row"><div><div class="label">Embedding calls</div></div><div class="val">23,418</div></div>
+      </div>
+
+      <!-- ── TELEGRAM BOT ── -->
+      <div class="panel" data-tab="telegram">
+        <div class="panel__head">
+          <div>
+            <h3>Telegram Bot</h3>
+            <div class="panel__sub">Send alerts and digests to the team via <b>@patrika_engine_bot</b></div>
+          </div>
+          <span class="stchip live">Connected</span>
+        </div>
+
+        <div class="grid-3" style="margin-bottom: 24px;">
+          <div class="stat-tile"><b>6</b><span>Linked users</span></div>
+          <div class="stat-tile"><b>47</b><span>Messages · 24h</span></div>
+          <div class="stat-tile"><b>312</b><span>Messages · 30d</span></div>
+        </div>
+
+        <div class="subhead">Bot configuration</div>
+        <div class="panel__row"><div><div class="label">Bot username</div><div class="sub">Tap to open in Telegram</div></div><div class="val">@patrika_engine_bot</div></div>
+        <div class="panel__row"><div><div class="label">Bot token</div><div class="sub">From BotFather · stored encrypted</div></div><div class="val">8284:•••••••3f7x</div></div>
+        <div class="panel__row"><div><div class="label">Webhook URL</div><div class="sub">Receives bot commands &amp; inline queries</div></div><div class="val">api.patrika.com/tg/webhook</div></div>
+        <div class="panel__row"><div><div class="label">Bot commands</div><div class="sub">Configured in BotFather</div></div><div class="val">/trending /draft /watch /brief</div></div>
+
+        <div class="subhead">When to message users</div>
+        <div class="panel__row"><div><div class="label">Watchlist hit</div><div class="sub">Any monitored handle posts</div></div><div class="toggle on"></div></div>
+        <div class="panel__row"><div><div class="label">Velocity spike</div><div class="sub">Topic &gt; 200% velocity in 1h</div></div><div class="toggle on"></div></div>
+        <div class="panel__row"><div><div class="label">Draft ready for review</div><div class="sub">AI completes a draft assigned to user</div></div><div class="toggle on"></div></div>
+        <div class="panel__row"><div><div class="label">Daily morning brief</div><div class="sub">07:00 IST digest of top stories</div></div><div class="toggle on"></div></div>
+        <div class="panel__row"><div><div class="label">Story gap detected</div><div class="sub">Mainstream outlets missing an angle</div></div><div class="toggle on"></div></div>
+        <div class="panel__row"><div><div class="label">Source health alert</div><div class="sub">A source stops syncing &gt; 30 min</div></div><div class="toggle"></div></div>
+
+        <div class="subhead">Send test message</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+          <select class="tg-select" style="flex: 0 0 260px;">
+            <option>To: All linked users (6)</option>
+            <option>Vikram Singh — @vikram_p</option>
+            <option>Anita Kapoor — @anita_k</option>
+            <option>Sanjay R. — @sanjay_r</option>
+            <option>Priya Mehta — @priya_m</option>
+            <option>Rahul Desai — @rahuld</option>
+            <option>Arjun Khanna — @arjun_k</option>
+          </select>
+        </div>
+        <textarea class="input" placeholder="Type a message...">🔥 Watchlist hit: @elonmusk just teased Tesla India launch for 2027. 8.1k retweets in 12 min. Tech desk should pick it up.</textarea>
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+          <button class="ab ab--red">Send via @patrika_engine_bot</button>
+          <button class="ab ab--ghost">Preview</button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<button class="fab">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+  Write on a topic
+  <kbd>⌘N</kbd>
+</button>
+
+<aside class="drawer" id="drawer">
+  <div class="drawer__bg" data-close></div>
+  <div class="drawer__panel">
+    <button class="drawer__close" data-close>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg>
+    </button>
+    <div class="drawer__contents">
+
+      <div class="topic-detail td" data-detail="1" data-section="city">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Maharashtra · City · Lead</div>
+          <h2 class="td__title">Mumbai monsoon hits early, civic systems strain</h2>
+          <div class="td__vel"><span class="big">↑ 312%</span><span class="window-l">2h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Sources</h5>
+          <div class="src-full">
+            <div class="src"><div class="src__icon x">X</div><div class="src__data"><b>847</b><span>18 verified</span></div></div>
+            <div class="src"><div class="src__icon rss">RSS</div><div class="src__data"><b>12</b><span>TOI HT NDTV</span></div></div>
+            <div class="src"><div class="src__icon gn">GN</div><div class="src__data"><b>34</b><span>4m ago</span></div></div>
+          </div>
+        </div>
+        <div class="td__block">
+          <h5>Top signals</h5>
+          <div class="signal"><span class="who">@MumbaiPolice</span><span class="text">Avoid Andheri subway, water at 4 ft</span><span class="stat-mini">3.2k RT · 12m ago</span></div>
+          <div class="signal"><span class="who">Times of India</span><span class="text">BMC pumps fail in 3 wards, schools shut tomorrow</span><span class="stat-mini">8m ago</span></div>
+          <div class="signal"><span class="who">@BMCMumbai</span><span class="text">All schools closed Friday, advisory in effect</span><span class="stat-mini">12k RT · 24m</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Civic infrastructure failure</b> — why the BMC's pre-monsoon prep didn't hold. Pair with a 6-month follow-up on the ₹430cr pump tender.</div>
+        </div>
+        <div class="td__block">
+          <h5>Context</h5>
+          <div class="meta-grid">
+            <div class="m"><span class="lbl">Desk</span><span class="v">Maharashtra · City</span></div>
+            <div class="m"><span class="lbl">Sentiment</span><span class="v">78% concern</span></div>
+            <div class="m"><span class="lbl">Geography</span><span class="v">Mumbai 89%</span></div>
+            <div class="m"><span class="lbl">Trust</span><span class="v"><span class="trust"><span class="d"></span><span class="d"></span><span class="d"></span><span class="d"></span><span class="d e"></span></span></span></div>
+            <div class="m"><span class="lbl">Best by</span><span class="v">17:00 IST</span></div>
+            <div class="m"><span class="lbl">Words</span><span class="v">600</span></div>
+          </div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button><button class="btn--ghost btn">Pin</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="2" data-section="business">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Business · Policy</div>
+          <h2 class="td__title">RBI signals repo rate cut in tomorrow's MPC review</h2>
+          <div class="td__vel"><span class="big">↑ 180%</span><span class="window-l">1h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Sources</h5>
+          <div class="src-full">
+            <div class="src"><div class="src__icon x">X</div><div class="src__data"><b>321</b><span>9 verified</span></div></div>
+            <div class="src"><div class="src__icon rss">RSS</div><div class="src__data"><b>8</b><span>ET Mint Bloomberg</span></div></div>
+            <div class="src"><div class="src__icon gn">GN</div><div class="src__data"><b>22</b><span>7m ago</span></div></div>
+          </div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Personal-finance explainer</b> — what a 25bps cut means for the average home-loan EMI. Print-ready lender table.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="3" data-section="sports">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Sports · Cricket</div>
+          <h2 class="td__title">Mumbai Indians clinch sixth IPL crown over Chennai</h2>
+          <div class="td__vel"><span class="big">↑ 145%</span><span class="window-l">3h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Match recap + tactical breakdown</b> — Rohit's captaincy, spinner masterclass.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="4" data-section="politics">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Politics · National</div>
+          <h2 class="td__title">Modi's Jhansi rally draws 50,000, focus on UP polls</h2>
+          <div class="td__vel"><span class="big">↑ 98%</span><span class="window-l">4h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>UP poll signal read</b> — what the rally rhetoric tells us about 2027 campaign priorities.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="5" data-section="weather">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Weather · National</div>
+          <h2 class="td__title">Heatwave warning for Delhi NCR, 46°C expected</h2>
+          <div class="td__vel"><span class="big">↑ 64%</span><span class="window-l">6h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Service piece</b> — heat advisory, vulnerable groups, helpline numbers.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="6" data-section="enter">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Entertainment · Bollywood</div>
+          <h2 class="td__title">Ranveer Singh lands Spielberg-style epic</h2>
+          <div class="td__vel"><span class="big">↑ 52%</span><span class="window-l">5h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Verify before publish</h5>
+          <div class="angle-box">Only one source reporting (Pinkvilla). Trust 2/5. Wait for confirmation.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Watch only</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="7" data-section="tech">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Tech · Auto · Watchlist hit</div>
+          <h2 class="td__title">Tesla India 2027 — Musk tease shifts auto stocks</h2>
+          <div class="td__vel"><span class="big">↑ 47%</span><span class="window-l">30m window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Sources</h5>
+          <div class="src-full">
+            <div class="src"><div class="src__icon x">X</div><div class="src__data"><b>423</b><span>watchlist hit</span></div></div>
+            <div class="src"><div class="src__icon gn">GN</div><div class="src__data"><b>4</b><span>2m ago</span></div></div>
+            <div class="src"><div class="src__icon rss">RSS</div><div class="src__data"><b>2</b><span>auto desks</span></div></div>
+          </div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Policy &amp; tariff context</b> — what changed since the 2021 retreat? Frame for India auto reader.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="8" data-section="business">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Business · Tech</div>
+          <h2 class="td__title">Bengaluru tech layoffs: 1,200 jobs at three startups</h2>
+          <div class="td__vel"><span class="big">↑ 38%</span><span class="window-l">4h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Sources</h5>
+          <div class="src-full">
+            <div class="src"><div class="src__icon rss">RSS</div><div class="src__data"><b>3</b><span>ET Inc42 YourStory</span></div></div>
+            <div class="src"><div class="src__icon gn">GN</div><div class="src__data"><b>8</b><span>14m ago</span></div></div>
+          </div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Ecosystem health check</b> — which roles cut, severance terms, what does this say about the funding winter?</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="9" data-section="politics">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Politics · Karnataka</div>
+          <h2 class="td__title">Karnataka cabinet reshuffle: 4 new ministers sworn in</h2>
+          <div class="td__vel"><span class="big">↑ 34%</span><span class="window-l">8h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Sources</h5>
+          <div class="src-full">
+            <div class="src"><div class="src__icon x">X</div><div class="src__data"><b>124</b><span>verified handles</span></div></div>
+            <div class="src"><div class="src__icon rss">RSS</div><div class="src__data"><b>5</b><span>Deccan Hindu</span></div></div>
+            <div class="src"><div class="src__icon gn">GN</div><div class="src__data"><b>14</b><span>1h ago</span></div></div>
+          </div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Power dynamics read</b> — who's in, who's out, and what each constituency tells us about CM's next move.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="10" data-section="sports">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Sports · WPL</div>
+          <h2 class="td__title">WPL 2026: 5 trade rumors before the window closes</h2>
+          <div class="td__vel"><span class="big">↑ 28%</span><span class="window-l">6h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Sources</h5>
+          <div class="src-full">
+            <div class="src"><div class="src__icon x">X</div><div class="src__data"><b>84</b><span>cricket beat</span></div></div>
+            <div class="src"><div class="src__icon rss">RSS</div><div class="src__data"><b>2</b><span>Cricbuzz ESPN</span></div></div>
+          </div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>5 names to watch</b> — Smriti, Harleen, Shafali, Deepti, Renuka. Trade scenarios &amp; cap impact.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="11" data-section="business">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Business · Markets</div>
+          <h2 class="td__title">Nifty closes at record 28,440, Bank Nifty hits all-time high</h2>
+          <div class="td__vel"><span class="big">↑ 24%</span><span class="window-l">2h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Sources</h5>
+          <div class="src-full">
+            <div class="src"><div class="src__icon rss">RSS</div><div class="src__data"><b>4</b><span>ET Mint MoneyControl</span></div></div>
+            <div class="src"><div class="src__icon gn">GN</div><div class="src__data"><b>12</b><span>17m ago</span></div></div>
+          </div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Sector rotation</b> — retail vs FII flows, who benefits, who's exposed. Avoid generic recap.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="12" data-section="city">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> City · Chennai</div>
+          <h2 class="td__title">Chennai water crisis worsens — Cauvery at 4-year low</h2>
+          <div class="td__vel"><span class="big">↑ 22%</span><span class="window-l">12h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Sources</h5>
+          <div class="src-full">
+            <div class="src"><div class="src__icon x">X</div><div class="src__data"><b>54</b><span>local handles</span></div></div>
+            <div class="src"><div class="src__icon rss">RSS</div><div class="src__data"><b>3</b><span>The Hindu DT Next</span></div></div>
+          </div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Service piece</b> — supply schedule, ward-wise rationing, helpline numbers. Push notification candidate.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="13" data-section="national">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> National · Exams</div>
+          <h2 class="td__title">UPSC Civil Services 2025 results — toppers list released</h2>
+          <div class="td__vel"><span class="big">↑ 18%</span><span class="window-l">10h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Sources</h5>
+          <div class="src-full">
+            <div class="src"><div class="src__icon x">X</div><div class="src__data"><b>312</b><span>incl. UPSC handle</span></div></div>
+            <div class="src"><div class="src__icon rss">RSS</div><div class="src__data"><b>8</b><span>major outlets</span></div></div>
+            <div class="src"><div class="src__icon gn">GN</div><div class="src__data"><b>19</b><span>22m ago</span></div></div>
+          </div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Toppers + trends</b> — Tier-2 city representation, gender mix, optional-subject patterns. Profile top 3.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+      <div class="topic-detail td" data-detail="14" data-section="business">
+        <div class="td__head">
+          <div class="td__tag"><span class="pip"></span> Business · Travel</div>
+          <h2 class="td__title">Air India hikes domestic fares 8% for summer season</h2>
+          <div class="td__vel"><span class="big">↑ 14%</span><span class="window-l">8h window · velocity</span></div>
+        </div>
+        <div class="td__block">
+          <h5>Sources</h5>
+          <div class="src-full">
+            <div class="src"><div class="src__icon rss">RSS</div><div class="src__data"><b>2</b><span>ET BS</span></div></div>
+            <div class="src"><div class="src__icon gn">GN</div><div class="src__data"><b>6</b><span>34m ago</span></div></div>
+          </div>
+        </div>
+        <div class="td__block">
+          <h5>Suggested angle</h5>
+          <div class="angle-box"><b>Route-wise impact</b> — Mumbai-Delhi, BLR-Mumbai, etc. Compare to IndiGo &amp; Vistara. Reader planning angle.</div>
+        </div>
+        <div class="td__actions">
+          <div class="td__actions-left"><button class="btn--ghost btn">Snooze</button></div>
+          <button class="btn">Generate draft</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</aside>
+
+<!-- ═══════ ARTICLE EDITOR ═══════ -->
+<div class="editor" id="editor">
+  <div class="editor__top">
+    <button class="editor__back" data-editor-close>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg>
+      Back
+    </button>
+    <div class="editor__title-bar">
+      <div class="editor__title-label">Article editor</div>
+      <div class="editor__title-status" id="editorStatus">New draft · unsaved</div>
+    </div>
+    <div class="editor__top-actions">
+      <button class="ab ab--ghost">Save as draft</button>
+      <button class="ab ab--red">Submit for review</button>
+    </div>
+  </div>
+
+  <div class="editor__scroll">
+    <div class="editor__layout">
+
+      <div class="editor__main">
+        <input id="editorTitle" class="editor__title-input" placeholder="Article headline..." />
+        <div class="editor__meta-row">
+          <select class="tg-select" id="editorDesk">
+            <option>Desk: Maharashtra · City</option>
+            <option>Business</option>
+            <option>Sports</option>
+            <option>Politics</option>
+            <option>National</option>
+            <option>Tech</option>
+            <option>Entertainment</option>
+            <option>Weather</option>
+          </select>
+          <select class="tg-select">
+            <option>Length: 600 words</option>
+            <option>400 words</option>
+            <option>800 words</option>
+            <option>1000 words</option>
+          </select>
+          <select class="tg-select">
+            <option>Tone: Editorial</option>
+            <option>Explainer</option>
+            <option>Service</option>
+            <option>Punchy</option>
+            <option>Investigative</option>
+          </select>
+          <select class="tg-select">
+            <option>Language: English</option>
+            <option>Hindi</option>
+            <option>Bilingual</option>
+          </select>
+        </div>
+        <textarea id="editorBody" class="editor__body-input" placeholder="Start typing your article, or click 'Generate draft from context' to have the AI write a first pass using the topic context on the right."></textarea>
+
+        <div class="editor__ai-bar">
+          <button class="ai-pill primary">✨ Generate draft from context</button>
+          <button class="ai-pill">Regenerate</button>
+          <button class="ai-pill">Expand intro</button>
+          <button class="ai-pill">Tighten</button>
+          <button class="ai-pill">Add quotes</button>
+          <button class="ai-pill">Translate to Hindi</button>
+        </div>
+      </div>
+
+      <div class="editor__side">
+
+        <div class="editor__panel">
+          <h4>Topic context</h4>
+          <div class="ed-ctx-empty" id="edCtxEmpty">No trend selected. Write from scratch, or open from a trend card on the dashboard to import the source context, signals, and suggested angle.</div>
+
+          <div class="ed-ctx" data-edctx="1" data-section="city">
+            <div class="ed-ctx__tag"><span class="pip"></span> Maharashtra · City · Lead</div>
+            <div class="ed-ctx__vel">↑ 312% · 2h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 847 · RSS 12 · GN 34</div></div>
+            <div class="ed-ctx__block"><strong>Top signals</strong>
+              <div class="ed-ctx__signal"><em>@MumbaiPolice</em> Avoid Andheri subway, water at 4 ft</div>
+              <div class="ed-ctx__signal"><em>TOI</em> BMC pumps fail in 3 wards, schools shut</div>
+              <div class="ed-ctx__signal"><em>@BMCMumbai</em> All schools closed Friday</div>
+            </div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Civic infrastructure failure</b> — why the BMC's pre-monsoon prep didn't hold. Pair with a 6-month follow-up on the ₹430cr pump tender.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="2" data-section="business">
+            <div class="ed-ctx__tag"><span class="pip"></span> Business · Policy</div>
+            <div class="ed-ctx__vel">↑ 180% · 1h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 321 · RSS 8 · GN 22</div></div>
+            <div class="ed-ctx__block"><strong>Top signals</strong>
+              <div class="ed-ctx__signal"><em>@RBI</em> MPC to review repo rate, statement 11:00 IST tomorrow</div>
+              <div class="ed-ctx__signal"><em>ET</em> Bond yields slip, market prices 25bps cut</div>
+            </div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Personal-finance explainer</b> — what a 25bps cut means for the average home-loan EMI. Print-ready lender table.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="3" data-section="sports">
+            <div class="ed-ctx__tag"><span class="pip"></span> Sports · Cricket</div>
+            <div class="ed-ctx__vel">↑ 145% · 3h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 1.2k · RSS 45 · GN 89</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Match recap + tactical breakdown</b> — Rohit's captaincy, spinner masterclass. Companion piece on MI's six-trophy era.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="4" data-section="politics">
+            <div class="ed-ctx__tag"><span class="pip"></span> Politics · National</div>
+            <div class="ed-ctx__vel">↑ 98% · 4h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 654 · RSS 18 · GN 41</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>UP poll signal read</b> — what the rally rhetoric tells us about 2027 campaign priorities. Local-language audience.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="5" data-section="weather">
+            <div class="ed-ctx__tag"><span class="pip"></span> Weather · National</div>
+            <div class="ed-ctx__vel">↑ 64% · 6h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 156 · RSS 7</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Service piece</b> — heat advisory, vulnerable groups, helpline numbers. Push notification candidate.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="6" data-section="enter">
+            <div class="ed-ctx__tag"><span class="pip"></span> Entertainment · Bollywood</div>
+            <div class="ed-ctx__vel">↑ 52% · 5h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 84 · GN 1 (Pinkvilla)</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Verify before publish</b> — single source (Pinkvilla). Trust 2/5. Wait for confirmation or write a measured "reports suggest" piece.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="7" data-section="tech">
+            <div class="ed-ctx__tag"><span class="pip"></span> Tech · Auto · Watchlist hit</div>
+            <div class="ed-ctx__vel">↑ 47% · 30m window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 423 (watchlist) · GN 4 · RSS 2</div></div>
+            <div class="ed-ctx__block"><strong>Top signals</strong>
+              <div class="ed-ctx__signal"><em>@elonmusk</em> Excited about Tesla India launch in 2027</div>
+            </div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Policy &amp; tariff context</b> — what changed since the 2021 retreat? Frame for India auto reader.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="8" data-section="business">
+            <div class="ed-ctx__tag"><span class="pip"></span> Business · Tech</div>
+            <div class="ed-ctx__vel">↑ 38% · 4h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">RSS 3 (ET, Inc42, YourStory) · GN 8</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Ecosystem health check</b> — which roles cut, severance terms, what this says about the funding winter.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="9" data-section="politics">
+            <div class="ed-ctx__tag"><span class="pip"></span> Politics · Karnataka</div>
+            <div class="ed-ctx__vel">↑ 34% · 8h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 124 · RSS 5 · GN 14</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Power dynamics read</b> — who's in, who's out, what each constituency tells us about the CM's next move.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="10" data-section="sports">
+            <div class="ed-ctx__tag"><span class="pip"></span> Sports · WPL</div>
+            <div class="ed-ctx__vel">↑ 28% · 6h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 84 · RSS 2 (Cricbuzz, ESPN)</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>5 names to watch</b> — Smriti, Harleen, Shafali, Deepti, Renuka. Trade scenarios &amp; cap impact.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="11" data-section="business">
+            <div class="ed-ctx__tag"><span class="pip"></span> Business · Markets</div>
+            <div class="ed-ctx__vel">↑ 24% · 2h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">RSS 4 · GN 12</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Sector rotation</b> — retail vs FII flows, who benefits, who's exposed. Avoid generic recap.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="12" data-section="city">
+            <div class="ed-ctx__tag"><span class="pip"></span> City · Chennai</div>
+            <div class="ed-ctx__vel">↑ 22% · 12h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 54 · RSS 3 (Hindu, DT Next)</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Service piece</b> — supply schedule, ward-wise rationing, helpline numbers. Push notification candidate.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="13" data-section="national">
+            <div class="ed-ctx__tag"><span class="pip"></span> National · Exams</div>
+            <div class="ed-ctx__vel">↑ 18% · 10h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">X 312 (incl. UPSC) · RSS 8 · GN 19</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Toppers + trends</b> — Tier-2 city representation, gender mix, optional-subject patterns. Profile top 3.</div>
+            </div>
+          </div>
+
+          <div class="ed-ctx" data-edctx="14" data-section="business">
+            <div class="ed-ctx__tag"><span class="pip"></span> Business · Travel</div>
+            <div class="ed-ctx__vel">↑ 14% · 8h window</div>
+            <div class="ed-ctx__block"><strong>Sources</strong><div class="ed-ctx__src">RSS 2 (ET, BS) · GN 6</div></div>
+            <div class="ed-ctx__block"><strong>Suggested angle</strong>
+              <div class="ed-ctx__angle"><b>Route-wise impact</b> — Mumbai-Delhi, BLR-Mumbai, etc. Compare to IndiGo &amp; Vistara. Reader-planning angle.</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="editor__panel">
+          <h4>AI Image</h4>
+          <div class="img-ph">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            <span>No image yet</span>
+          </div>
+          <textarea class="img-prompt" placeholder="Image prompt — leave blank to auto-fill from title..."></textarea>
+          <button class="ab ab--ghost" style="width: 100%;">Generate with Imagen 3</button>
+        </div>
+
+        <div class="editor__panel">
+          <h4>Stats</h4>
+          <div class="ed-stat-row"><span>Words</span><b id="wordCount">0 / 600</b></div>
+          <div class="ed-stat-row"><span>Style match</span><b>—</b></div>
+          <div class="ed-stat-row"><span>Reading time</span><b>—</b></div>
+          <div class="ed-stat-row"><span>Est. cost</span><b>$0.00</b></div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // View switching
+  function showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    const target = document.querySelector('.view--' + name);
+    if (target) target.classList.add('active');
+    document.querySelectorAll('.nav li').forEach(l => l.classList.remove('active'));
+    const activeLi = document.querySelector('.nav li[data-view="' + name + '"]');
+    if (activeLi) activeLi.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+  document.querySelectorAll('.nav li[data-view]').forEach(li => {
+    li.addEventListener('click', () => showView(li.dataset.view));
+  });
+
+  // Drawer
+  const drawer = document.getElementById('drawer');
+  const panels = document.querySelectorAll('.topic-detail');
+  function openDrawer(id) {
+    panels.forEach(p => p.classList.toggle('active', p.dataset.detail === id));
+    drawer.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeDrawer() {
+    drawer.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.querySelectorAll('.t-card[data-id], .row--trending[data-id]').forEach(el => {
+    el.addEventListener('click', () => openDrawer(el.dataset.id));
+  });
+  document.querySelectorAll('[data-close]').forEach(el => {
+    el.addEventListener('click', closeDrawer);
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+  // Filter chips (visual toggle + functional category filter on dashboard)
+  document.querySelectorAll('.filter-bar').forEach(bar => {
+    bar.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        bar.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        if (bar.id === 'trendFilter') {
+          const filter = chip.dataset.filter;
+          document.querySelectorAll('.view--dashboard .trend-grid .t-card').forEach(card => {
+            card.style.display = (filter === 'all' || card.dataset.section === filter) ? '' : 'none';
+          });
+        }
+      });
+    });
+  });
+
+  // Admin tabs — switch tab + show matching panel
+  document.querySelectorAll('.stabs').forEach(bar => {
+    const root = bar.closest('.view');
+    bar.querySelectorAll('.stab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        bar.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        if (tab.dataset.tab && root) {
+          root.querySelectorAll('.panel[data-tab]').forEach(p => {
+            p.classList.toggle('active', p.dataset.tab === tab.dataset.tab);
+          });
+        }
+      });
+    });
+  });
+
+  // ═══════ ARTICLE EDITOR ═══════
+  const editor = document.getElementById('editor');
+  const edCtxList = document.querySelectorAll('.ed-ctx');
+  const edCtxEmpty = document.getElementById('edCtxEmpty');
+  const editorTitle = document.getElementById('editorTitle');
+  const editorBody = document.getElementById('editorBody');
+  const editorStatus = document.getElementById('editorStatus');
+  const wordCount = document.getElementById('wordCount');
+
+  function openEditor(id) {
+    // close drawer if open
+    if (drawer && drawer.classList.contains('open')) {
+      drawer.classList.remove('open');
+    }
+    if (id) {
+      const card = document.querySelector('.t-card[data-id="' + id + '"]');
+      if (card) {
+        const title = card.querySelector('.t-card__title').textContent.trim();
+        editorTitle.value = title;
+        editorStatus.textContent = 'New draft from trend #' + id + ' · unsaved';
+      }
+      edCtxList.forEach(c => c.classList.toggle('active', c.dataset.edctx === String(id)));
+      if (edCtxEmpty) edCtxEmpty.style.display = 'none';
+    } else {
+      editorTitle.value = '';
+      editorBody.value = '';
+      editorStatus.textContent = 'New draft · unsaved';
+      edCtxList.forEach(c => c.classList.remove('active'));
+      if (edCtxEmpty) edCtxEmpty.style.display = 'block';
+    }
+    updateWordCount();
+    editor.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => editorTitle.focus(), 100);
+  }
+
+  function closeEditor() {
+    editor.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // FAB → open editor blank
+  document.querySelector('.fab').addEventListener('click', () => openEditor(null));
+
+  // Editor close
+  document.querySelectorAll('[data-editor-close]').forEach(el => {
+    el.addEventListener('click', closeEditor);
+  });
+
+  // Drawer "Generate draft" → open editor with that trend's context
+  document.querySelectorAll('.topic-detail .btn').forEach(btn => {
+    if (btn.textContent.trim().toLowerCase().includes('generate draft')) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const activePanel = btn.closest('.topic-detail');
+        if (activePanel) {
+          openEditor(activePanel.dataset.detail);
+        }
+      });
+    }
+  });
+
+  // ESC closes editor (and drawer)
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (editor.classList.contains('open')) closeEditor();
+    }
+  });
+
+  // Word count
+  function updateWordCount() {
+    const text = editorBody.value.trim();
+    const words = text ? text.split(/\s+/).filter(w => w.length > 0).length : 0;
+    wordCount.textContent = words + ' / 600';
+  }
+  editorBody.addEventListener('input', updateWordCount);
+
+  // Mock generated headlines + bodies per trend
+  const generated = {
+    '1': {
+      h: "BMC pumps fail as Mumbai's pre-monsoon storm exposes civic gaps",
+      b: "MUMBAI: Heavy pre-monsoon showers brought parts of Andheri's commuter belt to a standstill on Monday, with stormwater drains overwhelmed within two hours of the downpour. By afternoon, the Andheri subway had four feet of standing water, and Mumbai Police asked motorists to use the SV Road alternative.\n\nThe BMC said three pumping stations in the western suburbs failed, forcing the city's civic body to issue an advisory shutting all schools on Friday. Officials blamed an unusually early monsoon onset coupled with a backlog of unfinished desilting work — a ₹430cr tender awarded in 2022 that is now under fresh scrutiny.\n\nResidents shared images of submerged subways and stranded buses on social media through the afternoon, prompting rolling advisories from civic and police handles.\n\n[Generated by Engine v2.4 · style match 78%. Edit, verify, and add reporting before submitting.]",
+      m: 78
+    },
+    '2': {
+      h: "RBI poised for first repo cut in 18 months; home loan EMIs in focus",
+      b: "MUMBAI: The Reserve Bank of India is widely expected to deliver its first repo rate cut in 18 months when its Monetary Policy Committee meets on Tuesday, with bond markets and rate-sensitive sectors pricing in a 25 basis-point reduction.\n\nAnalysts at HDFC Securities and Kotak Institutional Equities said softer-than-projected April inflation and a sustained current account improvement gave the MPC space to ease, though Governor Sanjay Malhotra is expected to retain a cautious tone given crude price volatility.\n\nFor borrowers, a 25bps cut typically trims roughly ₹1,400 a month off the EMI on a ₹50 lakh home loan with 20 years remaining.\n\n[Generated · style match 84%.]",
+      m: 84
+    },
+    '3': {
+      h: "Sixth on the stand: MI ride spinners to record IPL title over CSK",
+      b: "AHMEDABAD: Mumbai Indians clinched their record-extending sixth IPL crown on Sunday night, edging Chennai Super Kings by 18 runs in a final defined by relentless spin pressure in the middle overs.\n\nKuldeep Yadav, Piyush Chawla and Mayank Markande choked the CSK chase to a halt after MS Dhoni's side reached 92 for one in the 11th over. Markande's three-over burst yielded just 14 runs and the wickets of Devon Conway and Ravindra Jadeja, swinging the match decisively.\n\nCaptain Rohit Sharma, named Player of the Tournament, said the team had played 'IPL cricket the way it should be played — with intent, with smarts, and with the bench delivering when it mattered.'\n\n[Generated · style match 91%.]",
+      m: 91
+    },
+    '4': {
+      h: "Jhansi roar: Modi targets UP poll, frames 2027 in Hindi belt pitch",
+      b: "JHANSI: Prime Minister Narendra Modi on Sunday addressed a 50,000-strong rally in Jhansi, drawing sharp battle lines for the 2027 Uttar Pradesh assembly elections and unveiling new infrastructure commitments for the Bundelkhand region.\n\nIn a 48-minute speech, Modi laid out plans for the long-pending Bundelkhand Expressway extension, a Defence Corridor cluster at Jhansi, and a state-funded housing scheme aimed at sub-1-lakh-rupee households. The pitch was notably development-first, with relatively muted references to opposition parties.\n\nThe rally is the third in UP in as many weeks, signalling heightened ground activity ahead of the 2027 poll.\n\n[Generated · style match 87%.]",
+      m: 87
+    },
+    '5': {
+      h: "Delhi NCR braces for 46°C peak as IMD issues red-alert heatwave warning",
+      b: "NEW DELHI: The India Meteorological Department on Sunday issued a red-alert heatwave warning for Delhi NCR for Monday, forecasting maximum temperatures of 46°C — the highest reading since May 2022.\n\nDelhi government officials urged residents to avoid outdoor exposure between 11 AM and 4 PM and announced an extension of cooling shelter hours. Sixty drinking-water tankers will be deployed across high-density labour zones in Mayapuri, Okhla and Anand Vihar.\n\nThe Delhi Disaster Management Authority helpline is operational at 1077. Schools have been instructed to advance summer-break closure by three days.\n\n[Generated · style match 88%.]",
+      m: 88
+    },
+    '6': {
+      h: "Ranveer Singh in Hollywood-scale epic? Pinkvilla report draws studio silence",
+      b: "MUMBAI: A Pinkvilla report on Sunday afternoon claimed that actor Ranveer Singh has signed for what it described as a 'Spielberg-style epic' to begin filming in late 2026 — a project the trade publication said combines an Indian production house with a yet-unnamed Hollywood studio.\n\nNeither Singh's representatives nor any of the studios named in the report have confirmed the details to Patrika. The story carried no on-the-record sources, and a Patrika check with three industry executives in Mumbai found no corroboration.\n\nReaders should treat the headline reports with caution until at least one major studio confirms.\n\n[Generated · style match 76%. Trust 2/5 — verify before publish.]",
+      m: 76
+    },
+    '7': {
+      h: "Musk's Tesla India tease rallies auto stocks; what's different from 2021?",
+      b: "BENGALURU: Tesla CEO Elon Musk's Sunday afternoon post on X — 'Excited about Tesla India launch in 2027' — drove a sharp two-percentage-point rally in Tata Motors and Mahindra & Mahindra shares in pre-market trade, even though Tesla has historically traded India entry plans for trade concessions.\n\nWhat is different this time, analysts say, is India's revised EV manufacturing policy notified in March 2026, which offers a 15% customs duty for CKD imports against a $500 million manufacturing commitment.\n\nTesla last walked back India plans in 2021 over duty disputes. Whether 2027 is realistic — or another negotiating gambit — will depend on whether the company's Hyderabad and Pune site visits this quarter translate into a formal MoU.\n\n[Generated · style match 81%.]",
+      m: 81
+    },
+    '8': {
+      h: "Funding winter bites: 1,200 jobs cut at three Bengaluru startups",
+      b: "BENGALURU: Three mid-stage Bengaluru technology companies — confirmed by Patrika as Slate, Plover and Foundry.ai — collectively laid off approximately 1,200 employees this week, citing a sustained funding crunch and slower-than-projected revenue scaling.\n\nThe layoffs cut across engineering, sales and middle-management functions. Severance terms reported range between two and four months of salary, with three months of insurance continuation.\n\nIndustry watchers say Series B and C-stage companies remain the most exposed in the current cycle, with later-stage capital flows still 38% below the 2024 peak.\n\n[Generated · style match 79%.]",
+      m: 79
+    },
+    '9': {
+      h: "Karnataka rejig: CM swaps four portfolios, signals tighter grip ahead of 2028",
+      b: "BENGALURU: Karnataka Chief Minister Siddaramaiah on Sunday swore in four new ministers in a cabinet rejig that political observers say tilts the state cabinet toward the CM's own loyalists ahead of the 2028 assembly elections.\n\nThe biggest change is in the Public Works Department, where senior MLA Lakshmi Hebbalkar has been elevated from minor portfolios to a full cabinet ranking. Two senior ministers seen as close to the Deputy CM have been moved to less visible portfolios.\n\nThe reshuffle, which had been speculated for weeks, was held back until after the recently-concluded budget session.\n\n[Generated · style match 85%.]",
+      m: 85
+    },
+    '10': {
+      h: "WPL 2026: Five trade moves that could redraw the league before close",
+      b: "MUMBAI: With 72 hours left in the Women's Premier League mid-season trade window, Patrika understands that at least five potential moves are being actively discussed between franchises, several of which could materially shift the title race.\n\nMumbai Indians are reportedly in conversations to bring back Shafali Verma from UP Warriorz, in what would be one of the highest-value trades in the league's short history. Smriti Mandhana's salary cap impact at RCB has prompted fresh talks with Delhi Capitals. Harleen Deol, Deepti Sharma and Renuka Singh are also said to be in flux.\n\nFranchise officials contacted by Patrika declined to confirm specifics on record.\n\n[Generated · style match 80%.]",
+      m: 80
+    },
+    '11': {
+      h: "Bull run extends: Nifty closes at 28,440 record, Bank Nifty seals all-time high",
+      b: "MUMBAI: The benchmark Nifty 50 index closed at a fresh lifetime high of 28,440 on Monday, while the Bank Nifty crossed 64,000 for the first time, capping a four-session winning run powered by financials, autos and a sharp rally in mid-cap IT.\n\nMarket strategists attributed the rally to expectations of a Tuesday repo rate cut, robust April auto sales numbers, and continued retail flows that hit a record ₹68,400cr in May to date. FIIs, however, remained net sellers for the third straight session.\n\nAnalysts caution that valuations are stretched at the index level and that any disappointment from the MPC could trigger a sharp pullback.\n\n[Generated · style match 86%.]",
+      m: 86
+    },
+    '12': {
+      h: "Chennai taps run dry as Cauvery drops to 4-year low; ward rationing kicks in",
+      b: "CHENNAI: With the Cauvery flow at Mettur falling to a four-year low and the city's main reservoirs at 22% capacity, Metrowater on Sunday rolled out a ward-wise rationing schedule for Chennai effective Monday, restricting supply to alternate days in 12 of the city's 15 zones.\n\nThe corporation has set up 47 supplementary water tanker stations across vulnerable neighbourhoods, prioritising slums in Royapuram, Tondiarpet and parts of Thiruvanmiyur. Helplines 1916 and 1860-425-4567 have been activated for citizen complaints.\n\nResidents are advised to store essential drinking water and avoid non-essential use; rationing is expected to continue through the southwest monsoon onset.\n\n[Generated · style match 88%.]",
+      m: 88
+    },
+    '13': {
+      h: "UPSC 2025: Tier-2 cities dominate top 10 as topper Aishwarya leads list",
+      b: "NEW DELHI: The Union Public Service Commission on Monday released the Civil Services 2025 final results, with Aishwarya Mishra from Lucknow topping the merit list and seven of the top ten ranks going to candidates from Tier-2 cities including Indore, Patna and Pune.\n\nFor the third consecutive year, women candidates secured 41% of the top 100 ranks. Among the most selected optional subjects in the top 50: Anthropology, Public Administration and Geography.\n\nThe UPSC said the result follows the highest-ever applicant pool of 13.4 lakh registrations.\n\n[Generated · style match 84%.]",
+      m: 84
+    },
+    '14': {
+      h: "Summer surge: Air India lifts domestic fares 8%; route-wise impact mapped",
+      b: "MUMBAI: Air India on Sunday revised its domestic base fares upward by 8% across most trunk and metro routes, effective the next booking cycle, citing higher aviation turbine fuel costs and a recalibration of summer-season demand.\n\nA Patrika analysis of the new fares finds the steepest impact on the Mumbai-Delhi route, where one-way economy now starts at ₹6,800 against the earlier ₹6,250 baseline. The Bengaluru-Mumbai and Hyderabad-Delhi corridors see roughly 7-7.5% increases.\n\nIndiGo and Akasa have not announced parallel hikes, though carriers typically follow Air India's lead within 72 hours when fuel-driven moves are involved.\n\n[Generated · style match 82%.]",
+      m: 82
+    }
+  };
+
+  // Generate draft from context → produces headline + body
+  document.querySelectorAll('.ai-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      if (pill.classList.contains('primary')) {
+        const activeCtx = document.querySelector('.ed-ctx.active');
+        const id = activeCtx ? activeCtx.dataset.edctx : null;
+        const gen = id ? generated[id] : null;
+
+        editorStatus.textContent = 'Generating headline + draft…';
+
+        setTimeout(() => {
+          if (gen) {
+            editorTitle.value = gen.h;
+            editorBody.value = gen.b;
+            editorStatus.textContent = 'Headline + draft generated · style match ' + gen.m + '% · unsaved';
+          } else {
+            editorBody.value = "[Open the editor from a trend card to generate a headline and draft from context, or write here from scratch.]";
+            editorStatus.textContent = 'No trend context · started blank';
+          }
+          updateWordCount();
+        }, 600);
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

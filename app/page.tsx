@@ -1,0 +1,407 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
+
+import { Shell } from "@/components/shell";
+import { useLang } from "@/lib/i18n/context";
+import { SECTION_COLORS, type Trend } from "@/lib/data/trends";
+import { SourcePill, TrustPips, freshness } from "@/components/trend-card";
+import { TrendDrawer } from "@/components/trend-drawer";
+
+// ─── Editorial feeds (the three columns) ──────────────────────
+type BucketKey = "breaking" | "trending" | "watching";
+
+const BUCKETS: Array<{
+  key: BucketKey;
+  label_en: string;
+  label_hi: string;
+  hint: string;
+}> = [
+  { key: "breaking", label_en: "Breaking", label_hi: "तत्काल",   hint: "3+ sources · broke in the last 30 min" },
+  { key: "trending", label_en: "Trending", label_hi: "ट्रेंडिंग", hint: "3+ sources · broke 30 min – 4 h ago" },
+  { key: "watching", label_en: "Watching", label_hi: "नज़र में",  hint: "2 sources · one outlet short of the bar" },
+];
+
+// ─── Page ─────────────────────────────────────────────────────
+export default function DashboardPage() {
+  const { t, lang } = useLang();
+  const [openTrend, setOpenTrend] = useState<Trend | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorTrend, setEditorTrend] = useState<Trend | null>(null);
+  const [editorTitle, setEditorTitle] = useState("");
+  const [buckets, setBuckets] = useState<Record<BucketKey, Trend[]>>({
+    breaking: [],
+    trending: [],
+    watching: [],
+  });
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+
+  // Fetch all 3 feeds in parallel, refresh every 60s.
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const keys: BucketKey[] = ["breaking", "trending", "watching"];
+        const results = await Promise.all(
+          keys.map((k) =>
+            fetch(`/api/trends?window=${k}`, { cache: "no-store" })
+              .then((r) => r.json())
+              .then((d): Trend[] =>
+                Array.isArray(d.trends) ? (d.trends as Trend[]) : []
+              )
+              .catch((): Trend[] => [])
+          )
+        );
+        if (cancelled) return;
+        setBuckets({
+          breaking: results[0],
+          trending: results[1],
+          watching: results[2],
+        });
+        setLoadState("ready");
+      } catch {
+        if (!cancelled) setLoadState("error");
+      }
+    }
+    load();
+    const id = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const [editorMode, setEditorMode] = useState<"factual" | "angle" | "blank">("blank");
+
+  function openEditor(trend: Trend | null, mode: "factual" | "angle" | "blank" = "blank") {
+    setEditorTrend(trend);
+    setEditorTitle(trend?.title ?? "");
+    setEditorMode(mode);
+    setEditorOpen(true);
+    setOpenTrend(null);
+  }
+
+  // The three-column board. Each column is a feed, scrolls independently.
+  return (
+    <Shell>
+      <div className="flex items-center justify-between pb-3 mb-4 border-b border-[var(--text)]">
+        <span className="text-[14px] font-medium">{t("trendingNow")}</span>
+        <span className="font-mono text-xs text-[var(--text-3)]">
+          {loadState === "loading"
+            ? t("loading")
+            : loadState === "error"
+            ? "—"
+            : t("live")}
+          {" · "}
+          <b className="text-[var(--text)] font-medium">
+            {buckets.breaking.length +
+              buckets.trending.length +
+              buckets.watching.length}{" "}
+            {t("topics")}
+          </b>
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 items-start">
+        {BUCKETS.map((b) => {
+          const items = buckets[b.key];
+          const label = lang === "hi" ? b.label_hi : b.label_en;
+          const accent =
+            b.key === "breaking"
+              ? "var(--red)"
+              : b.key === "trending"
+              ? "var(--blue)"
+              : "var(--amber)";
+          return (
+            <section
+              key={b.key}
+              className="bg-[var(--surface-2)] border border-[var(--border)] rounded-md flex flex-col min-h-[400px]"
+            >
+              {/* Column header */}
+              <header className="flex items-baseline justify-between gap-2 px-3.5 py-3 border-b border-[var(--border)] bg-white rounded-t-md">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ background: accent }}
+                  />
+                  <h2 className="text-[14px] font-medium text-[var(--text)]">
+                    {label}
+                  </h2>
+                </div>
+                <span className="font-mono text-[11px] text-[var(--text-3)]">
+                  {items.length}
+                </span>
+              </header>
+
+              {/* Description hint */}
+              <p className="px-3.5 pt-2 pb-1 text-[11px] text-[var(--text-3)] leading-snug">
+                {b.hint}
+              </p>
+
+              {/* Cards stack */}
+              <div className="p-2.5 space-y-2.5 flex-1">
+                {items.length > 0 ? (
+                  items.map((tr) => (
+                    <ColumnCard
+                      key={`${b.key}-${tr.id}`}
+                      trend={tr}
+                      onClick={() => setOpenTrend(tr)}
+                    />
+                  ))
+                ) : (
+                  <div className="text-center text-[12px] text-[var(--text-3)] py-12">
+                    {loadState === "loading" ? t("loading") : "—"}
+                  </div>
+                )}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+
+
+      <button
+        onClick={() => openEditor(null)}
+        className="fixed bottom-7 right-7 bg-[var(--red)] hover:bg-[var(--red-hover)] text-white px-5 py-3.5 rounded-full text-[14px] font-medium flex items-center gap-2.5 z-30 transition-all hover:-translate-y-0.5"
+        style={{ boxShadow: "0 4px 12px rgba(217, 48, 37, 0.3)" }}
+      >
+        <Plus size={16} />
+        {t("writeOnTopic")}
+        <kbd className="font-mono text-[11px] px-1.5 py-0.5 bg-white/20 rounded">⌘N</kbd>
+      </button>
+
+      {openTrend && (
+        <TrendDrawer
+          trend={openTrend}
+          onClose={() => setOpenTrend(null)}
+          onGenerate={(mode) => openEditor(openTrend, mode)}
+        />
+      )}
+
+      {editorOpen && (
+        <Editor
+          trend={editorTrend}
+          mode={editorMode}
+          title={editorTitle}
+          setTitle={setEditorTitle}
+          onClose={() => setEditorOpen(false)}
+        />
+      )}
+    </Shell>
+  );
+}
+
+// ─── Column card (compact variant of TrendCard for narrow columns) ───
+function ColumnCard({
+  trend,
+  onClick,
+}: {
+  trend: Trend;
+  onClick: () => void;
+}) {
+  const { lang } = useLang();
+  const title = lang === "hi" && trend.title_hi ? trend.title_hi : trend.title;
+  const tag = lang === "hi" && trend.desk_hi ? trend.desk_hi : trend.tag;
+  const lastSeen = freshness(trend.lastSeenMinAgo, lang);
+  return (
+    <button
+      onClick={onClick}
+      className="relative w-full bg-white border border-[var(--border)] hover:border-[var(--border-2)] rounded p-3 text-left flex flex-col gap-2 transition-all group hover:shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden"
+    >
+      <span
+        className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{ background: SECTION_COLORS[trend.section] }}
+      />
+      <div className="flex items-center justify-between gap-2 mt-0.5">
+        <span className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium truncate">
+          {tag}
+        </span>
+        <span className="font-mono text-[10.5px] text-[var(--text-3)] whitespace-nowrap">
+          {lastSeen}
+        </span>
+      </div>
+      <h3 className="text-[14px] font-medium leading-snug -tracking-[0.005em] line-clamp-3">
+        {title}
+      </h3>
+      <div className="flex items-center justify-between pt-1.5 mt-auto border-t border-[var(--border)] gap-2">
+        <span className="font-mono text-[11px] font-medium text-[var(--text)]">
+          {trend.signalCount}{" "}
+          <span className="text-[var(--text-3)] font-normal">
+            {trend.signalCount === 1 ? "src" : "srcs"}
+          </span>
+        </span>
+        <TrustPips score={trend.trust} />
+        <span className="flex gap-0.5">
+          {trend.sources.slice(0, 3).map((s) => (
+            <SourcePill key={s} src={s} />
+          ))}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// ─── Editor ───────────────────────────────────────────────────
+function Editor({
+  trend, mode, title, setTitle, onClose,
+}: {
+  trend: Trend | null;
+  mode: "factual" | "angle" | "blank";
+  title: string;
+  setTitle: (v: string) => void;
+  onClose: () => void;
+}) {
+  const { t, lang } = useLang();
+  const [body, setBody] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const words = body.trim() ? body.trim().split(/\s+/).length : 0;
+
+  // Auto-generate immediately if opened with a mode from the drawer
+  useEffect(() => {
+    if (trend && (mode === "factual" || mode === "angle")) {
+      handleGenerate(mode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleGenerate(activeMode: "factual" | "angle" = "factual") {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/drafts/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trendId: trend?.id ?? null,
+          mode: activeMode,
+          lang,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.title) setTitle(json.title);
+        if (json.body) setBody(json.body);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setBody(`[Generation failed: ${err.error ?? res.status}]`);
+      }
+    } catch (err) {
+      setBody(`[Network error: ${err instanceof Error ? err.message : "unknown"}]`);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-[var(--bg)] flex flex-col">
+      <div className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+        <button
+          onClick={onClose}
+          className="justify-self-start text-[var(--text-2)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] text-[13px] px-3 py-2 rounded flex items-center gap-2"
+        >
+          ← {t("back")}
+        </button>
+        <div className="text-center">
+          <div className="text-sm font-medium">{t("editorTitle")}</div>
+          <div className="text-[11px] text-[var(--text-3)] font-mono mt-0.5">
+            {trend ? `from trend #${trend.id}` : "New draft"}
+          </div>
+        </div>
+        <div className="justify-self-end flex gap-2">
+          <button className="bg-white border border-[var(--border)] hover:bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--text)] text-[13px] px-4 py-2 rounded font-medium">
+            {t("saveDraft")}
+          </button>
+          <button className="bg-[var(--red)] hover:bg-[var(--red-hover)] text-white text-[13px] px-4 py-2 rounded font-medium">
+            {t("submitReview")}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="grid grid-cols-[1fr_340px] gap-6 max-w-[1320px] mx-auto">
+          <div className="bg-white border border-[var(--border)] rounded-lg p-7">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Article headline..."
+              className="w-full text-2xl font-medium outline-none mb-3 placeholder:text-[var(--text-3)] placeholder:font-normal"
+            />
+            <div className="pb-4 border-b border-[var(--border)] mb-4 flex gap-2 flex-wrap">
+              {["Desk", "600 words", "Editorial", "English"].map((label) => (
+                <select key={label} className="bg-[var(--surface-2)] border border-[var(--border)] text-[13px] px-3 py-1.5 rounded outline-none focus:border-[var(--blue)] focus:bg-white">
+                  <option>{label}</option>
+                </select>
+              ))}
+            </div>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Start typing, or click Generate…"
+              className="w-full min-h-[380px] outline-none text-[15px] leading-[1.7] resize-y"
+            />
+            <div className="flex gap-2 flex-wrap mt-4 pt-4 border-t border-[var(--border)]">
+              <button
+                onClick={() => handleGenerate("factual")}
+                disabled={generating}
+                className="bg-[var(--text)] hover:bg-black disabled:opacity-50 text-white text-xs font-medium px-3.5 py-2 rounded-full"
+              >
+                {generating ? `✨ ${t("generating")}` : `✨ ${lang === "hi" ? "तथ्यात्मक ड्राफ़्ट" : "Factual draft"}`}
+              </button>
+              <button
+                onClick={() => handleGenerate("angle")}
+                disabled={generating}
+                className="bg-[var(--red)] hover:bg-[var(--red-hover)] disabled:opacity-50 text-white text-xs font-medium px-3.5 py-2 rounded-full"
+              >
+                {generating ? `✨ ${t("generating")}` : `✨ ${lang === "hi" ? "सुझाव वाला ड्राफ़्ट" : "Suggested-angle draft"}`}
+              </button>
+              {["Regenerate", "Expand", "Tighten", "Quotes"].map((l) => (
+                <button key={l} className="bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--red-soft)] hover:text-[var(--red)] text-xs font-medium text-[var(--text-2)] px-3.5 py-2 rounded-full">
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="bg-white border border-[var(--border)] rounded-lg p-4.5">
+              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-3)] font-medium mb-3">{t("topicContext")}</h4>
+              {trend ? (
+                <>
+                  <div className="text-[11px] uppercase tracking-wider text-[var(--text-3)] font-medium mb-1.5 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full" style={{ background: SECTION_COLORS[trend.section] }} />
+                    {trend.tag}
+                  </div>
+                  <div className="font-mono text-sm text-[var(--red)] font-medium pb-3 mb-3 border-b border-[var(--border)]">
+                    ↑ {trend.velocityPct}% · {freshness(trend.lastSeenMinAgo, lang)}
+                  </div>
+                  <div>
+                    <strong className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium block mb-1.5">Suggested angle</strong>
+                    <div className="bg-[var(--red-soft)] p-2.5 rounded text-[12.5px] leading-relaxed">
+                      {trend.suggestedAngle}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-[13px] text-[var(--text-3)] leading-relaxed">{t("noTrendSelected")}</div>
+              )}
+            </div>
+
+            <div className="bg-white border border-[var(--border)] rounded-lg p-4.5">
+              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-3)] font-medium mb-3">{t("stats")}</h4>
+              <div className="flex justify-between text-xs text-[var(--text-2)] py-1">
+                <span>{t("words")}</span>
+                <b className="text-[var(--text)] font-medium font-mono">{words} / 600</b>
+              </div>
+              <div className="flex justify-between text-xs text-[var(--text-2)] py-1">
+                <span>{t("readingTime")}</span>
+                <b className="text-[var(--text)] font-medium font-mono">
+                  {words > 0 ? Math.max(1, Math.round(words / 200)) + " min" : "—"}
+                </b>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
