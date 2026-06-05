@@ -92,7 +92,7 @@ export function TrendCard({
         }}
       />
       {trend.image && imgOk && (
-        <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--surface-2)]">
+        <div className="relative aspect-video w-full overflow-hidden bg-[var(--surface-2)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={trend.image}

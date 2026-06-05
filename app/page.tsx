@@ -9,8 +9,8 @@ import { SECTION_COLORS, type SectionKey, type Trend } from "@/lib/data/trends";
 import { TrustPips, freshness } from "@/components/trend-card";
 import { TrendDrawer } from "@/components/trend-drawer";
 
-// ─── Editorial feeds (the three columns) ──────────────────────
-type BucketKey = "breaking" | "trending" | "watching";
+// ─── Editorial feeds (the board columns) ──────────────────────
+type BucketKey = "breaking" | "trending" | "watching" | "social";
 
 const BUCKETS: Array<{
   key: BucketKey;
@@ -21,6 +21,7 @@ const BUCKETS: Array<{
   { key: "breaking", label_en: "Breaking", label_hi: "तत्काल",   hint: "3+ sources · broke in the last 30 min" },
   { key: "trending", label_en: "Trending", label_hi: "ट्रेंडिंग", hint: "3+ sources · broke 30 min – 4 h ago" },
   { key: "watching", label_en: "Watching", label_hi: "नज़र में",  hint: "2 sources · one outlet short of the bar" },
+  { key: "social",   label_en: "Social",   label_hi: "सोशल",     hint: "Stories carried on X / social sources" },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────
@@ -34,15 +35,16 @@ export default function DashboardPage() {
     breaking: [],
     trending: [],
     watching: [],
+    social: [],
   });
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
 
-  // Fetch all 3 feeds in parallel, refresh every 60s.
+  // Fetch all feeds in parallel, refresh every 60s.
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const keys: BucketKey[] = ["breaking", "trending", "watching"];
+        const keys: BucketKey[] = ["breaking", "trending", "watching", "social"];
         const results = await Promise.all(
           keys.map((k) =>
             fetch(`/api/trends?window=${k}`, { cache: "no-store" })
@@ -58,6 +60,7 @@ export default function DashboardPage() {
           breaking: results[0],
           trending: results[1],
           watching: results[2],
+          social: results[3],
         });
         setLoadState("ready");
       } catch {
@@ -82,7 +85,7 @@ export default function DashboardPage() {
     setOpenTrend(null);
   }
 
-  // The three-column board. Each column is a feed, scrolls independently.
+  // The board — one column per feed, each scrolls independently.
   return (
     <Shell>
       <div className="flex items-center justify-between pb-3 mb-4 border-b border-[var(--text)]">
@@ -97,13 +100,14 @@ export default function DashboardPage() {
           <b className="text-[var(--text)] font-medium">
             {buckets.breaking.length +
               buckets.trending.length +
-              buckets.watching.length}{" "}
+              buckets.watching.length +
+              buckets.social.length}{" "}
             {t("topics")}
           </b>
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 items-start">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-start">
         {BUCKETS.map((b) => {
           const items = buckets[b.key];
           const label = lang === "hi" ? b.label_hi : b.label_en;
@@ -112,7 +116,9 @@ export default function DashboardPage() {
               ? "var(--red)"
               : b.key === "trending"
               ? "var(--blue)"
-              : "var(--amber)";
+              : b.key === "watching"
+              ? "var(--amber)"
+              : "var(--purple)";
           return (
             <section
               key={b.key}
@@ -150,8 +156,14 @@ export default function DashboardPage() {
                     />
                   ))
                 ) : (
-                  <div className="text-center text-[12px] text-[var(--text-3)] py-12">
-                    {loadState === "loading" ? t("loading") : "—"}
+                  <div className="text-center text-[12px] text-[var(--text-3)] py-12 px-3 leading-snug">
+                    {loadState === "loading"
+                      ? t("loading")
+                      : b.key === "social"
+                      ? lang === "hi"
+                        ? "अभी कोई सोशल स्रोत कनेक्ट नहीं है"
+                        : "No social source connected yet"
+                      : "—"}
                   </div>
                 )}
               </div>
@@ -236,7 +248,7 @@ function ColumnCard({
           </span>
         </div>
 
-        <h3 className="text-[15px] font-medium leading-snug -tracking-[0.005em] line-clamp-2">
+        <h3 className="text-[14px] font-medium leading-snug -tracking-[0.005em] line-clamp-4">
           {title}
         </h3>
 
@@ -273,7 +285,7 @@ function CardHero({
   const [ok, setOk] = useState(true);
   const showImg = src && ok;
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--surface-2)]">
+    <div className="relative aspect-video w-full overflow-hidden bg-[var(--surface-2)]">
       {showImg ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}

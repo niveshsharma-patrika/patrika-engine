@@ -53,12 +53,13 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const requested = url.searchParams.get("window") ?? "trending";
-  type Win = "breaking" | "trending" | "watching";
+  type Win = "breaking" | "trending" | "watching" | "social";
   // Back-compat with the old window names.
   const alias: Record<string, Win> = {
     breaking: "breaking",
     trending: "trending",
     watching: "watching",
+    social: "social",
     now: "breaking",
     active: "trending",
     today: "trending",
@@ -101,13 +102,25 @@ export async function GET(req: Request) {
       .order("publisher_count", { ascending: false })
       .order("broke_at", { ascending: false })
       .limit(80);
-  } else {
+  } else if (windowParam === "watching") {
     // watching — exactly 2 publishers (broke_at is null until 3 is reached).
     query = supabase
       .from("trends")
       .select(baseSelect)
       .eq("status", "active")
       .eq("publisher_count", 2)
+      .gte("last_updated", isoMinAgo(WATCHING_FRESH_MIN))
+      .order("last_updated", { ascending: false })
+      .limit(60);
+  } else {
+    // social — stories carried on X / social. We pull recent active trends
+    // broadly here, then keep only those with a social (twitter) signal in
+    // the JS filter below (PostgREST can't filter by a nested source_type).
+    // Empty until a social source is connected.
+    query = supabase
+      .from("trends")
+      .select(baseSelect)
+      .eq("status", "active")
       .gte("last_updated", isoMinAgo(WATCHING_FRESH_MIN))
       .order("last_updated", { ascending: false })
       .limit(60);
@@ -163,6 +176,13 @@ export async function GET(req: Request) {
   const filtered: TrendRow[] = ((data as TrendRow[] | null) ?? []).filter((row) => {
     const sigs = row.signals ?? [];
     if (sigs.length === 0) return false;
+    if (windowParam === "social") {
+      // Only stories that have at least one social (X/Twitter) signal.
+      return sigs.some((s) => {
+        const sr = Array.isArray(s.sources) ? s.sources[0] : s.sources;
+        return sr?.source_type === "twitter";
+      });
+    }
     if (windowParam !== "watching") return true;
     let newest = 0;
     for (const s of sigs) {
