@@ -129,7 +129,21 @@ export async function ingestAllRss(
           }
         }
         const filteredRaw = raw.filter((s) => !s.url || !existingUrls.has(s.url));
-        const rows = filteredRaw.map((s: RawSignal) => ({ ...s, source_id: source.id }));
+        // Some feeds (e.g. Dainik Bhaskar) emit IST timestamps labelled as
+        // UTC, landing ~5.5h in the future. Any published_at more than 15 min
+        // ahead of now is unreliable — fall back to ingest time so freshness
+        // and clustering windows stay sane.
+        const nowMs = Date.now();
+        const nowIso = new Date(nowMs).toISOString();
+        const FUTURE_SLACK_MS = 15 * 60 * 1000;
+        const rows = filteredRaw.map((s: RawSignal) => {
+          const pubMs = new Date(s.published_at).getTime();
+          const published_at =
+            Number.isFinite(pubMs) && pubMs <= nowMs + FUTURE_SLACK_MS
+              ? s.published_at
+              : nowIso;
+          return { ...s, source_id: source.id, published_at };
+        });
 
         const { count, error: insErr } = rows.length === 0
           ? { count: 0, error: null }

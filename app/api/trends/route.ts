@@ -73,7 +73,7 @@ export async function GET(req: Request) {
       story_type, story_type_hi, is_national_or_world,
       signal_count, publisher_count, last_updated, first_seen, broke_at,
       signals (
-        id, author, content, published_at, url, metadata,
+        id, author, content, published_at, ingested_at, url, metadata,
         sources (source_type, name)
       )
     `;
@@ -140,9 +140,21 @@ export async function GET(req: Request) {
     author: string | null;
     content: string;
     published_at: string;
+    ingested_at: string | null;
     url: string | null;
     metadata: Record<string, unknown> | null;
     sources: { source_type: string; name: string } | { source_type: string; name: string }[] | null;
+  };
+
+  // Effective publish time: some feeds post-date articles (IST stamped as
+  // UTC → ~5.5h in the future). For anything more than 15 min ahead, fall
+  // back to when we ingested it — a far better estimate of the real time.
+  const FUTURE_SLACK_MS = 15 * 60 * 1000;
+  const effMs = (s: SignalRow): number => {
+    const p = new Date(s.published_at).getTime();
+    if (Number.isFinite(p) && p <= Date.now() + FUTURE_SLACK_MS) return p;
+    const ing = s.ingested_at ? new Date(s.ingested_at).getTime() : NaN;
+    return Number.isFinite(ing) ? Math.min(ing, Date.now()) : Date.now();
   };
 
   type TrendRow = {
@@ -186,7 +198,7 @@ export async function GET(req: Request) {
     if (windowParam !== "watching") return true;
     let newest = 0;
     for (const s of sigs) {
-      const t = new Date(s.published_at).getTime();
+      const t = effMs(s);
       if (t > newest) newest = t;
     }
     const ageNewestMin = (Date.now() - newest) / (60 * 1000);
@@ -205,19 +217,16 @@ export async function GET(req: Request) {
       else if (st === "google_news") sourceTypeSet.add("gn");
     }
 
-    // Newest-first — used both for the article previews and to pick the
-    // card's representative image (the first article that has one).
-    const byNewest = [...signals].sort(
-      (a, b) =>
-        new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
-    );
+    // Newest-first (by effective time) — used both for the article previews
+    // and to pick the card's representative image (first article with one).
+    const byNewest = [...signals].sort((a, b) => effMs(b) - effMs(a));
 
     const topSignals = byNewest.slice(0, 8).map((s) => {
       const srcRel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
       return {
         author: s.author ?? srcRel?.name ?? "Source",
         text: extractTitle(s.content),
-        meta: timeAgo(s.published_at),
+        meta: timeAgoMs(effMs(s)),
         url: s.url ?? undefined,
         image: imageFromMeta(s.metadata),
       };
@@ -226,10 +235,10 @@ export async function GET(req: Request) {
     // Card image = the newest article in the cluster that carries one.
     const image = byNewest.map((s) => imageFromMeta(s.metadata)).find(Boolean);
 
-    // Newest signal age — shown on the card as "last seen".
+    // Newest signal age (effective time) — shown on the card as "last seen".
     let newest = 0;
     for (const s of signals) {
-      const t = new Date(s.published_at).getTime();
+      const t = effMs(s);
       if (t > newest) newest = t;
     }
     const lastSeenMinAgo = newest > 0
@@ -281,8 +290,8 @@ function imageFromMeta(meta: Record<string, unknown> | null): string | undefined
   return typeof img === "string" && img.length > 0 ? img : undefined;
 }
 
-function timeAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
+function timeAgoMs(publishedMs: number): string {
+  const ms = Date.now() - publishedMs;
   const m = Math.round(ms / 60000);
   if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;
