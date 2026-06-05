@@ -57,6 +57,19 @@ function isImageUrl(url: string): boolean {
   return /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(url);
 }
 
+/** Coerce an rss-parser field that may be a string OR an object
+ * ({ _: "value", $: {...} }) into a plain string. */
+function asStr(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    if (typeof o._ === "string") return o._;
+    if (typeof o["#"] === "string") return o["#"];
+    if (typeof o.href === "string") return o.href;
+  }
+  return "";
+}
+
 function toArray(v: unknown): unknown[] {
   if (Array.isArray(v)) return v;
   return v != null ? [v] : [];
@@ -108,8 +121,10 @@ export async function fetchRssFeed(
     const snippet = ((item.contentSnippet ?? "") as string).slice(0, 280).trim();
     const content = snippet ? `${title} — ${snippet}` : title;
 
-    // External ID: prefer guid, fall back to link, then to a stable hash of title.
-    const idBase = item.guid || item.link || `${sourceName}::${title}`;
+    // Some feeds (e.g. ThePrint) ship guid/link as an object
+    // ({ _: "...", $: {...} }) rather than a string — coerce safely.
+    const link = asStr(item.link);
+    const idBase = asStr(item.guid) || link || `${sourceName}::${title}`;
     const external_id = idBase.slice(0, 500); // DB safety
 
     const image = pickFeedImage(item as unknown as Record<string, unknown>);
@@ -118,7 +133,7 @@ export async function fetchRssFeed(
       external_id,
       author: feed.title ?? sourceName,
       content,
-      url: item.link ?? null,
+      url: link || null,
       published_at: item.isoDate ?? new Date().toISOString(),
       metadata: {
         title,
