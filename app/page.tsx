@@ -25,9 +25,23 @@ const BUCKETS: Array<{
   { key: "social",     label_en: "Social",     label_hi: "सोशल",     hint: "Stories carried on X / social sources" },
 ];
 
+// ─── Category filters ─────────────────────────────────────────
+// Only the sections the clusterer actually produces (see sectionForCategory
+// in lib/clustering/lexical.ts) — plus "All".
+const CATEGORIES: Array<{ key: SectionKey | "all"; en: string; hi: string }> = [
+  { key: "all",      en: "All",           hi: "सभी" },
+  { key: "national", en: "National",      hi: "राष्ट्रीय" },
+  { key: "politics", en: "Politics",      hi: "राजनीति" },
+  { key: "business", en: "Business",      hi: "बिज़नेस" },
+  { key: "sports",   en: "Sports",        hi: "खेल" },
+  { key: "enter",    en: "Entertainment", hi: "मनोरंजन" },
+  { key: "tech",     en: "Tech",          hi: "टेक" },
+];
+
 // ─── Page ─────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { t, lang } = useLang();
+  const [filter, setFilter] = useState<SectionKey | "all">("all");
   const [openTrend, setOpenTrend] = useState<Trend | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorTrend, setEditorTrend] = useState<Trend | null>(null);
@@ -88,10 +102,21 @@ export default function DashboardPage() {
     setOpenTrend(null);
   }
 
+  // Flatten across feeds for category counts + filtering.
+  const allTrends = [
+    ...buckets.breaking,
+    ...buckets.trending,
+    ...buckets.developing,
+    ...buckets.watching,
+    ...buckets.social,
+  ];
+  const catCount = (key: SectionKey | "all") =>
+    key === "all" ? allTrends.length : allTrends.filter((tr) => tr.section === key).length;
+
   // The board — one column per feed, each scrolls independently.
   return (
     <>
-      <div className="flex items-center justify-between pb-3 mb-4 border-b border-[var(--text)]">
+      <div className="flex items-center justify-between pb-3 mb-3 border-b border-[var(--text)]">
         <span className="text-[14px] font-medium">{t("trendingNow")}</span>
         <span className="font-mono text-xs text-[var(--text-3)]">
           {loadState === "loading"
@@ -101,19 +126,51 @@ export default function DashboardPage() {
             : t("live")}
           {" · "}
           <b className="text-[var(--text)] font-medium">
-            {buckets.breaking.length +
-              buckets.trending.length +
-              buckets.developing.length +
-              buckets.watching.length +
-              buckets.social.length}{" "}
-            {t("topics")}
+            {catCount(filter)} {t("topics")}
           </b>
         </span>
       </div>
 
+      {/* Category filters */}
+      <div className="flex items-center gap-1.5 flex-wrap mb-4">
+        {CATEGORIES.map((c) => {
+          const active = filter === c.key;
+          const n = catCount(c.key);
+          return (
+            <button
+              key={c.key}
+              onClick={() => setFilter(c.key)}
+              className={`flex items-center gap-1.5 text-[12.5px] font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                active
+                  ? "bg-[var(--text)] text-white border-[var(--text)]"
+                  : "bg-white text-[var(--text-2)] border-[var(--border)] hover:border-[var(--text-2)] hover:text-[var(--text)]"
+              }`}
+            >
+              {c.key !== "all" && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{ background: SECTION_COLORS[c.key as SectionKey] }}
+                />
+              )}
+              {lang === "hi" ? c.hi : c.en}
+              <span
+                className={`font-mono text-[10.5px] ${
+                  active ? "text-white/70" : "text-[var(--text-3)]"
+                }`}
+              >
+                {n}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 items-start">
         {BUCKETS.map((b) => {
-          const items = buckets[b.key];
+          const items =
+            filter === "all"
+              ? buckets[b.key]
+              : buckets[b.key].filter((tr) => tr.section === filter);
           const label = lang === "hi" ? b.label_hi : b.label_en;
           const accent =
             b.key === "breaking"
