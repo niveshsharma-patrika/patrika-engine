@@ -1,4 +1,3 @@
-import { Shell } from "@/components/shell";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +41,7 @@ export default async function SuggestionsPage() {
   const trends = await loadTrends();
 
   return (
-    <Shell>
+    <>
       <div className="flex items-end justify-between gap-6 pb-4 mb-6 border-b border-[var(--border)]">
         <div>
           <h1 className="text-2xl font-medium">Editorial Suggestions</h1>
@@ -96,6 +95,6 @@ export default async function SuggestionsPage() {
           ))}
         </div>
       )}
-    </Shell>
+    </>
   );
 }

@@ -1,4 +1,3 @@
-import { Shell } from "@/components/shell";
 import {
   PipelineSwitches,
   type PipelineRow,
@@ -102,7 +101,7 @@ export default async function AdminPage() {
   );
 
   return (
-    <Shell>
+    <>
       <div className="flex items-end justify-between gap-6 pb-4 mb-6 border-b border-[var(--border)]">
         <div>
           <h1 className="text-2xl font-medium">Admin</h1>
@@ -254,6 +253,6 @@ export default async function AdminPage() {
           Usage tracking starts once drafts are generated and the model logs calls. Refinement during ingestion is also tracked here.
         </p>
       </section>
-    </Shell>
+    </>
   );
 }

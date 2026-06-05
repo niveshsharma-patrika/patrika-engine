@@ -15,7 +15,6 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
-import { Shell } from "@/components/shell";
 import { useLang } from "@/lib/i18n/context";
 
 type Item = {
@@ -130,7 +129,7 @@ export default function LastRunPage() {
   }
 
   return (
-    <Shell>
+    <>
       <section className="mb-6">
         <h1 className="text-[28px] font-bold tracking-tight mb-2">
           {t("pageLastRunTitle")}
@@ -281,7 +280,7 @@ export default function LastRunPage() {
           {lang === "hi" ? "लोड नहीं हो सका।" : "Could not load."}
         </div>
       )}
-    </Shell>
+    </>
   );
 }
 

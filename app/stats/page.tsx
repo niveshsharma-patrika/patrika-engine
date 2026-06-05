@@ -1,4 +1,3 @@
-import { Shell } from "@/components/shell";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -148,7 +147,7 @@ export default async function StatsPage() {
   ]);
 
   return (
-    <Shell>
+    <>
       <div className="flex items-end justify-between gap-6 pb-4 mb-6 border-b border-[var(--border)]">
         <div>
           <h1 className="text-2xl font-medium">Pipeline stats</h1>
@@ -291,7 +290,7 @@ export default async function StatsPage() {
           </tbody>
         </table>
       </div>
-    </Shell>
+    </>
   );
 }
 

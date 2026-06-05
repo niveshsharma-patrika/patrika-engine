@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { LangProvider } from "@/lib/i18n/context";
+import { Shell } from "@/components/shell";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -32,7 +33,9 @@ export default function RootLayout({
       className={`${roboto.variable} ${robotoMono.variable} h-full`}
     >
       <body className="min-h-full antialiased">
-        <LangProvider>{children}</LangProvider>
+        <LangProvider>
+          <Shell>{children}</Shell>
+        </LangProvider>
       </body>
     </html>
   );

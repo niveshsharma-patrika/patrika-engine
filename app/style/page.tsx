@@ -14,7 +14,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, X, Save, Trash2, FileText, Loader2, ExternalLink, Link as LinkIcon, Upload, Download } from "lucide-react";
 
-import { Shell } from "@/components/shell";
 import { useLang } from "@/lib/i18n/context";
 
 type Sample = {
@@ -170,7 +169,7 @@ export default function StylePage() {
   }
 
   return (
-    <Shell>
+    <>
       <section className="mb-8">
         <h1 className="text-[28px] font-bold tracking-tight mb-2">
           {lang === "hi" ? "शैली मॉड्यूल" : "Style Module"}
@@ -423,7 +422,7 @@ export default function StylePage() {
           }}
         />
       )}
-    </Shell>
+    </>
   );
 }
 

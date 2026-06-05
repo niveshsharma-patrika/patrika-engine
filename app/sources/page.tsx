@@ -1,4 +1,3 @@
-import { Shell } from "@/components/shell";
 import { SourceTable, type SourceRow } from "@/components/source-table";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -62,7 +61,7 @@ export default async function SourcesPage() {
   };
 
   return (
-    <Shell>
+    <>
       <div className="flex items-end justify-between gap-6 pb-4 mb-6 border-b border-[var(--border)]">
         <div>
           <h1 className="text-2xl font-medium">Sources</h1>
@@ -98,6 +97,6 @@ export default async function SourcesPage() {
           useful if a site fixes its feed.
         </p>
       </div>
-    </Shell>
+    </>
   );
 }

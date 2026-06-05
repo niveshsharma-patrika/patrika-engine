@@ -18,7 +18,6 @@
 
 import { useEffect, useState } from "react";
 
-import { Shell } from "@/components/shell";
 import { useLang } from "@/lib/i18n/context";
 import { TrendCard } from "@/components/trend-card";
 import { TrendDrawer } from "@/components/trend-drawer";
@@ -54,7 +53,7 @@ export default function TodayPage() {
   }, []);
 
   return (
-    <Shell>
+    <>
       <section className="mb-8">
         <h1 className="text-[28px] font-bold tracking-tight mb-2">
           {t("pageTodayTitle")}
@@ -112,6 +111,6 @@ export default function TodayPage() {
           readOnly
         />
       )}
-    </Shell>
+    </>
   );
 }

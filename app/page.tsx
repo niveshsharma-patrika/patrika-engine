@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { Plus, ChevronRight, Newspaper } from "lucide-react";
 
-import { Shell } from "@/components/shell";
 import { useLang } from "@/lib/i18n/context";
 import { SECTION_COLORS, type SectionKey, type Trend } from "@/lib/data/trends";
 import { TrustPips, freshness } from "@/components/trend-card";
 import { TrendDrawer } from "@/components/trend-drawer";
+import { SkeletonCard } from "@/components/skeletons";
 
 // ─── Editorial feeds (the board columns) ──────────────────────
 type BucketKey = "breaking" | "trending" | "watching" | "social";
@@ -87,7 +87,7 @@ export default function DashboardPage() {
 
   // The board — one column per feed, each scrolls independently.
   return (
-    <Shell>
+    <>
       <div className="flex items-center justify-between pb-3 mb-4 border-b border-[var(--text)]">
         <span className="text-[14px] font-medium">{t("trendingNow")}</span>
         <span className="font-mono text-xs text-[var(--text-3)]">
@@ -155,11 +155,15 @@ export default function DashboardPage() {
                       onClick={() => setOpenTrend(tr)}
                     />
                   ))
+                ) : loadState === "loading" ? (
+                  <>
+                    <SkeletonCard />
+                    <SkeletonCard />
+                    <SkeletonCard />
+                  </>
                 ) : (
                   <div className="text-center text-[12px] text-[var(--text-3)] py-12 px-3 leading-snug">
-                    {loadState === "loading"
-                      ? t("loading")
-                      : b.key === "social"
+                    {b.key === "social"
                       ? lang === "hi"
                         ? "अभी कोई सोशल स्रोत कनेक्ट नहीं है"
                         : "No social source connected yet"
@@ -200,7 +204,7 @@ export default function DashboardPage() {
           onClose={() => setEditorOpen(false)}
         />
       )}
-    </Shell>
+    </>
   );
 }
 
