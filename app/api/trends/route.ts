@@ -20,11 +20,12 @@ const VALID_SECTIONS: ReadonlyArray<SectionKey> = [
   "weather", "enter", "tech", "national",
 ];
 
-// ─── Time-window rules (must match lib/clustering/index.ts) ──────
-const BREAKING_MAX_MIN = 30;   // broke within the last 30 min
-const TRENDING_MAX_MIN = 240;  // broke within the last 4 hours
-const NEWS_PUBLISHER_BAR = 3;  // "3 distinct sources" = confirmed news
-const WATCHING_FRESH_MIN = 240; // a 2-source story is "watchable" for 4h
+// ─── Time-window rules (story age = first_seen) ─────────────────
+const BREAKING_MAX_MIN = 30;     // story started within the last 30 min
+const TRENDING_MAX_MIN = 240;    // story started within the last 4 hours
+const NEWS_PUBLISHER_BAR = 3;    // "3 distinct sources" = confirmed news
+const WATCHING_FRESH_MIN = 240;  // a 2-source story is "watchable" for 4h
+const DEVELOPING_FRESH_MIN = 120; // >4h-old story still counts if covered <2h ago
 
 /**
  * GET /api/trends — trends from Supabase, shaped for the dashboard.
@@ -53,11 +54,12 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const requested = url.searchParams.get("window") ?? "trending";
-  type Win = "breaking" | "trending" | "watching" | "social";
+  type Win = "breaking" | "trending" | "developing" | "watching" | "social";
   // Back-compat with the old window names.
   const alias: Record<string, Win> = {
     breaking: "breaking",
     trending: "trending",
+    developing: "developing",
     watching: "watching",
     social: "social",
     now: "breaking",
@@ -105,6 +107,19 @@ export async function GET(req: Request) {
       .order("publisher_count", { ascending: false })
       .order("first_seen", { ascending: false })
       .limit(80);
+  } else if (windowParam === "developing") {
+    // Older than 4h (aged out of Trending) but still alive — kept only if a
+    // fresh article landed recently (enforced by the JS filter below). The
+    // ongoing-saga lane.
+    query = supabase
+      .from("trends")
+      .select(baseSelect)
+      .eq("status", "active")
+      .gte("publisher_count", NEWS_PUBLISHER_BAR)
+      .lt("first_seen", isoMinAgo(TRENDING_MAX_MIN))
+      .gte("last_updated", isoMinAgo(DEVELOPING_FRESH_MIN))
+      .order("publisher_count", { ascending: false })
+      .limit(60);
   } else if (windowParam === "watching") {
     // watching — exactly 2 publishers (broke_at is null until 3 is reached).
     query = supabase
@@ -198,14 +213,17 @@ export async function GET(req: Request) {
         return sr?.source_type === "twitter";
       });
     }
-    if (windowParam !== "watching") return true;
-    let newest = 0;
-    for (const s of sigs) {
-      const t = effMs(s);
-      if (t > newest) newest = t;
+    if (windowParam === "watching" || windowParam === "developing") {
+      let newest = 0;
+      for (const s of sigs) {
+        const t = effMs(s);
+        if (t > newest) newest = t;
+      }
+      const ageNewestMin = (Date.now() - newest) / (60 * 1000);
+      const limit = windowParam === "developing" ? DEVELOPING_FRESH_MIN : WATCHING_FRESH_MIN;
+      return ageNewestMin <= limit;
     }
-    const ageNewestMin = (Date.now() - newest) / (60 * 1000);
-    return ageNewestMin <= WATCHING_FRESH_MIN;
+    return true;
   });
 
   const trends: Trend[] = filtered.map((row, idx) => {

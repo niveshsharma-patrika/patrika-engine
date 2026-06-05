@@ -10,7 +10,7 @@ import { TrendDrawer } from "@/components/trend-drawer";
 import { SkeletonCard } from "@/components/skeletons";
 
 // ─── Editorial feeds (the board columns) ──────────────────────
-type BucketKey = "breaking" | "trending" | "watching" | "social";
+type BucketKey = "breaking" | "trending" | "developing" | "watching" | "social";
 
 const BUCKETS: Array<{
   key: BucketKey;
@@ -18,10 +18,11 @@ const BUCKETS: Array<{
   label_hi: string;
   hint: string;
 }> = [
-  { key: "breaking", label_en: "Breaking", label_hi: "तत्काल",   hint: "3+ sources · story started in the last 30 min" },
-  { key: "trending", label_en: "Trending", label_hi: "ट्रेंडिंग", hint: "3+ sources · story started 30 min – 4 h ago" },
-  { key: "watching", label_en: "Watching", label_hi: "नज़र में",  hint: "2 sources · one outlet short of the bar" },
-  { key: "social",   label_en: "Social",   label_hi: "सोशल",     hint: "Stories carried on X / social sources" },
+  { key: "breaking",   label_en: "Breaking",   label_hi: "तत्काल",   hint: "3+ sources · story started in the last 30 min" },
+  { key: "trending",   label_en: "Trending",   label_hi: "ट्रेंडिंग", hint: "3+ sources · story started 30 min – 4 h ago" },
+  { key: "developing", label_en: "Developing", label_hi: "जारी",     hint: "3+ sources · older story, still covered in last 2 h" },
+  { key: "watching",   label_en: "Watching",   label_hi: "नज़र में",  hint: "2 sources · one outlet short of the bar" },
+  { key: "social",     label_en: "Social",     label_hi: "सोशल",     hint: "Stories carried on X / social sources" },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ export default function DashboardPage() {
   const [buckets, setBuckets] = useState<Record<BucketKey, Trend[]>>({
     breaking: [],
     trending: [],
+    developing: [],
     watching: [],
     social: [],
   });
@@ -44,7 +46,7 @@ export default function DashboardPage() {
     let cancelled = false;
     async function load() {
       try {
-        const keys: BucketKey[] = ["breaking", "trending", "watching", "social"];
+        const keys: BucketKey[] = ["breaking", "trending", "developing", "watching", "social"];
         const results = await Promise.all(
           keys.map((k) =>
             fetch(`/api/trends?window=${k}`, { cache: "no-store" })
@@ -59,8 +61,9 @@ export default function DashboardPage() {
         setBuckets({
           breaking: results[0],
           trending: results[1],
-          watching: results[2],
-          social: results[3],
+          developing: results[2],
+          watching: results[3],
+          social: results[4],
         });
         setLoadState("ready");
       } catch {
@@ -100,6 +103,7 @@ export default function DashboardPage() {
           <b className="text-[var(--text)] font-medium">
             {buckets.breaking.length +
               buckets.trending.length +
+              buckets.developing.length +
               buckets.watching.length +
               buckets.social.length}{" "}
             {t("topics")}
@@ -107,7 +111,7 @@ export default function DashboardPage() {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-start">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 items-start">
         {BUCKETS.map((b) => {
           const items = buckets[b.key];
           const label = lang === "hi" ? b.label_hi : b.label_en;
@@ -116,6 +120,8 @@ export default function DashboardPage() {
               ? "var(--red)"
               : b.key === "trending"
               ? "var(--blue)"
+              : b.key === "developing"
+              ? "var(--green)"
               : b.key === "watching"
               ? "var(--amber)"
               : "var(--purple)";
