@@ -37,7 +37,7 @@ export async function enrichPendingSignals(
 
   const { data: rows, error } = await supabase
     .from("signals")
-    .select("id, url")
+    .select("id, url, metadata")
     .is("enriched_at", null)
     .eq("enrich_failed", false)
     .not("url", "is", null)
@@ -48,7 +48,8 @@ export async function enrichPendingSignals(
     throw new Error(`enrich: fetch pending failed: ${error.message}`);
   }
 
-  const pending = ((rows as Array<{ id: string; url: string }> | null) ?? []);
+  type PendingRow = { id: string; url: string; metadata: Record<string, unknown> | null };
+  const pending = ((rows as PendingRow[] | null) ?? []);
 
   let enriched = 0;
   let failed = 0;
@@ -74,19 +75,21 @@ export async function enrichPendingSignals(
           failed += 1;
           continue;
         }
+        // Merge an og:image / JSON-LD image into metadata, but never
+        // overwrite an image the RSS feed already gave us.
+        const existingMeta = (row.metadata ?? {}) as Record<string, unknown>;
+        const update: Record<string, unknown> = {
+          description: data.description,
+          keywords: data.keywords.length > 0 ? data.keywords : null,
+          publisher_section: data.publisher_section,
+          enriched_at: nowIso,
+        };
+        if (data.image && !existingMeta.image) {
+          update.metadata = { ...existingMeta, image: data.image };
+        }
         const { error: uErr } = await supabase
           .from("signals")
-          .update({
-            description: data.description,
-            keywords: data.keywords.length > 0 ? data.keywords : null,
-            publisher_section: data.publisher_section,
-            enriched_at: nowIso,
-            // Clear the embedding so the embed step re-embeds with the
-            // richer text (title + description + keywords). Without this
-            // the signal would keep its old title-only embedding forever.
-            embedding: null,
-            embedded_at: null,
-          })
+          .update(update)
           .eq("id", row.id);
         if (uErr) {
           failed += 1;

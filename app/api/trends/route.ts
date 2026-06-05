@@ -71,7 +71,7 @@ export async function GET(req: Request) {
       story_type, story_type_hi, is_national_or_world,
       signal_count, publisher_count, last_updated, first_seen, broke_at,
       signals (
-        id, author, content, published_at, url,
+        id, author, content, published_at, url, metadata,
         sources (source_type, name)
       )
     `;
@@ -127,6 +127,7 @@ export async function GET(req: Request) {
     content: string;
     published_at: string;
     url: string | null;
+    metadata: Record<string, unknown> | null;
     sources: { source_type: string; name: string } | { source_type: string; name: string }[] | null;
   };
 
@@ -183,20 +184,26 @@ export async function GET(req: Request) {
       else if (st === "google_news") sourceTypeSet.add("gn");
     }
 
-    const topSignals = [...signals]
-      .sort(
-        (a, b) =>
-          new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
-      )
-      .slice(0, 3)
-      .map((s) => {
-        const srcRel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
-        return {
-          author: s.author ?? srcRel?.name ?? "Source",
-          text: extractTitle(s.content),
-          meta: timeAgo(s.published_at),
-        };
-      });
+    // Newest-first — used both for the article previews and to pick the
+    // card's representative image (the first article that has one).
+    const byNewest = [...signals].sort(
+      (a, b) =>
+        new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
+    );
+
+    const topSignals = byNewest.slice(0, 8).map((s) => {
+      const srcRel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
+      return {
+        author: s.author ?? srcRel?.name ?? "Source",
+        text: extractTitle(s.content),
+        meta: timeAgo(s.published_at),
+        url: s.url ?? undefined,
+        image: imageFromMeta(s.metadata),
+      };
+    });
+
+    // Card image = the newest article in the cluster that carries one.
+    const image = byNewest.map((s) => imageFromMeta(s.metadata)).find(Boolean);
 
     // Newest signal age — shown on the card as "last seen".
     let newest = 0;
@@ -234,6 +241,7 @@ export async function GET(req: Request) {
       storyType_hi: row.story_type_hi ?? undefined,
       isNationalOrWorld: row.is_national_or_world ?? false,
       lastSeenMinAgo,
+      image,
       topSignals,
     };
   });
@@ -243,6 +251,13 @@ export async function GET(req: Request) {
 
 function extractTitle(content: string): string {
   return content.split(" — ")[0].slice(0, 200);
+}
+
+/** Pull the image URL a signal stored in metadata.image (set at fetch from
+ * the RSS feed, or during enrichment from og:image / JSON-LD). */
+function imageFromMeta(meta: Record<string, unknown> | null): string | undefined {
+  const img = meta?.image;
+  return typeof img === "string" && img.length > 0 ? img : undefined;
 }
 
 function timeAgo(iso: string): string {

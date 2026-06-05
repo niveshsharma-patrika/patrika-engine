@@ -10,12 +10,68 @@
  *     (we don't render Editor on /today to keep that page focused on the digest)
  */
 
+import { useState } from "react";
 import Link from "next/link";
 import { X, ExternalLink } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
 import { SECTION_COLORS, type Trend } from "@/lib/data/trends";
 import { SourcePill, TrustPips, freshness } from "@/components/trend-card";
+
+type ArticleSignal = NonNullable<Trend["topSignals"]>[number];
+
+/** One article in the cluster, shown as a card. Links out to the source
+ * when a URL is available; the thumbnail comes from that article. */
+function ArticleCard({ sig }: { sig: ArticleSignal }) {
+  const [imgOk, setImgOk] = useState(true);
+  const inner = (
+    <>
+      {sig.image && imgOk && (
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-[var(--surface-2)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={sig.image}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setImgOk(false)}
+            className="h-full w-full object-cover"
+          />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-[11px] text-[var(--text-3)] truncate">
+            {sig.author}
+          </span>
+          {sig.url && (
+            <ExternalLink
+              size={13}
+              className="shrink-0 text-[var(--text-3)] group-hover:text-[var(--red)]"
+            />
+          )}
+        </div>
+        <div className="text-[13.5px] text-[var(--text)] leading-snug mt-0.5 line-clamp-3">
+          {sig.text}
+        </div>
+        {sig.meta && (
+          <div className="font-mono text-[11px] text-[var(--text-3)] mt-1">{sig.meta}</div>
+        )}
+      </div>
+    </>
+  );
+
+  const cls =
+    "flex gap-3 p-2.5 rounded-lg border border-[var(--border)] hover:border-[var(--text)] hover:shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all group";
+
+  return sig.url ? (
+    <a href={sig.url} target="_blank" rel="noopener noreferrer" className={cls}>
+      {inner}
+    </a>
+  ) : (
+    <div className={cls}>{inner}</div>
+  );
+}
 
 export type GenerateMode = "factual" | "angle";
 
@@ -87,24 +143,14 @@ export function TrendDrawer({
           {trend.topSignals && trend.topSignals.length > 0 && (
             <div className="py-4 border-b border-[var(--border)]">
               <h5 className="text-xs uppercase tracking-wider text-[var(--text-3)] font-medium mb-3">
-                Top signals
+                {lang === "hi" ? "कवरेज" : "Coverage"}
+                <span className="ml-2 font-mono text-[var(--text-3)] normal-case tracking-normal">
+                  {trend.topSignals.length}
+                </span>
               </h5>
               <div className="space-y-2">
                 {trend.topSignals.map((sig, i) => (
-                  <div
-                    key={i}
-                    className="text-sm pb-2 border-b border-[var(--border)] last:border-0"
-                  >
-                    <div className="font-mono text-[11px] text-[var(--text-3)] mb-1">
-                      {sig.author}
-                    </div>
-                    <div className="text-[var(--text)]">{sig.text}</div>
-                    {sig.meta && (
-                      <div className="font-mono text-[11px] text-[var(--text-3)] mt-1">
-                        {sig.meta}
-                      </div>
-                    )}
-                  </div>
+                  <ArticleCard key={i} sig={sig} />
                 ))}
               </div>
             </div>

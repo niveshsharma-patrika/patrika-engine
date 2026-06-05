@@ -8,6 +8,7 @@
  * vocabulary without duplicating code.
  */
 
+import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
@@ -69,6 +70,7 @@ export function TrendCard({
   dimmed?: boolean;
 }) {
   const { lang } = useLang();
+  const [imgOk, setImgOk] = useState(true);
   const title = lang === "hi" && trend.title_hi ? trend.title_hi : trend.title;
   const tag = lang === "hi" && trend.desk_hi ? trend.desk_hi : trend.tag;
   const lastSeen = freshness(trend.lastSeenMinAgo, lang);
@@ -81,36 +83,51 @@ export function TrendCard({
   return (
     <button
       onClick={onClick}
-      className={`relative bg-white border border-[var(--border)] hover:border-[var(--border-2)] rounded-md p-5 pt-4 pb-3.5 text-left flex flex-col gap-2.5 min-h-[168px] transition-all overflow-hidden group hover:shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04)] ${cardOpacity}`}
+      className={`relative bg-white border border-[var(--border)] hover:border-[var(--border-2)] rounded-md text-left flex flex-col min-h-[168px] transition-all overflow-hidden group hover:shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04)] ${cardOpacity}`}
     >
       <span
-        className="absolute top-0 left-0 right-0 h-[3px]"
+        className="absolute top-0 left-0 right-0 h-[3px] z-10"
         style={{
           background: dimmed ? "var(--border-2)" : SECTION_COLORS[trend.section],
         }}
       />
-      <div className="flex justify-between items-baseline gap-3 mt-1">
-        <span className="text-[10.5px] uppercase tracking-wider text-[var(--text-3)] font-medium">
-          {tag}
-        </span>
-        <span className={`font-mono text-[13px] font-medium ${velocityColor} whitespace-nowrap`}>
-          {trend.signalCount} {trend.signalCount === 1 ? "source" : "sources"}
-          <span className="text-[var(--text-3)] ml-1.5 font-normal">· {lastSeen}</span>
-        </span>
-      </div>
-      <h3 className="text-[18px] font-medium leading-snug flex-1 -tracking-[0.005em]">
-        {title}
-      </h3>
-      <div className="flex items-center justify-between pt-3 gap-2.5 border-t border-[var(--border)]">
-        <div className="flex gap-1">
-          {trend.sources.map((s) => (
-            <SourcePill key={s} src={s} />
-          ))}
+      {trend.image && imgOk && (
+        <div className="h-28 w-full overflow-hidden bg-[var(--surface-2)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={trend.image}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setImgOk(false)}
+            className={`h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${dimmed ? "grayscale opacity-80" : ""}`}
+          />
         </div>
-        <ChevronRight
-          size={14}
-          className="text-[var(--text-3)] group-hover:text-[var(--red)] group-hover:translate-x-0.5 transition-transform"
-        />
+      )}
+      <div className="p-5 pt-4 pb-3.5 flex flex-col gap-2.5 flex-1">
+        <div className="flex justify-between items-baseline gap-3">
+          <span className="text-[10.5px] uppercase tracking-wider text-[var(--text-3)] font-medium">
+            {tag}
+          </span>
+          <span className={`font-mono text-[13px] font-medium ${velocityColor} whitespace-nowrap`}>
+            {trend.signalCount} {trend.signalCount === 1 ? "source" : "sources"}
+            <span className="text-[var(--text-3)] ml-1.5 font-normal">· {lastSeen}</span>
+          </span>
+        </div>
+        <h3 className="text-[18px] font-medium leading-snug flex-1 -tracking-[0.005em]">
+          {title}
+        </h3>
+        <div className="flex items-center justify-between pt-3 gap-2.5 border-t border-[var(--border)]">
+          <div className="flex gap-1">
+            {trend.sources.map((s) => (
+              <SourcePill key={s} src={s} />
+            ))}
+          </div>
+          <ChevronRight
+            size={14}
+            className="text-[var(--text-3)] group-hover:text-[var(--red)] group-hover:translate-x-0.5 transition-transform"
+          />
+        </div>
       </div>
     </button>
   );

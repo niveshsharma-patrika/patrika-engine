@@ -1,5 +1,12 @@
 import Parser from "rss-parser";
 
+// Capture image fields most news feeds expose. enclosure is parsed by
+// rss-parser out of the box; media:* need to be registered as custom fields.
+const MEDIA_FIELDS: Array<[string, string, { keepArray: true }]> = [
+  ["media:content", "mediaContent", { keepArray: true }],
+  ["media:thumbnail", "mediaThumbnail", { keepArray: true }],
+];
+
 // Default parser: pretends to be Chrome so sources like Moneycontrol /
 // FirstPost / News18 that block non-browser UAs let us through.
 const DEFAULT_PARSER = new Parser({
@@ -10,6 +17,7 @@ const DEFAULT_PARSER = new Parser({
     Accept: "application/rss+xml, application/xml, text/xml, */*",
     "Accept-Language": "en-IN,en;q=0.9,hi;q=0.8",
   },
+  customFields: { item: MEDIA_FIELDS },
 });
 
 // xcancel.com / nitter forks require an RSS-reader-style UA + RSS Accept
@@ -24,6 +32,7 @@ const XCANCEL_PARSER = new Parser({
     "User-Agent": PATRIKA_RSS_UA,
     Accept: "application/rss+xml",
   },
+  customFields: { item: MEDIA_FIELDS },
 });
 
 function pickParser(url: string): Parser {
@@ -41,6 +50,39 @@ export type RawSignal = {
   published_at: string;
   metadata: Record<string, unknown>;
 };
+
+// ─── Image extraction from the feed item ────────────────────────
+
+function isImageUrl(url: string): boolean {
+  return /\.(jpe?g|png|webp|gif|avif)(\?|#|$)/i.test(url);
+}
+
+function toArray(v: unknown): unknown[] {
+  if (Array.isArray(v)) return v;
+  return v != null ? [v] : [];
+}
+
+/** Best-effort image URL from a feed item: enclosure, then media:content
+ * (image only), then media:thumbnail. Returns null if none look like images. */
+function pickFeedImage(item: Record<string, unknown>): string | null {
+  const enc = item.enclosure as { url?: string; type?: string } | undefined;
+  if (enc?.url && (!enc.type || /^image\//i.test(enc.type))) return enc.url;
+
+  for (const m of toArray(item.mediaContent)) {
+    const a = (m as { $?: { url?: string; medium?: string; type?: string } })?.$;
+    if (!a?.url) continue;
+    if (a.medium === "image" || /^image\//i.test(a.type ?? "") || isImageUrl(a.url)) {
+      return a.url;
+    }
+  }
+
+  for (const m of toArray(item.mediaThumbnail)) {
+    const a = (m as { $?: { url?: string } })?.$;
+    if (a?.url) return a.url;
+  }
+
+  return null;
+}
 
 /**
  * Fetch an RSS/Atom feed and normalise items into RawSignals.
@@ -70,6 +112,8 @@ export async function fetchRssFeed(
     const idBase = item.guid || item.link || `${sourceName}::${title}`;
     const external_id = idBase.slice(0, 500); // DB safety
 
+    const image = pickFeedImage(item as unknown as Record<string, unknown>);
+
     return {
       external_id,
       author: feed.title ?? sourceName,
@@ -80,6 +124,7 @@ export async function fetchRssFeed(
         title,
         snippet,
         categories: (item.categories ?? []) as string[],
+        ...(image ? { image } : {}),
       },
     };
   });

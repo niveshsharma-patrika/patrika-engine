@@ -22,6 +22,7 @@ export type EnrichedFields = {
   description: string | null;
   keywords: string[];
   publisher_section: string | null;
+  image: string | null;
 };
 
 const FETCH_TIMEOUT_MS = 8000;
@@ -70,14 +71,16 @@ export function parseJsonLd(html: string): EnrichedFields | null {
   const keywords =
     (jl?.keywords && jl.keywords.length > 0 ? jl.keywords : meta.keywords) ?? [];
   const publisher_section = jl?.publisher_section ?? meta.section;
+  const image = jl?.image ?? meta.image;
 
   // If we got nothing useful at all, surface as a failure.
-  if (!description && keywords.length === 0 && !publisher_section) return null;
+  if (!description && keywords.length === 0 && !publisher_section && !image) return null;
 
   return {
     description: description ?? null,
     keywords,
     publisher_section: publisher_section ?? null,
+    image: image ?? null,
   };
 }
 
@@ -131,6 +134,7 @@ function pickFromJsonLd(html: string): EnrichedFields | null {
     keywords: parseKeywords(best.keywords),
     publisher_section:
       pickStr(best.articleSection) ?? pickStr(best.section) ?? null,
+    image: pickImageUrl(best.image),
   };
 }
 
@@ -140,6 +144,7 @@ function scrapeMetaTags(html: string): {
   description: string | null;
   keywords: string[];
   section: string | null;
+  image: string | null;
 } {
   const head = html.slice(0, 80_000);
 
@@ -147,6 +152,14 @@ function scrapeMetaTags(html: string): {
     const mm = head.match(re);
     return mm ? decodeEntities(mm[1].trim()) : null;
   }
+
+  const image =
+    metaContent(
+      /<meta\s+(?:property|name)=["']og:image(?::secure_url|:url)?["']\s+content=["']([^"']+)["']/i
+    ) ??
+    metaContent(
+      /<meta\s+(?:name|property)=["']twitter:image(?::src)?["']\s+content=["']([^"']+)["']/i
+    );
 
   const description =
     metaContent(
@@ -177,7 +190,26 @@ function scrapeMetaTags(html: string): {
       /<meta\s+(?:property|name)=["']article:tag["']\s+content=["']([^"']+)["']/i
     );
 
-  return { description, keywords, section };
+  return { description, keywords, section, image };
+}
+
+/** A JSON-LD `image` can be a URL string, an ImageObject ({url|contentUrl}),
+ * or an array of either. Return the first usable URL. */
+function pickImageUrl(v: unknown): string | null {
+  if (typeof v === "string") return v.trim() || null;
+  if (Array.isArray(v)) {
+    for (const x of v) {
+      const u = pickImageUrl(x);
+      if (u) return u;
+    }
+    return null;
+  }
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    const u = o.url ?? o.contentUrl;
+    if (typeof u === "string") return u.trim() || null;
+  }
+  return null;
 }
 
 function decodeEntities(s: string): string {

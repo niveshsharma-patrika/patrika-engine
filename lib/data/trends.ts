@@ -27,7 +27,9 @@ export type Trend = {
   trust: number; // 0-5
   desk: string;
   suggestedAngle: string;
-  topSignals?: { author: string; text: string; meta?: string }[];
+  // Representative image for the card — taken from one of the cluster's articles.
+  image?: string;
+  topSignals?: { author: string; text: string; meta?: string; url?: string; image?: string }[];
   // Hindi translations (populated for live trends)
   title_hi?: string;
   desk_hi?: string;

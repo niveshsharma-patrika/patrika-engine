@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, ChevronRight } from "lucide-react";
 
 import { Shell } from "@/components/shell";
 import { useLang } from "@/lib/i18n/context";
@@ -204,41 +204,91 @@ function ColumnCard({
   const title = lang === "hi" && trend.title_hi ? trend.title_hi : trend.title;
   const tag = lang === "hi" && trend.desk_hi ? trend.desk_hi : trend.tag;
   const lastSeen = freshness(trend.lastSeenMinAgo, lang);
+  const moreLabel = lang === "hi" ? "और देखें" : "More";
   return (
-    <button
+    <div
       onClick={onClick}
-      className="relative w-full bg-white border border-[var(--border)] hover:border-[var(--border-2)] rounded p-3 text-left flex flex-col gap-2 transition-all group hover:shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="relative w-full bg-white border border-[var(--border)] hover:border-[var(--border-2)] rounded text-left flex flex-col transition-all group hover:shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]"
     >
       <span
-        className="absolute top-0 left-0 right-0 h-[2px]"
+        className="absolute top-0 left-0 right-0 h-[2px] z-10"
         style={{ background: SECTION_COLORS[trend.section] }}
       />
-      <div className="flex items-center justify-between gap-2 mt-0.5">
-        <span className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium truncate">
-          {tag}
-        </span>
-        <span className="font-mono text-[10.5px] text-[var(--text-3)] whitespace-nowrap">
-          {lastSeen}
-        </span>
-      </div>
-      <h3 className="text-[14px] font-medium leading-snug -tracking-[0.005em] line-clamp-3">
-        {title}
-      </h3>
-      <div className="flex items-center justify-between pt-1.5 mt-auto border-t border-[var(--border)] gap-2">
-        <span className="font-mono text-[11px] font-medium text-[var(--text)]">
-          {trend.signalCount}{" "}
-          <span className="text-[var(--text-3)] font-normal">
-            {trend.signalCount === 1 ? "src" : "srcs"}
+
+      <CardImage src={trend.image} />
+
+      <div className="p-3 flex flex-col gap-2 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium truncate">
+              {tag}
+            </span>
+            <span className="flex gap-0.5 shrink-0">
+              {trend.sources.slice(0, 3).map((s) => (
+                <SourcePill key={s} src={s} />
+              ))}
+            </span>
+          </div>
+          <span className="font-mono text-[10.5px] text-[var(--text-3)] whitespace-nowrap">
+            {lastSeen}
           </span>
-        </span>
-        <TrustPips score={trend.trust} />
-        <span className="flex gap-0.5">
-          {trend.sources.slice(0, 3).map((s) => (
-            <SourcePill key={s} src={s} />
-          ))}
-        </span>
+        </div>
+
+        <h3 className="text-[14px] font-medium leading-snug -tracking-[0.005em] line-clamp-3">
+          {title}
+        </h3>
+
+        <div className="flex items-center justify-between pt-1.5 mt-auto border-t border-[var(--border)] gap-2">
+          <span className="flex items-center gap-2">
+            <span className="font-mono text-[11px] font-medium text-[var(--text)]">
+              {trend.signalCount}{" "}
+              <span className="text-[var(--text-3)] font-normal">
+                {trend.signalCount === 1 ? "src" : "srcs"}
+              </span>
+            </span>
+            <TrustPips score={trend.trust} />
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+            }}
+            className="flex items-center gap-0.5 text-[11px] font-medium text-[var(--text-2)] hover:text-[var(--red)] px-1.5 py-0.5 rounded hover:bg-[var(--red-soft)] transition-colors"
+          >
+            {moreLabel}
+            <ChevronRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
       </div>
-    </button>
+    </div>
+  );
+}
+
+/** Card thumbnail — pulled from one of the cluster's articles. Renders
+ * nothing if there's no image or the image fails to load. */
+function CardImage({ src }: { src?: string }) {
+  const [ok, setOk] = useState(true);
+  if (!src || !ok) return null;
+  return (
+    <div className="h-24 w-full overflow-hidden bg-[var(--surface-2)]">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setOk(false)}
+        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+      />
+    </div>
   );
 }
 
