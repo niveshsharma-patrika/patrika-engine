@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, ChevronRight } from "lucide-react";
+import { Plus, ChevronRight, Newspaper } from "lucide-react";
 
 import { Shell } from "@/components/shell";
 import { useLang } from "@/lib/i18n/context";
-import { SECTION_COLORS, type Trend } from "@/lib/data/trends";
-import { SourcePill, TrustPips, freshness } from "@/components/trend-card";
+import { SECTION_COLORS, type SectionKey, type Trend } from "@/lib/data/trends";
+import { TrustPips, freshness } from "@/components/trend-card";
 import { TrendDrawer } from "@/components/trend-drawer";
 
 // ─── Editorial feeds (the three columns) ──────────────────────
@@ -192,7 +192,7 @@ export default function DashboardPage() {
   );
 }
 
-// ─── Column card (compact variant of TrendCard for narrow columns) ───
+// ─── Column card — image-forward tile for the feed columns ───
 function ColumnCard({
   trend,
   onClick,
@@ -216,46 +216,32 @@ function ColumnCard({
       }}
       role="button"
       tabIndex={0}
-      className="relative w-full bg-white border border-[var(--border)] hover:border-[var(--border-2)] rounded text-left flex flex-col transition-all group hover:shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]"
+      className="group relative flex flex-col bg-white border border-[var(--border)] rounded-xl overflow-hidden cursor-pointer transition-all hover:shadow-[0_6px_20px_rgba(0,0,0,0.10)] hover:border-[var(--border-2)] hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]"
     >
-      <span
-        className="absolute top-0 left-0 right-0 h-[2px] z-10"
-        style={{ background: SECTION_COLORS[trend.section] }}
-      />
+      <CardHero src={trend.image} section={trend.section} count={trend.signalCount} />
 
-      <CardImage src={trend.image} />
-
-      <div className="p-3 flex flex-col gap-2 flex-1">
+      <div className="p-3.5 flex flex-col gap-2 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 min-w-0">
+          <span className="flex items-center gap-1.5 min-w-0">
+            <span
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ background: SECTION_COLORS[trend.section] }}
+            />
             <span className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium truncate">
               {tag}
             </span>
-            <span className="flex gap-0.5 shrink-0">
-              {trend.sources.slice(0, 3).map((s) => (
-                <SourcePill key={s} src={s} />
-              ))}
-            </span>
-          </div>
+          </span>
           <span className="font-mono text-[10.5px] text-[var(--text-3)] whitespace-nowrap">
             {lastSeen}
           </span>
         </div>
 
-        <h3 className="text-[14px] font-medium leading-snug -tracking-[0.005em] line-clamp-3">
+        <h3 className="text-[15px] font-medium leading-snug -tracking-[0.005em] line-clamp-2">
           {title}
         </h3>
 
-        <div className="flex items-center justify-between pt-1.5 mt-auto border-t border-[var(--border)] gap-2">
-          <span className="flex items-center gap-2">
-            <span className="font-mono text-[11px] font-medium text-[var(--text)]">
-              {trend.signalCount}{" "}
-              <span className="text-[var(--text-3)] font-normal">
-                {trend.signalCount === 1 ? "src" : "srcs"}
-              </span>
-            </span>
-            <TrustPips score={trend.trust} />
-          </span>
+        <div className="flex items-center justify-between pt-2 mt-auto border-t border-[var(--border)] gap-2">
+          <TrustPips score={trend.trust} />
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -272,22 +258,43 @@ function ColumnCard({
   );
 }
 
-/** Card thumbnail — pulled from one of the cluster's articles. Renders
- * nothing if there's no image or the image fails to load. */
-function CardImage({ src }: { src?: string }) {
+/** Image-forward hero — a 4:3 image from one of the cluster's articles with
+ * the source-count chip overlaid. Falls back to a tinted placeholder when
+ * there's no image (or it fails to load). */
+function CardHero({
+  src,
+  section,
+  count,
+}: {
+  src?: string;
+  section: SectionKey;
+  count: number;
+}) {
   const [ok, setOk] = useState(true);
-  if (!src || !ok) return null;
+  const showImg = src && ok;
   return (
-    <div className="h-24 w-full overflow-hidden bg-[var(--surface-2)]">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt=""
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        onError={() => setOk(false)}
-        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-      />
+    <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--surface-2)]">
+      {showImg ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setOk(false)}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <span className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-black/35 to-transparent pointer-events-none" />
+        </>
+      ) : (
+        <div className="absolute inset-0 grid place-items-center">
+          <Newspaper size={26} className="opacity-25" style={{ color: SECTION_COLORS[section] }} />
+        </div>
+      )}
+      <span className="absolute top-2 right-2 font-mono text-[10px] font-medium text-white bg-black/55 backdrop-blur-sm rounded-full px-2 py-0.5">
+        {count} {count === 1 ? "src" : "srcs"}
+      </span>
     </div>
   );
 }

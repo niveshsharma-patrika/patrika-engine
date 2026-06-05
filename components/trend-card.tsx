@@ -92,7 +92,7 @@ export function TrendCard({
         }}
       />
       {trend.image && imgOk && (
-        <div className="h-28 w-full overflow-hidden bg-[var(--surface-2)]">
+        <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--surface-2)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={trend.image}
@@ -100,7 +100,7 @@ export function TrendCard({
             loading="lazy"
             referrerPolicy="no-referrer"
             onError={() => setImgOk(false)}
-            className={`h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${dimmed ? "grayscale opacity-80" : ""}`}
+            className={`absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${dimmed ? "grayscale opacity-80" : ""}`}
           />
         </div>
       )}
