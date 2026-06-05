@@ -156,7 +156,10 @@ type SignalRow = {
   topic_id: string | null;
   url: string | null;
   metadata: Record<string, unknown> | null;
-  sources: { name: string; language: string | null } | { name: string; language: string | null }[] | null;
+  sources:
+    | { name: string; language: string | null; desk: string | null }
+    | { name: string; language: string | null; desk: string | null }[]
+    | null;
 };
 
 async function loadRecentSignals(
@@ -171,7 +174,7 @@ async function loadRecentSignals(
     const { data, error } = await supabase
       .from("signals")
       .select(
-        "id, content, description, keywords, publisher_section, published_at, source_id, topic_id, url, metadata, sources(name, language)"
+        "id, content, description, keywords, publisher_section, published_at, source_id, topic_id, url, metadata, sources(name, language, desk)"
       )
       .gte("published_at", sinceIso)
       .order("published_at", { ascending: false })
@@ -206,6 +209,7 @@ async function loadRecentSignals(
         sourceId: r.source_id,
         topicId: r.topic_id,
         language: src?.language ?? null,
+        focus: src?.desk ?? null, // category hint lives in sources.desk
       });
     }
     if (rows.length < PAGE) break;

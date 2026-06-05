@@ -31,6 +31,7 @@ const BUCKETS: Array<{
 const CATEGORIES: Array<{ key: SectionKey | "all"; en: string; hi: string }> = [
   { key: "all",      en: "All",           hi: "सभी" },
   { key: "national", en: "National",      hi: "राष्ट्रीय" },
+  { key: "world",    en: "World",         hi: "दुनिया" },
   { key: "politics", en: "Politics",      hi: "राजनीति" },
   { key: "business", en: "Business",      hi: "बिज़नेस" },
   { key: "sports",   en: "Sports",        hi: "खेल" },

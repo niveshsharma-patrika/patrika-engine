@@ -13,11 +13,12 @@ const SECTION_LABELS: Record<SectionKey, string> = {
   enter: "Entertainment",
   tech: "Tech",
   national: "National",
+  world: "World",
 };
 
 const VALID_SECTIONS: ReadonlyArray<SectionKey> = [
   "city", "business", "sports", "politics",
-  "weather", "enter", "tech", "national",
+  "weather", "enter", "tech", "national", "world",
 ];
 
 // ─── Time-window rules (story age = first_seen) ─────────────────

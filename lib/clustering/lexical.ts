@@ -108,6 +108,7 @@ export type SignalInput = {
   sourceId: string | null;
   topicId: string | null;
   language: string | null;
+  focus: string | null; // the source's category (sports/business/world/…), if any
 };
 
 /** A fully-featurised article, ready to cluster. */
@@ -243,7 +244,26 @@ function normalizeCategory(value: string): string {
   return CATEGORY_GROUPS[c] ? c : "national";
 }
 
+// A category-specific feed is the most reliable signal of a story's beat —
+// trust it over headline keywords. General/national feeds fall through to
+// the keyword classifier below.
+const FOCUS_TO_CATEGORY: Record<string, string> = {
+  sports: "sports",
+  business: "business",
+  markets: "business",
+  tech: "technology",
+  technology: "technology",
+  enter: "entertainment",
+  entertainment: "entertainment",
+  world: "world",
+  politics: "politics",
+};
+
 function inferCategory(input: SignalInput): string {
+  if (input.focus) {
+    const mapped = FOCUS_TO_CATEGORY[input.focus.trim().toLowerCase()];
+    if (mapped) return mapped;
+  }
   const source = input.publisher.toLowerCase();
   const text = `${input.section || ""} ${input.title} ${input.keywords.join(" ")}`.toLowerCase();
   const combined = `${source} ${text}`;
@@ -633,7 +653,7 @@ export function sectionForCategory(category: string): string {
   if (c === "politics" || c === "courts" || c === "crime") return "politics";
   if (c === "entertainment" || c === "bollywood") return "enter";
   if (c === "technology") return "tech";
-  if (c === "world") return "national";
+  if (c === "world") return "world";
   if (c === "health") return "national";
   return "national";
 }

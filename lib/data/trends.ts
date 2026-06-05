@@ -11,7 +11,8 @@ export type SectionKey =
   | "weather"
   | "enter"
   | "tech"
-  | "national";
+  | "national"
+  | "world";
 
 export type SourceKey = "x" | "rss" | "gn";
 
@@ -55,5 +56,6 @@ export const SECTION_COLORS: Record<SectionKey, string> = {
   enter: "var(--purple)",
   tech: "var(--blue)",
   national: "var(--text)",
+  world: "#0d9488",
 };
 
