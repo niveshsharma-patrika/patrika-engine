@@ -418,17 +418,46 @@ async function createTrend(
 
 // ─── Reconcile ──────────────────────────────────────────────────
 
+type SigJoin = {
+  source_id: string | null;
+  published_at: string | null;
+  sources: { name: string; language: string | null } | { name: string; language: string | null }[] | null;
+};
+
+/** broke_at = the publish time at which a trend's signals first span
+ * NEWS_PUBLISHER_BAR distinct publishers (sorted by publish time). Derived
+ * from ALL linked signals so it reflects the true story timeline regardless
+ * of the order we ingested the articles. Future times are clamped to now. */
+function brokeAtFromSignals(sigs: SigJoin[]): string | null {
+  const nowMs = Date.now();
+  const items = sigs
+    .map((s) => {
+      const srel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
+      const pub = srel?.name ? canonicalPublisherKey(srel.name) : null;
+      const t = s.published_at ? new Date(s.published_at).getTime() : NaN;
+      return pub && Number.isFinite(t) ? { pub, t: Math.min(t, nowMs) } : null;
+    })
+    .filter((x): x is { pub: string; t: number } => x != null)
+    .sort((a, b) => a.t - b.t);
+  const seen = new Set<string>();
+  for (const it of items) {
+    seen.add(it.pub);
+    if (seen.size >= NEWS_PUBLISHER_BAR) return new Date(it.t).toISOString();
+  }
+  return null;
+}
+
 /**
- * Recompute signal_count / publisher_count / trust from what's actually
- * linked, and archive any trend that ended up with zero signals (its
- * members got pulled into a bigger cluster on a later tick).
+ * Recompute signal_count / publisher_count / trust / broke_at from what's
+ * actually linked, and archive any trend that ended up with zero signals
+ * (its members got pulled into a bigger cluster on a later tick).
  */
 async function reconcileTrendCounts(
   supabase: SupabaseClient
 ): Promise<{ reconciled: number; archived: number }> {
   const { data: trends, error } = await supabase
     .from("trends")
-    .select("id, signal_count, publisher_count, status, trust_score")
+    .select("id, signal_count, publisher_count, status, trust_score, broke_at")
     .neq("status", "archived");
 
   if (error || !trends) return { reconciled: 0, archived: 0 };
@@ -439,6 +468,7 @@ async function reconcileTrendCounts(
     publisher_count: number | null;
     status: string;
     trust_score: number | null;
+    broke_at: string | null;
   };
   const rows = trends as Row[];
 
@@ -451,13 +481,9 @@ async function reconcileTrendCounts(
       slice.map(async (t) => {
         const { data: sigRows } = await supabase
           .from("signals")
-          .select("source_id, sources(name, language)")
+          .select("source_id, published_at, sources(name, language)")
           .eq("topic_id", t.id);
 
-        type SigJoin = {
-          source_id: string | null;
-          sources: { name: string; language: string | null } | { name: string; language: string | null }[] | null;
-        };
         const sigs = (sigRows as SigJoin[] | null) ?? [];
         const actual = sigs.length;
 
@@ -471,11 +497,23 @@ async function reconcileTrendCounts(
 
         const newStatus = actual === 0 ? "archived" : "active";
         const trust = computeTrust(publishers.size, languages);
+        // Authoritative broke_at: the moment the story reached 3 distinct
+        // publishers, derived from ALL its signals' publish times (not frozen
+        // at the in-system crossing, which depends on ingestion order).
+        const newBrokeAt =
+          publishers.size >= NEWS_PUBLISHER_BAR ? brokeAtFromSignals(sigs) : null;
+        const brokeChanged =
+          (newBrokeAt == null) !== (t.broke_at == null) ||
+          (newBrokeAt != null &&
+            t.broke_at != null &&
+            new Date(newBrokeAt).getTime() !== new Date(t.broke_at).getTime());
+
         const needsUpdate =
           actual !== (t.signal_count ?? -1) ||
           publishers.size !== (t.publisher_count ?? -1) ||
           newStatus !== t.status ||
-          trust !== (t.trust_score ?? 0);
+          trust !== (t.trust_score ?? 0) ||
+          brokeChanged;
         if (!needsUpdate) return;
 
         const { error: uErr } = await supabase
@@ -485,6 +523,7 @@ async function reconcileTrendCounts(
             publisher_count: publishers.size,
             status: newStatus,
             trust_score: trust,
+            broke_at: newBrokeAt,
           })
           .eq("id", t.id);
         if (uErr) return;
