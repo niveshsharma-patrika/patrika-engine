@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { decodeEntities } from "@/lib/clustering/lexical";
 import type { SectionKey, SourceKey, Trend } from "@/lib/data/trends";
 
 export const dynamic = "force-dynamic";
@@ -225,8 +226,8 @@ export async function GET(req: Request) {
       id: idx + 1,
       section,
       tag,
-      title: row.title,
-      title_hi: row.title_hi ?? undefined,
+      title: decodeEntities(row.title),
+      title_hi: row.title_hi ? decodeEntities(row.title_hi) : undefined,
       velocityPct: Number(row.velocity_pct ?? 0),
       window: row.velocity_window ?? "—",
       // Show DISTINCT PUBLISHERS as the source count — that's the 3-source rule.
@@ -250,7 +251,7 @@ export async function GET(req: Request) {
 }
 
 function extractTitle(content: string): string {
-  return content.split(" — ")[0].slice(0, 200);
+  return decodeEntities(content.split(" — ")[0]).slice(0, 200);
 }
 
 /** Pull the image URL a signal stored in metadata.image (set at fetch from

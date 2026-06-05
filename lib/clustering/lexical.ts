@@ -135,13 +135,32 @@ export type LexicalDoc = {
 
 // ─── Text helpers ───────────────────────────────────────────────
 
-function cleanText(value: string): string {
-  return String(value || "")
-    .replace(/&amp;/g, "&")
+function codePoint(n: number): string {
+  try {
+    return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Decode HTML entities — numeric (&#8217; / &#x2019;) and the common named
+ * ones — so headlines don't show raw "&#8217;s". */
+export function decodeEntities(s: string): string {
+  return String(s || "")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => codePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => codePoint(parseInt(d, 10)))
+    .replace(/&nbsp;/g, " ")
+    .replace(/&rsquo;|&lsquo;|&apos;/g, "'")
+    .replace(/&rdquo;|&ldquo;|&quot;/g, '"')
+    .replace(/&ndash;|&mdash;/g, "–")
+    .replace(/&hellip;/g, "…")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&");
+}
+
+function cleanText(value: string): string {
+  return decodeEntities(String(value || ""))
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
