@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { decodeEntities } from "@/lib/clustering/lexical";
+import { decodeEntities, canonicalPublisherKey } from "@/lib/clustering/lexical";
 import type { SectionKey, SourceKey, Trend } from "@/lib/data/trends";
 
 export const dynamic = "force-dynamic";
@@ -239,11 +239,23 @@ export async function GET(req: Request) {
       else if (st === "google_news") sourceTypeSet.add("gn");
     }
 
-    // Newest-first (by effective time) — used both for the article previews
-    // and to pick the card's representative image (first article with one).
+    // Newest-first (by effective time).
     const byNewest = [...signals].sort((a, b) => effMs(b) - effMs(a));
 
-    const topSignals = byNewest.slice(0, 8).map((s) => {
+    // One card per distinct publisher (the newest from each) so the drawer
+    // doesn't repeat the same outlet — or the same article arriving via
+    // several of our feeds.
+    const seenPub = new Set<string>();
+    const distinctByPublisher: SignalRow[] = [];
+    for (const s of byNewest) {
+      const srcRel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
+      const pub = canonicalPublisherKey((s.author ?? srcRel?.name ?? "").trim());
+      if (pub && seenPub.has(pub)) continue;
+      if (pub) seenPub.add(pub);
+      distinctByPublisher.push(s);
+    }
+
+    const topSignals = distinctByPublisher.slice(0, 8).map((s) => {
       const srcRel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
       return {
         author: s.author ?? srcRel?.name ?? "Source",

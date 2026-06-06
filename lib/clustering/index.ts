@@ -160,6 +160,7 @@ type SignalRow = {
   keywords: string[] | null;
   publisher_section: string | null;
   published_at: string;
+  author: string | null;
   source_id: string | null;
   topic_id: string | null;
   url: string | null;
@@ -182,7 +183,7 @@ async function loadRecentSignals(
     const { data, error } = await supabase
       .from("signals")
       .select(
-        "id, content, description, keywords, publisher_section, published_at, source_id, topic_id, url, metadata, sources(name, language, desk)"
+        "id, content, description, keywords, publisher_section, published_at, author, source_id, topic_id, url, metadata, sources(name, language, desk)"
       )
       .gte("published_at", sinceIso)
       .order("published_at", { ascending: false })
@@ -195,7 +196,10 @@ async function loadRecentSignals(
     for (const r of rows) {
       if (!isClusterEligible(r.publisher_section)) continue;
       const src = Array.isArray(r.sources) ? r.sources[0] : r.sources;
-      const publisher = src?.name ?? "";
+      // The real publisher is the article's author (the <source> name for
+      // Google News, the feed/sitemap publisher otherwise) — NOT our feed
+      // name, which would treat "Google News · Business" as one publisher.
+      const publisher = (r.author ?? "").trim() || src?.name || "";
       if (!publisher) continue;
 
       const meta = r.metadata ?? {};
@@ -433,8 +437,18 @@ async function createTrend(
 type SigJoin = {
   source_id: string | null;
   published_at: string | null;
+  author: string | null;
   sources: { name: string; language: string | null } | { name: string; language: string | null }[] | null;
 };
+
+/** The real publisher of a signal: its author (the <source> for Google News,
+ * the feed/sitemap publisher otherwise), falling back to the feed name. */
+function publisherOf(s: SigJoin): string | null {
+  const author = (s.author ?? "").trim();
+  if (author) return canonicalPublisherKey(author);
+  const srel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
+  return srel?.name ? canonicalPublisherKey(srel.name) : null;
+}
 
 /** broke_at = the publish time at which a trend's signals first span
  * NEWS_PUBLISHER_BAR distinct publishers (sorted by publish time). Derived
@@ -444,8 +458,7 @@ function brokeAtFromSignals(sigs: SigJoin[]): string | null {
   const nowMs = Date.now();
   const items = sigs
     .map((s) => {
-      const srel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
-      const pub = srel?.name ? canonicalPublisherKey(srel.name) : null;
+      const pub = publisherOf(s);
       const t = s.published_at ? new Date(s.published_at).getTime() : NaN;
       return pub && Number.isFinite(t) ? { pub, t: Math.min(t, nowMs) } : null;
     })
@@ -507,7 +520,7 @@ async function reconcileTrendCounts(
       slice.map(async (t) => {
         const { data: sigRows } = await supabase
           .from("signals")
-          .select("source_id, published_at, sources(name, language)")
+          .select("source_id, published_at, author, sources(name, language)")
           .eq("topic_id", t.id);
 
         const sigs = (sigRows as SigJoin[] | null) ?? [];
@@ -516,8 +529,9 @@ async function reconcileTrendCounts(
         const publishers = new Set<string>();
         const languages = new Set<string>();
         for (const s of sigs) {
+          const pub = publisherOf(s);
+          if (pub) publishers.add(pub);
           const srel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
-          if (srel?.name) publishers.add(canonicalPublisherKey(srel.name));
           if (srel?.language) languages.add(srel.language);
         }
 

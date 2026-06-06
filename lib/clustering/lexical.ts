@@ -52,37 +52,68 @@ const GENERIC_ANCHOR_WORDS = new Set<string>([
 
 // Canonicalise publisher names so two feeds from the same outlet (e.g. TOI
 // sitemap + TOI RSS) count as ONE publisher for the 3-source rule.
+// Matched as SUBSTRINGS against the normalised name (punctuation → spaces),
+// so section-prefixed feed titles fold correctly: "Sports | The Indian
+// Express" and "India | The Indian Express" both → "indian express".
+// ORDER MATTERS — more specific names first so "new indian express" doesn't
+// collapse into "indian express", and "the hindu" never matches "hindustan".
 const PUBLISHER_ALIASES: Array<[RegExp, string]> = [
-  [/^(the\s+)?times\s+of\s+india$|^toi$/i, "times of india"],
-  [/^(the\s+)?economic\s+times$|^et$/i, "economic times"],
-  [/^hindustan\s+times$|^ht$/i, "hindustan times"],
-  [/^hindustan\s+hindi$|^live\s*hindustan$/i, "hindustan hindi"],
-  [/^news18(\s+hindi)?$|^cnn\s*news18$/i, "news18"],
-  [/^abp(\s+live|\s+news|\s+news\s+hindi)?$/i, "abp"],
-  [/^zee\s+news(\s+hindi)?$/i, "zee news"],
-  [/^(the\s+)?print$/i, "the print"],
-  [/^(the\s+)?wire$/i, "the wire"],
-  [/^scroll(\.in)?$/i, "scroll"],
-  [/^livemint$|^mint$/i, "mint"],
-  [/^business\s+standard$/i, "business standard"],
-  [/^moneycontrol(\.com)?$/i, "moneycontrol"],
-  [/^cnbc\s*tv18$/i, "cnbc tv18"],
-  [/^financial\s+express$/i, "financial express"],
-  [/^business\s+today$/i, "business today"],
-  [/^forbes\s+india$/i, "forbes india"],
-  [/^espn\s+cricinfo$/i, "espn cricinfo"],
-  [/^sportstar$/i, "sportstar"],
-  [/^aaj\s*tak$/i, "aaj tak"],
-  [/^dainik\s+jagran$|^jagran$/i, "dainik jagran"],
-  [/^amar\s+ujala$/i, "amar ujala"],
-  [/^rajasthan\s+patrika$|^patrika$/i, "rajasthan patrika"],
-  [/^deccan\s+herald$/i, "deccan herald"],
-  [/^(the\s+)?tribune$/i, "the tribune"],
-  [/^(the\s+)?telegraph(\s+india)?$/i, "the telegraph"],
-  [/^dna(\s+india)?$/i, "dna india"],
-  [/^times\s+now$/i, "times now"],
-  [/^republic\s+world$/i, "republic world"],
-  [/^india\s+today$/i, "india today"],
+  // ── India ──
+  [/new\s+indian\s+express/i, "new indian express"],   // BEFORE indian express
+  [/indian\s+express/i, "indian express"],
+  [/economic\s+times/i, "economic times"],
+  [/times\s+of\s+india|\btoi\b/i, "times of india"],
+  [/times\s+now/i, "times now"],
+  [/hindustan\s+hindi|live\s*hindustan/i, "hindustan hindi"],
+  [/hindustan\s+times/i, "hindustan times"],
+  [/\bthe\s+hindu\b/i, "the hindu"],                    // \b keeps it off "hindustan"
+  [/news\s*18|cnn\s*news18/i, "news18"],
+  [/india\s+today/i, "india today"],
+  [/\bndtv\b/i, "ndtv"],                                // folds NDTV Sports / Profit / …
+  [/aaj\s*tak/i, "aaj tak"],
+  [/amar\s+ujala/i, "amar ujala"],
+  [/dainik\s+bhaskar|\bbhaskar\b/i, "dainik bhaskar"],
+  [/dainik\s+jagran|\bjagran\b/i, "dainik jagran"],
+  [/zee\s+news/i, "zee news"],
+  [/\babp\b/i, "abp"],
+  [/cnbc\s*tv18/i, "cnbc tv18"],                        // BEFORE cnbc
+  [/moneycontrol/i, "moneycontrol"],
+  [/business\s+standard/i, "business standard"],
+  [/livemint|\bmint\b/i, "mint"],
+  [/financial\s+express/i, "financial express"],
+  [/business\s+today/i, "business today"],
+  [/forbes\s+india/i, "forbes india"],
+  [/espn\s*cricinfo/i, "espn cricinfo"],
+  [/sportstar/i, "sportstar"],
+  [/deccan\s+herald/i, "deccan herald"],
+  [/the\s+tribune/i, "the tribune"],
+  [/telegraph/i, "the telegraph"],
+  [/\bdna\b/i, "dna india"],
+  [/republic\s+world|republic\s+tv/i, "republic"],
+  [/the\s+print|theprint/i, "the print"],
+  [/the\s+wire/i, "the wire"],
+  [/\bscroll\b/i, "scroll"],
+  [/rajasthan\s+patrika|\bpatrika\b/i, "rajasthan patrika"],
+  [/bollywood\s+hungama/i, "bollywood hungama"],
+  [/pinkvilla/i, "pinkvilla"],
+  [/gadgets\s*360/i, "gadgets360"],
+  // ── International ──
+  [/\bbbc\b/i, "bbc"],
+  [/the\s+guardian|theguardian/i, "the guardian"],
+  [/\breuters\b/i, "reuters"],
+  [/new\s+york\s+times|nytimes|\bnyt\b/i, "new york times"],
+  [/al\s*jazeera/i, "al jazeera"],
+  [/\bcnn\b/i, "cnn"],
+  [/deutsche\s+welle|\bdw\b/i, "dw"],
+  [/france\s*24/i, "france24"],
+  [/financial\s+times/i, "financial times"],
+  [/\bcnbc\b/i, "cnbc"],
+  [/techcrunch/i, "techcrunch"],
+  [/the\s+verge/i, "the verge"],
+  [/ars\s+technica/i, "ars technica"],
+  [/engadget/i, "engadget"],
+  [/\bvariety\b/i, "variety"],
+  [/sky\s+sports/i, "sky sports"],
 ];
 
 // Broad sections that may merge with each other when the story link is
@@ -222,17 +253,18 @@ function isStoryAnchorFeature(feature: string): boolean {
 }
 
 export function canonicalPublisherKey(name: string): string {
-  let n = cleanText(name)
+  // Normalise punctuation to spaces but keep all words (incl. a leading
+  // "the") so the substring aliases below can match reliably.
+  const norm = cleanText(name)
     .toLowerCase()
-    .replace(/\.com$/i, "")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
-  n = n.replace(/^the\s+/, "");
   for (const [pattern, alias] of PUBLISHER_ALIASES) {
-    if (pattern.test(n)) return alias;
+    if (pattern.test(norm)) return alias;
   }
-  return n;
+  // No known publisher matched — fall back to the bare name minus "the".
+  return norm.replace(/^the\s+/, "");
 }
 
 function normalizeCategory(value: string): string {
