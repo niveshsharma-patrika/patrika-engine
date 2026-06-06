@@ -395,19 +395,33 @@ export async function POST(req: Request) {
   // single setting against the 2024-knowledge / hallucination problem.
   const TEMPERATURE = 0.2;
 
-  const headline = await generateText({
-    model: drafting.model,
-    system: drafting.systemPrompt ?? undefined,
-    prompt: headlinePrompt,
-    temperature: TEMPERATURE,
-  });
+  let headline, body;
+  try {
+    headline = await generateText({
+      model: drafting.model,
+      system: drafting.systemPrompt ?? undefined,
+      prompt: headlinePrompt,
+      temperature: TEMPERATURE,
+    });
 
-  const body = await generateText({
-    model: drafting.model,
-    system: drafting.systemPrompt ?? undefined,
-    prompt: bodyPrompt,
-    temperature: TEMPERATURE,
-  });
+    body = await generateText({
+      model: drafting.model,
+      system: drafting.systemPrompt ?? undefined,
+      prompt: bodyPrompt,
+      temperature: TEMPERATURE,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Generation failed.";
+    const rateLimited = /quota|rate.?limit|exhausted|RESOURCE_EXHAUSTED|429/i.test(msg);
+    return Response.json(
+      {
+        error: rateLimited
+          ? "Gemini free-tier rate limit hit — wait ~30s and hit Regenerate, or enable billing on the Google project for higher limits."
+          : `Generation failed: ${msg.slice(0, 200)}`,
+      },
+      { status: 503 }
+    );
+  }
 
   return Response.json({
     title: headline.text.trim().replace(/^["']|["']$/g, ""),
