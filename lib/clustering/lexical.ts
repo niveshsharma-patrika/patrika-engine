@@ -116,6 +116,20 @@ const PUBLISHER_ALIASES: Array<[RegExp, string]> = [
   [/sky\s+sports/i, "sky sports"],
 ];
 
+// The set of "major" publishers = every outlet we have an alias for (the
+// well-known national + international names). A story covered ONLY by
+// long-tail / local outlets (which canonicalise to their bare names, not an
+// alias) is corroborated but not prominent — used to keep trivial local
+// stories out of Breaking/Trending.
+export const MAJOR_PUBLISHERS: ReadonlySet<string> = new Set(
+  PUBLISHER_ALIASES.map(([, alias]) => alias)
+);
+
+/** True if a (raw) publisher name resolves to a known major outlet. */
+export function isMajorPublisher(name: string): boolean {
+  return MAJOR_PUBLISHERS.has(canonicalPublisherKey(name));
+}
+
 // Broad sections that may merge with each other when the story link is
 // strong. Keeps sports out of business unless the evidence is overwhelming.
 const CATEGORY_GROUPS: Record<string, string> = {

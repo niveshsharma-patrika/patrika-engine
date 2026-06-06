@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { decodeEntities, canonicalPublisherKey } from "@/lib/clustering/lexical";
+import { decodeEntities, canonicalPublisherKey, MAJOR_PUBLISHERS } from "@/lib/clustering/lexical";
 import type { SectionKey, SourceKey, Trend } from "@/lib/data/trends";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +25,7 @@ const VALID_SECTIONS: ReadonlyArray<SectionKey> = [
 const BREAKING_MAX_MIN = 30;     // story started within the last 30 min
 const TRENDING_MAX_MIN = 240;    // story started within the last 4 hours
 const NEWS_PUBLISHER_BAR = 3;    // "3 distinct sources" = confirmed news
+const MAJOR_BAR = 2;            // …of which >=2 must be major outlets (prominence)
 const WATCHING_FRESH_MIN = 240;  // a 2-source story is "watchable" for 4h
 const DEVELOPING_FRESH_MIN = 120; // >4h-old story still counts if covered <2h ago
 
@@ -214,6 +215,21 @@ export async function GET(req: Request) {
         return sr?.source_type === "twitter";
       });
     }
+
+    // Prominence gate for the confirmed-news feeds: the story must be carried
+    // by >= MAJOR_BAR *major* outlets, not just any 3 publishers. Keeps
+    // trivial stories covered only by long-tail / local sites out of
+    // Breaking / Trending / Developing.
+    if (windowParam !== "watching") {
+      const majors = new Set<string>();
+      for (const s of sigs) {
+        const srcRel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
+        const pub = canonicalPublisherKey((s.author ?? srcRel?.name ?? "").trim());
+        if (pub && MAJOR_PUBLISHERS.has(pub)) majors.add(pub);
+      }
+      if (majors.size < MAJOR_BAR) return false;
+    }
+
     if (windowParam === "watching" || windowParam === "developing") {
       let newest = 0;
       for (const s of sigs) {
