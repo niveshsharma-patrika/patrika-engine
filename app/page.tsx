@@ -11,6 +11,7 @@ import {
   Eye,
   Rss,
   Hash,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -498,39 +499,53 @@ function Editor({
               placeholder="Article headline..."
               className="w-full text-2xl font-medium outline-none mb-3 placeholder:text-[var(--text-3)] placeholder:font-normal"
             />
-            <div className="pb-4 border-b border-[var(--border)] mb-4 flex gap-2 flex-wrap">
-              {["Desk", "600 words", "Editorial", "English"].map((label) => (
-                <select key={label} className="bg-[var(--surface-2)] border border-[var(--border)] text-[13px] px-3 py-1.5 rounded outline-none focus:border-[var(--blue)] focus:bg-white">
-                  <option>{label}</option>
-                </select>
-              ))}
+            <div className="border-t border-[var(--border)] pt-4 relative">
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                disabled={generating}
+                placeholder={
+                  lang === "hi"
+                    ? "लिखना शुरू करें, या नीचे रीजेनरेट दबाएँ…"
+                    : "Start typing, or hit Regenerate below…"
+                }
+                className={`w-full min-h-[420px] outline-none text-[15px] leading-[1.7] resize-y transition-opacity ${
+                  generating ? "opacity-25" : ""
+                }`}
+              />
+              {generating && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center pointer-events-none">
+                  <Loader2 className="animate-spin text-[var(--red)]" size={30} />
+                  <div className="text-[13.5px] text-[var(--text)] font-medium">
+                    {mode === "angle"
+                      ? lang === "hi"
+                        ? "चयनित एंगल से ड्राफ़्ट लिखा जा रहा है…"
+                        : "Writing the draft from your selected angle…"
+                      : lang === "hi"
+                      ? "ड्राफ़्ट लिखा जा रहा है…"
+                      : "Writing the draft…"}
+                  </div>
+                  <div className="text-[11px] text-[var(--text-3)]">
+                    {lang === "hi" ? "कुछ सेकंड लग सकते हैं" : "This usually takes a few seconds"}
+                  </div>
+                </div>
+              )}
             </div>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Start typing, or click Generate…"
-              className="w-full min-h-[380px] outline-none text-[15px] leading-[1.7] resize-y"
-            />
             <div className="flex gap-2 flex-wrap mt-4 pt-4 border-t border-[var(--border)]">
               <button
-                onClick={() => handleGenerate("factual")}
+                onClick={() => handleGenerate(mode === "angle" ? "angle" : "factual")}
                 disabled={generating}
-                className="bg-[var(--text)] hover:bg-black disabled:opacity-50 text-white text-xs font-medium px-3.5 py-2 rounded-full"
+                className="bg-[var(--text)] hover:bg-black disabled:opacity-50 text-white text-xs font-medium px-4 py-2 rounded-full flex items-center gap-1.5"
               >
-                {generating ? `✨ ${t("generating")}` : `✨ ${lang === "hi" ? "तथ्यात्मक ड्राफ़्ट" : "Factual draft"}`}
+                {generating ? (
+                  <>
+                    <Loader2 className="animate-spin" size={13} />
+                    {t("generating")}
+                  </>
+                ) : (
+                  `✨ ${lang === "hi" ? "फिर से बनाएँ" : "Regenerate"}`
+                )}
               </button>
-              <button
-                onClick={() => handleGenerate("angle")}
-                disabled={generating}
-                className="bg-[var(--red)] hover:bg-[var(--red-hover)] disabled:opacity-50 text-white text-xs font-medium px-3.5 py-2 rounded-full"
-              >
-                {generating ? `✨ ${t("generating")}` : `✨ ${lang === "hi" ? "सुझाव वाला ड्राफ़्ट" : "Suggested-angle draft"}`}
-              </button>
-              {["Regenerate", "Expand", "Tighten", "Quotes"].map((l) => (
-                <button key={l} className="bg-[var(--surface-2)] border border-[var(--border)] hover:bg-[var(--red-soft)] hover:text-[var(--red)] text-xs font-medium text-[var(--text-2)] px-3.5 py-2 rounded-full">
-                  {l}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -547,9 +562,23 @@ function Editor({
                     ↑ {trend.velocityPct}% · {freshness(trend.lastSeenMinAgo, lang)}
                   </div>
                   <div>
-                    <strong className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium block mb-1.5">Suggested angle</strong>
+                    <strong className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium block mb-1.5">
+                      {angle
+                        ? lang === "hi" ? "इस एंगल पर लिख रहे हैं" : "Writing to this angle"
+                        : lang === "hi" ? "सुझाया गया एंगल" : "Suggested angle"}
+                    </strong>
                     <div className="bg-[var(--red-soft)] p-2.5 rounded text-[12.5px] leading-relaxed">
-                      {trend.suggestedAngle}
+                      {angle ? (
+                        <>
+                          <div className="font-medium text-[var(--text)]">{angle.title}</div>
+                          <div className="mt-1 text-[var(--text-2)]">{angle.summary}</div>
+                          <span className="mt-1.5 inline-block text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-white/70 text-[var(--text-3)]">
+                            {angle.format}
+                          </span>
+                        </>
+                      ) : (
+                        trend.suggestedAngle
+                      )}
                     </div>
                   </div>
                 </>

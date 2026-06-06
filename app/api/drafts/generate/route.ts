@@ -46,7 +46,6 @@ async function loadStyleAssets(storyType: string | null | undefined): Promise<{
     samples = (data as SampleRow[] | null) ?? [];
   }
   if (samples.length < 2) {
-    const need = 2 - samples.length;
     const { data: extra } = await supabase
       .from("style_samples")
       .select("title, body, story_type")
@@ -94,6 +93,7 @@ function groundingRules(lang: "en" | "hi"): string {
 • अपनी प्रशिक्षण डेटा (2024 या उससे पहले) से कोई नाम, तारीख, उद्धरण, या संख्या न जोड़ें।
 • यदि कोई जानकारी संकेतों में नहीं है तो [विवरण आवश्यक] लिखें — आविष्कार न करें।
 • यदि संकेत अपर्याप्त हैं, तो जवाब दें: "INSUFFICIENT INFORMATION: <क्या चाहिए>"
+• तथ्यों का श्रेय कहानी के लोगों/संस्थानों को दें ("पुलिस ने कहा", "एयरलाइन ने बताया") — कभी भी उन समाचार आउटलेट्स/एजेंसियों को नहीं जिन्होंने इसे रिपोर्ट किया। "दैनिक भास्कर के अनुसार", "ABP ने बताया" जैसा कुछ न लिखें और न ही किसी प्रकाशन का नाम लें। पत्रिका अपनी रिपोर्ट लिख रही है।
 ═══════════════════════════════════════════`;
   }
   return `
@@ -106,8 +106,11 @@ HARD RULES — never break these
   your training data — even if you "remember" them. They will be wrong or stale.
 • If a fact isn't in the signals, write "[detail needed]" instead of inventing.
 • If signals are insufficient, return literally: "INSUFFICIENT INFORMATION: <what's needed>"
-• Every factual claim should be attributable to a signal. Match Patrika's
-  attribution style ("Mumbai Police said…", "the BMC told reporters…").
+• Attribute facts to the people / institutions IN the story ("the police said",
+  "the airline said", "officials told reporters") — NEVER to the news outlets or
+  wire agencies that carried the report. Do NOT write "according to Dainik Bhaskar",
+  "ABP reported", "as per Times of India", or name any publication. Patrika is
+  writing its OWN report from these facts.
 ═══════════════════════════════════════════`;
 }
 
@@ -258,8 +261,10 @@ function buildPrompts(
   const baseContext = `
 TOPIC: ${trend.title}
 SECTION: ${trend.desk ?? trend.section ?? "General"}
-SOURCE SIGNALS (the ONLY source of factual information you may use):
-${trend.signals.map((s) => `- ${s.author}: ${s.text}`).join("\n") || "(no signals captured)"}
+SOURCE REPORTS — the ONLY facts you may use. These are how different outlets /
+wire agencies reported the story. Use the FACTS; do NOT cite, name, or quote the
+outlets themselves (the reader must never see "Dainik Bhaskar", "ABP", etc.):
+${trend.signals.map((s, i) => `[${i + 1}] ${s.text}`).join("\n") || "(no reports captured)"}
 `;
 
   // Style assets + grounding rules go at the TOP of every prompt so the
@@ -287,7 +292,7 @@ ${baseContext}
 Rules:
 - Start with a DATELINE in caps (e.g. MUMBAI:, NEW DELHI:)
 - Lede paragraph: who/what/when/where in one tight sentence
-- Attribute every claim to its source ("Mumbai Police said…", "the BMC told reporters…")
+- Attribute claims to the people / institutions in the story (police, officials, the company) — NEVER to the news outlets or agencies that reported it
 - Do NOT invent quotes or facts beyond the signals above
 - Do NOT use the suggested editorial angle — this draft is the straight report
 - End with: [Factual draft · edit and verify before publishing.]`,
@@ -323,7 +328,7 @@ Rules:
 - Open with a strong nut graf that signals the angle, not just the surface event
 - Build the argument with evidence from the signals; bring in context that follows from the signals (not from training-data memory)
 - Avoid generic news framing — the reader should know within 2 paragraphs why Patrika is covering this from THIS angle
-- Attribute factual claims; opinion can come from the analysis itself but mark it as such
+- Attribute factual claims to the people / institutions in the story, never to the outlets that carried them; opinion can come from the analysis itself but mark it as such
 - Don't invent quotes
 - End with: [Angle-driven draft (${angleFormat}) · edit and verify before publishing.]`,
   };
