@@ -3,20 +3,19 @@ import { XMLParser } from "fast-xml-parser";
 import type { RawSignal } from "./rss";
 
 /**
- * Google News topic RSS fetcher.
+ * Google News topic/search RSS fetcher.
  *
- * Each item carries a <source url="…"> attribute with the publisher's
- * canonical URL. That URL is what we use as `external_id` — NOT the
- * wrapped news.google.com link from <link>. Two reasons:
+ * Each item carries:
+ *   • <title>   "Headline - Publisher Name"
+ *   • <link>    a unique news.google.com/rss/articles/… URL that redirects
+ *               to the publisher's article — used as external_id + url.
+ *   • <source url="https://publisher.com">Publisher Name</source>
+ *               the url is only the publisher's DOMAIN, so we take just the
+ *               NAME (it drives the distinct-publisher / 3-source count).
  *
- *   1. Dedup. A TOI article appearing in both TOI's sitemap-news AND
- *      Google News BUSINESS will hit the same external_id, so the unique
- *      index (source_id, external_id) naturally prevents double-counting
- *      within a source. (Cross-source dup is fine — it becomes evidence
- *      for clustering.)
- *
- *   2. Permanence. The Google News wrapped URL is opaque + redirects;
- *      the publisher URL is what reporters/editors actually click.
+ * The same article may also arrive via a publisher's own feed under a
+ * different URL — that's fine: clustering groups them and the publisher
+ * name canonicalises to one outlet, so the 3-source rule stays honest.
  *
  * Filter: same today-IST cutoff as sitemap-news. Google sometimes returns
  * 24-48h of items; we drop anything pre-midnight IST.
@@ -115,17 +114,17 @@ export async function fetchGoogleNews(
     const titleRaw = s(item.title);
     if (!titleRaw) continue;
 
-    // <source url=""> attribute → canonical publisher URL
-    let publisherUrl = "";
+    // <source> gives the real publisher NAME — essential for the 3-source
+    // count. Its url attribute is only the publisher's domain (e.g.
+    // https://www.reuters.com), so it is NOT a per-article identifier.
     let publisherName = "";
     const src = item.source;
-    if (src && typeof src === "object") {
-      publisherUrl = s(src["@_url"]);
-      publisherName = s(src["#text"]);
-    }
-    // If no <source url>, fall back to <link> (wrapped Google URL) — uglier
-    // but better than dropping. Most items have <source url>.
-    const articleUrl = publisherUrl || s(item.link);
+    if (src && typeof src === "object") publisherName = s(src["#text"]);
+    else if (typeof src === "string") publisherName = s(src);
+
+    // <link> is Google's per-article URL (unique; redirects to the
+    // publisher's article). Use it as both external_id and url.
+    const articleUrl = s(item.link);
     if (!articleUrl) continue;
 
     // Parse pubDate (RFC 822 format like "Wed, 20 May 2026 09:41:26 GMT")
