@@ -54,6 +54,7 @@ export type ProviderKey = keyof typeof AI_PROVIDERS;
  */
 export const USE_CASES = [
   "drafting", // generate article body
+  "angles", // propose 2-3 editorial angles for a story
   "headline", // polish/regenerate headline
   "summary", // condense for ticker / brief
   "embedding", // RAG retrieval

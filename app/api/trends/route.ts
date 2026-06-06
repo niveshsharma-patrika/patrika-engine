@@ -366,6 +366,7 @@ export async function GET(req: Request) {
 
     return {
       id: idx + 1,
+      uid: row.id,
       section,
       tag,
       title: decodeEntities(row.title),

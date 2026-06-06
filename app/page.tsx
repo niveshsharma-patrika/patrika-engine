@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
-import { SECTION_COLORS, type SectionKey, type Trend } from "@/lib/data/trends";
+import { SECTION_COLORS, type SectionKey, type StoryAngle, type Trend } from "@/lib/data/trends";
 import { TrustPips, freshness } from "@/components/trend-card";
 import { TrendDrawer } from "@/components/trend-drawer";
 import { SkeletonCard } from "@/components/skeletons";
@@ -128,11 +128,17 @@ export default function DashboardPage() {
   }, []);
 
   const [editorMode, setEditorMode] = useState<"factual" | "angle" | "blank">("blank");
+  const [editorAngle, setEditorAngle] = useState<StoryAngle | undefined>(undefined);
 
-  function openEditor(trend: Trend | null, mode: "factual" | "angle" | "blank" = "blank") {
+  function openEditor(
+    trend: Trend | null,
+    mode: "factual" | "angle" | "blank" = "blank",
+    angle?: StoryAngle
+  ) {
     setEditorTrend(trend);
     setEditorTitle(trend?.title ?? "");
     setEditorMode(mode);
+    setEditorAngle(angle);
     setEditorOpen(true);
     setOpenTrend(null);
   }
@@ -281,7 +287,7 @@ export default function DashboardPage() {
         <TrendDrawer
           trend={openTrend}
           onClose={() => setOpenTrend(null)}
-          onGenerate={(mode) => openEditor(openTrend, mode)}
+          onGenerate={(mode, angle) => openEditor(openTrend, mode, angle)}
         />
       )}
 
@@ -289,6 +295,7 @@ export default function DashboardPage() {
         <Editor
           trend={editorTrend}
           mode={editorMode}
+          angle={editorAngle}
           title={editorTitle}
           setTitle={setEditorTitle}
           onClose={() => setEditorOpen(false)}
@@ -407,10 +414,11 @@ function CardHero({
 
 // ─── Editor ───────────────────────────────────────────────────
 function Editor({
-  trend, mode, title, setTitle, onClose,
+  trend, mode, angle, title, setTitle, onClose,
 }: {
   trend: Trend | null;
   mode: "factual" | "angle" | "blank";
+  angle?: StoryAngle;
   title: string;
   setTitle: (v: string) => void;
   onClose: () => void;
@@ -435,9 +443,10 @@ function Editor({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          trendId: trend?.id ?? null,
+          trendId: trend?.uid ?? trend?.id ?? null,
           mode: activeMode,
           lang,
+          angle: activeMode === "angle" ? angle : undefined,
         }),
       });
       if (res.ok) {

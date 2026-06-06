@@ -153,7 +153,15 @@ const Body = z.object({
   trendId: z.union([z.number(), z.string()]).nullable(),
   mode: z.enum(["factual", "angle"]).default("factual"),
   lang: z.enum(["en", "hi"]).default("en"),
+  // A specific AI-generated angle the editor selected in the drawer. When
+  // present (mode "angle"), the draft is written to THIS angle instead of the
+  // no-AI suggested_angle.
+  angle: z
+    .object({ title: z.string(), summary: z.string(), format: z.string() })
+    .nullish(),
 });
+
+type SelectedAngle = { title: string; summary: string; format: string };
 
 type LiveTrend = {
   id: string;
@@ -233,8 +241,15 @@ function buildPrompts(
   mode: "factual" | "angle",
   lang: "en" | "hi",
   styleBlock: string,
-  grounding: string
+  grounding: string,
+  selectedAngle?: SelectedAngle | null
 ) {
+  // The angle the draft follows: the editor's chosen AI angle if present,
+  // otherwise the no-AI suggested angle on the trend.
+  const angleText = selectedAngle
+    ? `${selectedAngle.title} — ${selectedAngle.summary}`
+    : trend.suggestedAngle ?? "(none specified)";
+  const angleFormat = selectedAngle?.format ?? trend.storyType ?? "Analysis";
   const langDirective =
     lang === "hi"
       ? "Write in HINDI (Devanagari script). Match Patrika's Hindi newsroom voice."
@@ -288,21 +303,21 @@ ${langDirective}
 Write a single 8-14 word newspaper headline that captures the editorial ANGLE below, not just the surface event. Headlines that drive a reader to read because of the perspective. Return ONLY the headline.
 
 TOPIC: ${trend.title}
-EDITORIAL ANGLE: ${trend.suggestedAngle ?? ""}
-STORY FORMAT: ${trend.storyType ?? "Analysis"}`,
+EDITORIAL ANGLE: ${angleText}
+STORY FORMAT: ${angleFormat}`,
 
     bodyPrompt: `${preamble}
 
 ${langDirective}
 
-Write a 500-700 word piece in the format of ${trend.storyType ?? "Analysis"}. Match the structure, density, and voice of the Patrika sample articles above.
+Write a 500-700 word piece in the format of ${angleFormat}. Match the structure, density, and voice of the Patrika sample articles above.
 
 This is NOT a straight news report — it's the Patrika take following the editorial angle below.
 
 ${baseContext}
 
-EDITORIAL ANGLE: ${trend.suggestedAngle ?? "(none specified)"}
-STORY FORMAT: ${trend.storyType ?? "Analysis"}
+EDITORIAL ANGLE: ${angleText}
+STORY FORMAT: ${angleFormat}
 
 Rules:
 - Open with a strong nut graf that signals the angle, not just the surface event
@@ -310,7 +325,7 @@ Rules:
 - Avoid generic news framing — the reader should know within 2 paragraphs why Patrika is covering this from THIS angle
 - Attribute factual claims; opinion can come from the analysis itself but mark it as such
 - Don't invent quotes
-- End with: [Angle-driven draft (${trend.storyType ?? "Analysis"}) · edit and verify before publishing.]`,
+- End with: [Angle-driven draft (${angleFormat}) · edit and verify before publishing.]`,
   };
 }
 
@@ -367,7 +382,8 @@ export async function POST(req: Request) {
     parsed.data.mode,
     parsed.data.lang,
     styleBlock,
-    grounding
+    grounding,
+    parsed.data.angle
   );
 
   // Low temperature suppresses creative invention — the most reliable

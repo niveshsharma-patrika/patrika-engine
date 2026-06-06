@@ -67,6 +67,22 @@ type ResolvedModel = {
 };
 
 /**
+ * Zero-config default: if a Google key is in env, route to Gemini 2.0 Flash.
+ * This lets angle generation + drafting work the moment the key is set,
+ * without any admin DB wiring (ai_config / ai_providers rows).
+ */
+function geminiEnvFallback(): ResolvedModel | null {
+  const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!key) return null;
+  return {
+    model: createGoogleGenerativeAI({ apiKey: key })("gemini-2.0-flash"),
+    providerKey: "google",
+    modelKey: "gemini-2.0-flash",
+    systemPrompt: null,
+  };
+}
+
+/**
  * Resolve which model to use for a given use case, based on admin config.
  * Returns the LanguageModel + metadata, or null if unconfigured / no key.
  *
@@ -110,7 +126,8 @@ export async function getModelFor(
     .eq("use_case", useCase)
     .maybeSingle();
 
-  if (error || !data?.ai_models) return null;
+  // No admin config row for this use case → fall back to Gemini if a key is set.
+  if (error || !data?.ai_models) return geminiEnvFallback();
 
   // Supabase joins return arrays or objects depending on relationship — coerce.
   const modelRow = Array.isArray(data.ai_models) ? data.ai_models[0] : data.ai_models;
@@ -127,7 +144,7 @@ export async function getModelFor(
     console.warn(
       `No API key configured for provider "${providerKey}" (use case: ${useCase})`
     );
-    return null;
+    return geminiEnvFallback();
   }
 
   return {

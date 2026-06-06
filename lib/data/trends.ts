@@ -16,8 +16,19 @@ export type SectionKey =
 
 export type SourceKey = "x" | "rss" | "gn";
 
+/** An AI-proposed editorial angle for a story (generated on demand, saved). */
+export type StoryAngle = {
+  id: string;
+  title: string; // the hook / angle headline
+  summary: string; // 1-2 sentences: the lens + what to focus on
+  format: string; // suggested story format (Explainer / Ground report / Analysis / …)
+};
+
 export type Trend = {
   id: number | string;
+  // The real DB row id (uuid) for live stories — used by the AI endpoints
+  // (angles + draft) to target the right row. Absent for mock / newswire cards.
+  uid?: string;
   section: SectionKey;
   tag: string;
   title: string;
@@ -39,6 +50,8 @@ export type Trend = {
   storyType?: string;
   storyType_hi?: string;
   isNationalOrWorld?: boolean;
+  // AI-generated editorial angles (on demand, persisted). Undefined until generated.
+  angles?: StoryAngle[];
   // Minutes since the most recent signal in this cluster — what we display
   // on the card. Updated whenever the cluster catches a new signal.
   lastSeenMinAgo?: number;
