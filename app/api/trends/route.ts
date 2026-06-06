@@ -52,6 +52,25 @@ function effMs(s: { published_at: string | null; ingested_at: string | null }): 
   return Number.isFinite(ing) ? Math.min(ing, Date.now()) : Date.now();
 }
 
+// Daily evergreen filler that gets enough Google-News publishers to clear the
+// 3-source bar but isn't news: horoscopes, lottery results, daily commodity/
+// fuel-rate roundups. Title-based (these leak in with a null/misc section, so
+// the section gate misses them). Conservative — adjacent-word patterns only,
+// so real market stories ("NSE accounts cross 26 crore") are untouched.
+const FILLER_PATTERNS: RegExp[] = [
+  /\b(horoscope|rashifal|zodiac|astrolog\w*|numerolog\w*|tarot|panchang)\b/i,
+  /राशिफल|पंचांग|अंक\s*ज्योतिष/,
+  /\blottery\b.{0,30}\b(result|today|sambad|draw|number)\b/i,
+  /\b(kerala|nagaland|sikkim|dear)\s+lottery\b/i,
+  /\b(gold|silver|petrol|diesel|cng)\s+(rate|price)s?\s+today\b/i,
+  /आज के (भाव|रेट|दाम)|आज का (भाव|रेट|दाम)/,
+];
+function isFillerStory(title: string): boolean {
+  const t = (title || "").trim();
+  if (!t) return false;
+  return FILLER_PATTERNS.some((rx) => rx.test(t));
+}
+
 /**
  * GET /api/trends — trends from Supabase, shaped for the dashboard.
  *
@@ -212,6 +231,8 @@ export async function GET(req: Request) {
   const filtered: TrendRow[] = ((data as TrendRow[] | null) ?? []).filter((row) => {
     const sigs = row.signals ?? [];
     if (sigs.length === 0) return false;
+    // Keep astrology / lottery / daily-rate filler out of every confirmed feed.
+    if (isFillerStory(decodeEntities(row.title))) return false;
     if (windowParam === "social") {
       // Only stories that have at least one social (X/Twitter) signal.
       return sigs.some((s) => {
@@ -426,6 +447,7 @@ async function newswireResponse(
     if (!isClusterEligible(r.publisher_section)) continue;
     const title = extractTitle(r.content ?? "");
     if (title.length < 12) continue;
+    if (isFillerStory(title)) continue;
     if (r.url && seenUrl.has(r.url)) continue;
 
     const srcRel = Array.isArray(r.sources) ? r.sources[0] : r.sources;

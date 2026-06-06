@@ -26,6 +26,16 @@ const BUCKETS: Array<{
   { key: "social",     label_en: "Social",     label_hi: "सोशल",     hint: "Stories carried on X / social sources" },
 ];
 
+// Per-tab accent colour (the dot + the active underline).
+const TAB_ACCENT: Record<BucketKey, string> = {
+  breaking: "var(--red)",
+  trending: "var(--blue)",
+  developing: "var(--green)",
+  watching: "var(--amber)",
+  newswire: "#0d9488",
+  social: "var(--purple)",
+};
+
 // ─── Category filters ─────────────────────────────────────────
 // Only the sections the clusterer actually produces (see sectionForCategory
 // in lib/clustering/lexical.ts) — plus "All".
@@ -44,6 +54,7 @@ const CATEGORIES: Array<{ key: SectionKey | "all"; en: string; hi: string }> = [
 export default function DashboardPage() {
   const { t, lang } = useLang();
   const [filter, setFilter] = useState<SectionKey | "all">("all");
+  const [tab, setTab] = useState<BucketKey>("breaking");
   const [openTrend, setOpenTrend] = useState<Trend | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorTrend, setEditorTrend] = useState<Trend | null>(null);
@@ -106,16 +117,13 @@ export default function DashboardPage() {
     setOpenTrend(null);
   }
 
-  // Flatten across feeds for category counts + filtering.
-  const allTrends = [
-    ...buckets.breaking,
-    ...buckets.trending,
-    ...buckets.developing,
-    ...buckets.watching,
-    ...buckets.social,
-  ];
-  const catCount = (key: SectionKey | "all") =>
-    key === "all" ? allTrends.length : allTrends.filter((tr) => tr.section === key).length;
+  // One section (tab) at a time. Category chips filter WITHIN the active tab.
+  const tabItems = buckets[tab] ?? [];
+  const catCountInTab = (key: SectionKey | "all") =>
+    key === "all" ? tabItems.length : tabItems.filter((tr) => tr.section === key).length;
+  const visibleItems =
+    filter === "all" ? tabItems : tabItems.filter((tr) => tr.section === filter);
+  const activeBucket = BUCKETS.find((b) => b.key === tab) ?? BUCKETS[0];
 
   // The board — one column per feed, each scrolls independently.
   return (
@@ -130,16 +138,54 @@ export default function DashboardPage() {
             : t("live")}
           {" · "}
           <b className="text-[var(--text)] font-medium">
-            {catCount(filter)} {t("topics")}
+            {visibleItems.length} {t("topics")}
           </b>
         </span>
       </div>
 
-      {/* Category filters */}
+      {/* Section tabs — each shows ALL stories in that feed */}
+      <div className="flex items-center gap-0.5 flex-wrap mb-3 border-b border-[var(--border)]">
+        {BUCKETS.map((b) => {
+          const active = tab === b.key;
+          const accent = TAB_ACCENT[b.key];
+          const n = (buckets[b.key] ?? []).length;
+          const label = lang === "hi" ? b.label_hi : b.label_en;
+          return (
+            <button
+              key={b.key}
+              onClick={() => setTab(b.key)}
+              className={`relative flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 -mb-px border-b-2 transition-colors ${
+                active
+                  ? "text-[var(--text)]"
+                  : "border-transparent text-[var(--text-3)] hover:text-[var(--text)]"
+              }`}
+              style={{ borderColor: active ? accent : "transparent" }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ background: accent }}
+              />
+              {label}
+              <span
+                className={`font-mono text-[10.5px] ${
+                  active ? "text-[var(--text-2)]" : "text-[var(--text-3)]"
+                }`}
+              >
+                {n}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Active section hint */}
+      <p className="text-[12px] text-[var(--text-3)] mb-3 leading-snug">{activeBucket.hint}</p>
+
+      {/* Category filters — scoped to the active tab */}
       <div className="flex items-center gap-1.5 flex-wrap mb-4">
         {CATEGORIES.map((c) => {
           const active = filter === c.key;
-          const n = catCount(c.key);
+          const n = catCountInTab(c.key);
           return (
             <button
               key={c.key}
@@ -169,78 +215,29 @@ export default function DashboardPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 items-start">
-        {BUCKETS.map((b) => {
-          const items =
-            filter === "all"
-              ? buckets[b.key]
-              : buckets[b.key].filter((tr) => tr.section === filter);
-          const label = lang === "hi" ? b.label_hi : b.label_en;
-          const accent =
-            b.key === "breaking"
-              ? "var(--red)"
-              : b.key === "trending"
-              ? "var(--blue)"
-              : b.key === "developing"
-              ? "var(--green)"
-              : b.key === "watching"
-              ? "var(--amber)"
-              : "var(--purple)";
-          return (
-            <section
-              key={b.key}
-              className="bg-[var(--surface-2)] border border-[var(--border)] rounded-md flex flex-col min-h-[400px]"
-            >
-              {/* Column header */}
-              <header className="flex items-baseline justify-between gap-2 px-3.5 py-3 border-b border-[var(--border)] bg-white rounded-t-md">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: accent }}
-                  />
-                  <h2 className="text-[14px] font-medium text-[var(--text)]">
-                    {label}
-                  </h2>
-                </div>
-                <span className="font-mono text-[11px] text-[var(--text-3)]">
-                  {items.length}
-                </span>
-              </header>
-
-              {/* Description hint */}
-              <p className="px-3.5 pt-2 pb-1 text-[11px] text-[var(--text-3)] leading-snug">
-                {b.hint}
-              </p>
-
-              {/* Cards stack */}
-              <div className="p-2.5 space-y-2.5 flex-1">
-                {items.length > 0 ? (
-                  items.map((tr) => (
-                    <ColumnCard
-                      key={`${b.key}-${tr.id}`}
-                      trend={tr}
-                      onClick={() => setOpenTrend(tr)}
-                    />
-                  ))
-                ) : loadState === "loading" ? (
-                  <>
-                    <SkeletonCard />
-                    <SkeletonCard />
-                    <SkeletonCard />
-                  </>
-                ) : (
-                  <div className="text-center text-[12px] text-[var(--text-3)] py-12 px-3 leading-snug">
-                    {b.key === "social"
-                      ? lang === "hi"
-                        ? "अभी कोई सोशल स्रोत कनेक्ट नहीं है"
-                        : "No social source connected yet"
-                      : "—"}
-                  </div>
-                )}
-              </div>
-            </section>
-          );
-        })}
+      {/* All stories in the active section */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 items-start">
+        {visibleItems.length > 0 ? (
+          visibleItems.map((tr) => (
+            <ColumnCard key={`${tab}-${tr.id}`} trend={tr} onClick={() => setOpenTrend(tr)} />
+          ))
+        ) : loadState === "loading" ? (
+          Array.from({ length: 10 }).map((_, i) => <SkeletonCard key={i} />)
+        ) : (
+          <div className="col-span-full text-center text-[13px] text-[var(--text-3)] py-20 px-3 leading-snug">
+            {tab === "social"
+              ? lang === "hi"
+                ? "अभी कोई सोशल स्रोत कनेक्ट नहीं है"
+                : "No social source connected yet"
+              : filter !== "all"
+              ? lang === "hi"
+                ? "इस श्रेणी में कोई कहानी नहीं"
+                : "No stories in this category"
+              : lang === "hi"
+              ? "इस सेक्शन में अभी कोई कहानी नहीं"
+              : "No stories in this section right now"}
+          </div>
+        )}
       </div>
 
 
