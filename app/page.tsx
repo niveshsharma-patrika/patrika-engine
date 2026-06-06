@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, ChevronRight, Newspaper } from "lucide-react";
+import {
+  Plus,
+  ChevronRight,
+  Newspaper,
+  Zap,
+  TrendingUp,
+  Activity,
+  Eye,
+  Rss,
+  Hash,
+  type LucideIcon,
+} from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
 import { SECTION_COLORS, type SectionKey, type Trend } from "@/lib/data/trends";
@@ -26,7 +37,7 @@ const BUCKETS: Array<{
   { key: "social",     label_en: "Social",     label_hi: "सोशल",     hint: "Stories carried on X / social sources" },
 ];
 
-// Per-tab accent colour (the dot + the active underline).
+// Per-tab accent colour + icon.
 const TAB_ACCENT: Record<BucketKey, string> = {
   breaking: "var(--red)",
   trending: "var(--blue)",
@@ -34,6 +45,15 @@ const TAB_ACCENT: Record<BucketKey, string> = {
   watching: "var(--amber)",
   newswire: "#0d9488",
   social: "var(--purple)",
+};
+
+const TAB_ICON: Record<BucketKey, LucideIcon> = {
+  breaking: Zap,
+  trending: TrendingUp,
+  developing: Activity,
+  watching: Eye,
+  newswire: Rss,
+  social: Hash,
 };
 
 // ─── Category filters ─────────────────────────────────────────
@@ -143,32 +163,38 @@ export default function DashboardPage() {
         </span>
       </div>
 
-      {/* Section tabs — each shows ALL stories in that feed */}
-      <div className="flex items-center gap-0.5 flex-wrap mb-3 border-b border-[var(--border)]">
+      {/* Section tabs — big, icon-led; each shows ALL stories in that feed */}
+      <div className="flex items-center gap-2 flex-wrap mb-4">
         {BUCKETS.map((b) => {
           const active = tab === b.key;
           const accent = TAB_ACCENT[b.key];
           const n = (buckets[b.key] ?? []).length;
           const label = lang === "hi" ? b.label_hi : b.label_en;
+          const Icon = TAB_ICON[b.key];
           return (
             <button
               key={b.key}
               onClick={() => setTab(b.key)}
-              className={`relative flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 -mb-px border-b-2 transition-colors ${
+              aria-pressed={active}
+              className={`group flex items-center gap-2 pl-3 pr-3.5 py-2.5 rounded-xl border text-[14.5px] font-semibold transition-all ${
                 active
-                  ? "text-[var(--text)]"
-                  : "border-transparent text-[var(--text-3)] hover:text-[var(--text)]"
+                  ? "text-white shadow-[0_5px_16px_rgba(0,0,0,0.13)]"
+                  : "bg-white border-[var(--border)] text-[var(--text-2)] hover:border-[var(--text-3)] hover:text-[var(--text)] hover:-translate-y-0.5 hover:shadow-sm"
               }`}
-              style={{ borderColor: active ? accent : "transparent" }}
+              style={active ? { background: accent, borderColor: accent } : undefined}
             >
               <span
-                className="w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ background: accent }}
-              />
+                className="flex items-center justify-center w-7 h-7 rounded-lg shrink-0 transition-colors"
+                style={{
+                  background: active ? "rgba(255,255,255,0.2)" : `color-mix(in srgb, ${accent} 13%, white)`,
+                }}
+              >
+                <Icon size={16} strokeWidth={2.5} style={{ color: active ? "white" : accent }} />
+              </span>
               {label}
               <span
-                className={`font-mono text-[10.5px] ${
-                  active ? "text-[var(--text-2)]" : "text-[var(--text-3)]"
+                className={`font-mono text-[11px] leading-none px-1.5 py-1 rounded-md ${
+                  active ? "bg-white/20 text-white" : "bg-[var(--surface-2)] text-[var(--text-3)]"
                 }`}
               >
                 {n}
@@ -179,7 +205,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Active section hint */}
-      <p className="text-[12px] text-[var(--text-3)] mb-3 leading-snug">{activeBucket.hint}</p>
+      <p className="text-[12.5px] text-[var(--text-3)] mb-3 leading-snug">{activeBucket.hint}</p>
 
       {/* Category filters — scoped to the active tab */}
       <div className="flex items-center gap-1.5 flex-wrap mb-4">
