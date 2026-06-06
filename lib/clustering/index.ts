@@ -181,10 +181,14 @@ type SignalRow = {
   url: string | null;
   metadata: Record<string, unknown> | null;
   sources:
-    | { name: string; language: string | null; desk: string | null }
-    | { name: string; language: string | null; desk: string | null }[]
+    | { name: string; language: string | null; desk: string | null; source_type: string | null }
+    | { name: string; language: string | null; desk: string | null; source_type: string | null }[]
     | null;
 };
+
+// Social signals (reddit/youtube/twitter) feed only the Social firehose tab —
+// they are NEVER clustered, so they can't count as a news "publisher".
+const SOCIAL_SOURCE_TYPES = new Set(["reddit", "youtube", "twitter"]);
 
 async function loadRecentSignals(
   supabase: SupabaseClient,
@@ -198,7 +202,7 @@ async function loadRecentSignals(
     const { data, error } = await supabase
       .from("signals")
       .select(
-        "id, content, description, keywords, publisher_section, published_at, author, source_id, topic_id, url, metadata, sources(name, language, desk)"
+        "id, content, description, keywords, publisher_section, published_at, author, source_id, topic_id, url, metadata, sources(name, language, desk, source_type)"
       )
       .gte("published_at", sinceIso)
       .order("published_at", { ascending: false })
@@ -211,6 +215,9 @@ async function loadRecentSignals(
     for (const r of rows) {
       if (!isClusterEligible(r.publisher_section)) continue;
       const src = Array.isArray(r.sources) ? r.sources[0] : r.sources;
+      // Social signals (reddit/youtube/twitter) feed only the Social firehose,
+      // never the news clusters — skip them here.
+      if (src?.source_type && SOCIAL_SOURCE_TYPES.has(src.source_type)) continue;
       // The real publisher is the article's author (the <source> name for
       // Google News, the feed/sitemap publisher otherwise) — NOT our feed
       // name, which would treat "Google News · Business" as one publisher.

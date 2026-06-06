@@ -89,7 +89,7 @@ export async function ingestAllRss(
         .from("sources")
         .select("id, name, source_type, url, handle, desk, is_active")
         .eq("is_active", true)
-        .in("source_type", ["rss", "twitter", "google_news", "sitemap_news"]);
+        .in("source_type", ["rss", "twitter", "google_news", "sitemap_news", "reddit", "youtube"]);
 
   if (sourcesErr) {
     throw new Error(`Failed to fetch sources: ${sourcesErr.message}`);

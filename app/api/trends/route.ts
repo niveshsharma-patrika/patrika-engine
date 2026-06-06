@@ -39,6 +39,7 @@ const MAJOR_BAR = 1;              // at least this many major outlets…
 const HIGH_CORROBORATION = 4;     // …OR this many distinct publishers, major or not
 const WATCHING_FRESH_MIN = 240;   // a 2-source story is "watchable" for 4h
 const NEWSWIRE_FRESH_MIN = 180;   // single-source firehose: articles from the last 3h
+const SOCIAL_FRESH_MIN = 720;     // social firehose: posts from the last 12h
 
 // Effective publish time: some feeds post-date articles (IST stamped as UTC →
 // ~5.5h in the future). For anything >15 min ahead, fall back to when we
@@ -119,6 +120,9 @@ export async function GET(req: Request) {
   // trends — so it takes a wholly separate path.
   if (windowParam === "newswire") {
     return newswireResponse(supabase);
+  }
+  if (windowParam === "social") {
+    return socialResponse(supabase);
   }
 
   const baseSelect = `
@@ -233,13 +237,6 @@ export async function GET(req: Request) {
     if (sigs.length === 0) return false;
     // Keep astrology / lottery / daily-rate filler out of every confirmed feed.
     if (isFillerStory(decodeEntities(row.title))) return false;
-    if (windowParam === "social") {
-      // Only stories that have at least one social (X/Twitter) signal.
-      return sigs.some((s) => {
-        const sr = Array.isArray(s.sources) ? s.sources[0] : s.sources;
-        return sr?.source_type === "twitter";
-      });
-    }
 
     // Prominence gate for the confirmed-news feeds. Keep long-tail-only
     // stories out, but DON'T suppress a widely-covered story just because its
@@ -503,6 +500,102 @@ async function newswireResponse(
       topSignals: [
         {
           author: pubName,
+          text: decodeEntities(title),
+          meta: timeAgoMs(tMs),
+          url: r.url ?? undefined,
+          image: imageFromMeta(r.metadata),
+        },
+      ],
+    });
+    if (trends.length >= 80) break;
+  }
+
+  return Response.json({ trends, count: trends.length });
+}
+
+/**
+ * Social — firehose of recent posts from connected social sources
+ * (reddit / youtube / twitter). Read straight from social signals (which are
+ * excluded from clustering), capped per source so one subreddit/channel can't
+ * dominate. The `twitter` type is supported for when a working RSS endpoint
+ * (self-hosted Nitter / scraper) is added.
+ */
+async function socialResponse(
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<Response> {
+  const sinceIso = new Date(Date.now() - SOCIAL_FRESH_MIN * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("signals")
+    .select(
+      "id, content, author, published_at, ingested_at, url, metadata, sources!inner(source_type, name)"
+    )
+    .in("sources.source_type", ["reddit", "youtube", "twitter"])
+    .gte("published_at", sinceIso)
+    .order("published_at", { ascending: false })
+    .limit(400);
+
+  if (error) {
+    return Response.json(
+      { trends: [], reason: "query_failed", error: error.message },
+      { status: 500 }
+    );
+  }
+
+  type SR = {
+    id: string;
+    content: string | null;
+    author: string | null;
+    published_at: string | null;
+    ingested_at: string | null;
+    url: string | null;
+    metadata: Record<string, unknown> | null;
+    sources:
+      | { source_type: string; name: string }
+      | { source_type: string; name: string }[]
+      | null;
+  };
+  const PLATFORM: Record<string, string> = {
+    reddit: "Reddit",
+    youtube: "YouTube",
+    twitter: "X",
+  };
+  const rows = (data as SR[] | null) ?? [];
+  const seenUrl = new Set<string>();
+  const perSource = new Map<string, number>();
+  const PER_SOURCE = 6;
+  const trends: Trend[] = [];
+
+  for (const r of rows) {
+    const title = extractTitle(r.content ?? "");
+    if (title.length < 6) continue;
+    if (r.url && seenUrl.has(r.url)) continue;
+    const src = Array.isArray(r.sources) ? r.sources[0] : r.sources;
+    const platform = PLATFORM[src?.source_type ?? ""] ?? "Social";
+    const srcName = (src?.name ?? platform).trim();
+    if ((perSource.get(srcName) ?? 0) >= PER_SOURCE) continue;
+    if (r.url) seenUrl.add(r.url);
+    perSource.set(srcName, (perSource.get(srcName) ?? 0) + 1);
+    const tMs = effMs(r);
+
+    trends.push({
+      id: trends.length + 1,
+      section: "national",
+      tag: `${platform} · ${srcName}`,
+      title: decodeEntities(title),
+      velocityPct: 0,
+      window: "—",
+      signalCount: 1,
+      sources: [],
+      trust: 1,
+      desk: platform,
+      suggestedAngle: "",
+      storyType: platform,
+      isNationalOrWorld: false,
+      lastSeenMinAgo: Math.max(0, Math.round((Date.now() - tMs) / 60000)),
+      image: imageFromMeta(r.metadata),
+      topSignals: [
+        {
+          author: srcName,
           text: decodeEntities(title),
           meta: timeAgoMs(tMs),
           url: r.url ?? undefined,
