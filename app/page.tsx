@@ -18,10 +18,10 @@ const BUCKETS: Array<{
   label_hi: string;
   hint: string;
 }> = [
-  { key: "breaking",   label_en: "Breaking",   label_hi: "तत्काल",   hint: "3+ sources · story started in the last 30 min" },
-  { key: "trending",   label_en: "Trending",   label_hi: "ट्रेंडिंग", hint: "3+ sources · story started 30 min – 4 h ago" },
-  { key: "developing", label_en: "Developing", label_hi: "जारी",     hint: "3+ sources · older story, still covered in last 2 h" },
-  { key: "watching",   label_en: "Watching",   label_hi: "नज़र में",  hint: "2 sources · one outlet short of the bar" },
+  { key: "breaking",   label_en: "Breaking",   label_hi: "तत्काल",   hint: "Major story · covered in the last 30 min" },
+  { key: "trending",   label_en: "Trending",   label_hi: "ट्रेंडिंग", hint: "Major story · last covered 30 min – 4 h ago" },
+  { key: "developing", label_en: "Developing", label_hi: "जारी",     hint: "Major story · last covered 4 – 12 h ago" },
+  { key: "watching",   label_en: "Watching",   label_hi: "नज़र में",  hint: "2 sources · not yet at the 3-outlet bar" },
   { key: "social",     label_en: "Social",     label_hi: "सोशल",     hint: "Stories carried on X / social sources" },
 ];
 

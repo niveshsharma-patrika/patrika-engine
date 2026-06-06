@@ -21,13 +21,16 @@ const VALID_SECTIONS: ReadonlyArray<SectionKey> = [
   "weather", "enter", "tech", "national", "world",
 ];
 
-// ─── Time-window rules (story age = first_seen) ─────────────────
-const BREAKING_MAX_MIN = 30;     // story started within the last 30 min
-const TRENDING_MAX_MIN = 240;    // story started within the last 4 hours
+// ─── Time-window rules (recency = the story's NEWEST article) ───
+// A story with 3 distinct publishers is rarely brand-new (3 newsrooms take
+// time to converge), so we bucket by how recently it was LAST covered, not
+// when it first appeared.
+const BREAKING_MAX_MIN = 30;     // last covered within 30 min
+const TRENDING_MAX_MIN = 240;    // last covered 30 min – 4 h ago
+const DEVELOPING_MAX_MIN = 720;  // last covered 4 – 12 h ago
 const NEWS_PUBLISHER_BAR = 3;    // "3 distinct sources" = confirmed news
-const MAJOR_BAR = 2;            // …of which >=2 must be major outlets (prominence)
+const MAJOR_BAR = 2;             // …of which >=2 must be major outlets (prominence)
 const WATCHING_FRESH_MIN = 240;  // a 2-source story is "watchable" for 4h
-const DEVELOPING_FRESH_MIN = 120; // >4h-old story still counts if covered <2h ago
 
 /**
  * GET /api/trends — trends from Supabase, shaped for the dashboard.
@@ -85,43 +88,23 @@ export async function GET(req: Request) {
   const isoMinAgo = (m: number) => new Date(Date.now() - m * 60 * 1000).toISOString();
 
   let query;
-  if (windowParam === "breaking") {
-    // 3+ publishers and the story itself is < 30 min old (its earliest
-    // article is recent) — a genuine fast-breaking event, not an old topic
-    // that only just picked up a 3rd outlet.
+  if (
+    windowParam === "breaking" ||
+    windowParam === "trending" ||
+    windowParam === "developing"
+  ) {
+    // The confirmed-news pool: 3+ publishers, touched in the last 12h. Which
+    // bucket (Breaking / Trending / Developing) a story lands in is decided
+    // in the JS filter below by its newest article's age + the major-outlet
+    // prominence gate. (PostgREST can't MAX() over the joined signals.)
     query = supabase
       .from("trends")
       .select(baseSelect)
       .eq("status", "active")
       .gte("publisher_count", NEWS_PUBLISHER_BAR)
-      .gte("first_seen", isoMinAgo(BREAKING_MAX_MIN))
-      .order("first_seen", { ascending: false })
-      .limit(40);
-  } else if (windowParam === "trending") {
-    // Story is 30 min – 4 h old — past the initial burst, still current.
-    query = supabase
-      .from("trends")
-      .select(baseSelect)
-      .eq("status", "active")
-      .gte("publisher_count", NEWS_PUBLISHER_BAR)
-      .gte("first_seen", isoMinAgo(TRENDING_MAX_MIN))
-      .lt("first_seen", isoMinAgo(BREAKING_MAX_MIN))
-      .order("publisher_count", { ascending: false })
-      .order("first_seen", { ascending: false })
-      .limit(80);
-  } else if (windowParam === "developing") {
-    // Older than 4h (aged out of Trending) but still alive — kept only if a
-    // fresh article landed recently (enforced by the JS filter below). The
-    // ongoing-saga lane.
-    query = supabase
-      .from("trends")
-      .select(baseSelect)
-      .eq("status", "active")
-      .gte("publisher_count", NEWS_PUBLISHER_BAR)
-      .lt("first_seen", isoMinAgo(TRENDING_MAX_MIN))
-      .gte("last_updated", isoMinAgo(DEVELOPING_FRESH_MIN))
-      .order("publisher_count", { ascending: false })
-      .limit(60);
+      .gte("last_updated", isoMinAgo(DEVELOPING_MAX_MIN))
+      .order("last_updated", { ascending: false })
+      .limit(150);
   } else if (windowParam === "watching") {
     // watching — exactly 2 publishers (broke_at is null until 3 is reached).
     query = supabase
@@ -230,15 +213,35 @@ export async function GET(req: Request) {
       if (majors.size < MAJOR_BAR) return false;
     }
 
-    if (windowParam === "watching" || windowParam === "developing") {
+    // Recency bucketing for the confirmed-news feeds — by the NEWEST article
+    // (when the story was last covered):
+    //   Breaking   <30 min · Trending 30 min–4 h · Developing 4–12 h
+    if (
+      windowParam === "breaking" ||
+      windowParam === "trending" ||
+      windowParam === "developing"
+    ) {
+      let newest = 0;
+      for (const s of sigs) {
+        const t = effMs(s);
+        if (t > newest) newest = t;
+      }
+      const ageMin = (Date.now() - newest) / (60 * 1000);
+      if (windowParam === "breaking") return ageMin < BREAKING_MAX_MIN;
+      if (windowParam === "trending")
+        return ageMin >= BREAKING_MAX_MIN && ageMin < TRENDING_MAX_MIN;
+      return ageMin >= TRENDING_MAX_MIN && ageMin < DEVELOPING_MAX_MIN;
+    }
+
+    // watching — a 2-source story with a fresh article in the last 4h.
+    if (windowParam === "watching") {
       let newest = 0;
       for (const s of sigs) {
         const t = effMs(s);
         if (t > newest) newest = t;
       }
       const ageNewestMin = (Date.now() - newest) / (60 * 1000);
-      const limit = windowParam === "developing" ? DEVELOPING_FRESH_MIN : WATCHING_FRESH_MIN;
-      return ageNewestMin <= limit;
+      return ageNewestMin <= WATCHING_FRESH_MIN;
     }
     return true;
   });
