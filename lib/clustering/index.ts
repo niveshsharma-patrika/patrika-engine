@@ -535,7 +535,12 @@ async function reconcileTrendCounts(
           if (srel?.language) languages.add(srel.language);
         }
 
-        const newStatus = actual === 0 ? "archived" : "active";
+        // Archive when a trend has no signals OR has fallen below the
+        // tracking bar (a single publisher) — those are invisible in every
+        // feed anyway, so they shouldn't linger as "active" clutter. If it
+        // regrows to >=2 publishers a later tick reuses + reactivates the row.
+        const newStatus =
+          actual === 0 || publishers.size < MIN_TRACK_PUBLISHERS ? "archived" : "active";
         const trust = computeTrust(publishers.size, languages);
         // Authoritative timeline from ALL the story's signals (not frozen at
         // creation, which depends on the order we ingested the articles):

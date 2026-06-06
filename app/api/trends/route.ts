@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { decodeEntities, canonicalPublisherKey, MAJOR_PUBLISHERS } from "@/lib/clustering/lexical";
+import { isClusterEligible } from "@/lib/clustering/section-gate";
 import type { SectionKey, SourceKey, Trend } from "@/lib/data/trends";
 
 export const dynamic = "force-dynamic";
@@ -25,13 +26,31 @@ const VALID_SECTIONS: ReadonlyArray<SectionKey> = [
 // A story with 3 distinct publishers is rarely brand-new (3 newsrooms take
 // time to converge), so we bucket by how recently it was LAST covered, not
 // when it first appeared.
-const BREAKING_MAX_MIN = 30;      // last covered within 30 min
-const BREAKING_EMERGED_MIN = 90;  // …AND the story first appeared <90 min ago
-const TRENDING_MAX_MIN = 240;    // last covered 30 min – 4 h ago
-const DEVELOPING_MAX_MIN = 720;  // last covered 4 – 12 h ago
-const NEWS_PUBLISHER_BAR = 3;    // "3 distinct sources" = confirmed news
-const MAJOR_BAR = 2;             // …of which >=2 must be major outlets (prominence)
-const WATCHING_FRESH_MIN = 240;  // a 2-source story is "watchable" for 4h
+const BREAKING_MAX_MIN = 30;       // last covered within 30 min
+const BREAKING_EMERGED_MIN = 120;  // …AND the story first appeared <2 h ago
+const TRENDING_MAX_MIN = 240;     // last covered 30 min – 4 h ago
+const DEVELOPING_MAX_MIN = 720;   // last covered 4 – 12 h ago
+const NEWS_PUBLISHER_BAR = 3;     // "3 distinct sources" = confirmed news
+// Prominence: a confirmed story shows if it has >=1 major outlet OR a real
+// crowd of publishers (>=4) even with none on the major list — so a
+// 10-publisher tech story or genuine Hindi/regional news isn't suppressed.
+// Only a 3-publisher, zero-major long-tail story is held back.
+const MAJOR_BAR = 1;              // at least this many major outlets…
+const HIGH_CORROBORATION = 4;     // …OR this many distinct publishers, major or not
+const WATCHING_FRESH_MIN = 240;   // a 2-source story is "watchable" for 4h
+const NEWSWIRE_FRESH_MIN = 180;   // single-source firehose: articles from the last 3h
+
+// Effective publish time: some feeds post-date articles (IST stamped as UTC →
+// ~5.5h in the future). For anything >15 min ahead, fall back to when we
+// ingested it — a far better estimate of the real time. Module-level so both
+// the trends path and the newswire path share it.
+const FUTURE_SLACK_MS = 15 * 60 * 1000;
+function effMs(s: { published_at: string | null; ingested_at: string | null }): number {
+  const p = s.published_at ? new Date(s.published_at).getTime() : NaN;
+  if (Number.isFinite(p) && p <= Date.now() + FUTURE_SLACK_MS) return p;
+  const ing = s.ingested_at ? new Date(s.ingested_at).getTime() : NaN;
+  return Number.isFinite(ing) ? Math.min(ing, Date.now()) : Date.now();
+}
 
 /**
  * GET /api/trends — trends from Supabase, shaped for the dashboard.
@@ -60,20 +79,28 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const requested = url.searchParams.get("window") ?? "trending";
-  type Win = "breaking" | "trending" | "developing" | "watching" | "social";
+  type Win = "breaking" | "trending" | "developing" | "watching" | "newswire" | "social";
   // Back-compat with the old window names.
   const alias: Record<string, Win> = {
     breaking: "breaking",
     trending: "trending",
     developing: "developing",
     watching: "watching",
+    newswire: "newswire",
     social: "social",
     now: "breaking",
     active: "trending",
     today: "trending",
     watchlist: "watching",
+    wire: "newswire",
   };
   const windowParam: Win = alias[requested] ?? "trending";
+
+  // Newswire is the single-source firehose — built from raw signals, not
+  // trends — so it takes a wholly separate path.
+  if (windowParam === "newswire") {
+    return newswireResponse(supabase);
+  }
 
   const baseSelect = `
       id, title, title_hi, section, desk, desk_hi, velocity_pct, velocity_window, trust_score,
@@ -98,6 +125,8 @@ export async function GET(req: Request) {
     // bucket (Breaking / Trending / Developing) a story lands in is decided
     // in the JS filter below by its newest article's age + the major-outlet
     // prominence gate. (PostgREST can't MAX() over the joined signals.)
+    // Limit is high enough to fetch the WHOLE live pool (was 150, which
+    // silently dropped the tail of a >150-story pool).
     query = supabase
       .from("trends")
       .select(baseSelect)
@@ -105,7 +134,7 @@ export async function GET(req: Request) {
       .gte("publisher_count", NEWS_PUBLISHER_BAR)
       .gte("last_updated", isoMinAgo(DEVELOPING_MAX_MIN))
       .order("last_updated", { ascending: false })
-      .limit(150);
+      .limit(400);
   } else if (windowParam === "watching") {
     // watching — exactly 2 publishers (broke_at is null until 3 is reached).
     query = supabase
@@ -150,16 +179,7 @@ export async function GET(req: Request) {
     sources: { source_type: string; name: string } | { source_type: string; name: string }[] | null;
   };
 
-  // Effective publish time: some feeds post-date articles (IST stamped as
-  // UTC → ~5.5h in the future). For anything more than 15 min ahead, fall
-  // back to when we ingested it — a far better estimate of the real time.
-  const FUTURE_SLACK_MS = 15 * 60 * 1000;
-  const effMs = (s: SignalRow): number => {
-    const p = new Date(s.published_at).getTime();
-    if (Number.isFinite(p) && p <= Date.now() + FUTURE_SLACK_MS) return p;
-    const ing = s.ingested_at ? new Date(s.ingested_at).getTime() : NaN;
-    return Number.isFinite(ing) ? Math.min(ing, Date.now()) : Date.now();
-  };
+  // effMs (effective publish time) is defined at module scope above.
 
   type TrendRow = {
     id: string;
@@ -200,18 +220,24 @@ export async function GET(req: Request) {
       });
     }
 
-    // Prominence gate for the confirmed-news feeds: the story must be carried
-    // by >= MAJOR_BAR *major* outlets, not just any 3 publishers. Keeps
-    // trivial stories covered only by long-tail / local sites out of
-    // Breaking / Trending / Developing.
+    // Prominence gate for the confirmed-news feeds. Keep long-tail-only
+    // stories out, but DON'T suppress a widely-covered story just because its
+    // outlets aren't on the (English-leaning) major list — a 10-publisher tech
+    // story, or genuine Hindi/regional news. Pass if there's >=1 major outlet
+    // OR a real crowd (>=HIGH_CORROBORATION distinct publishers). Only a small
+    // 3-publisher, zero-major long-tail story is held back.
     if (windowParam !== "watching") {
+      const pubs = new Set<string>();
       const majors = new Set<string>();
       for (const s of sigs) {
         const srcRel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
         const pub = canonicalPublisherKey((s.author ?? srcRel?.name ?? "").trim());
-        if (pub && MAJOR_PUBLISHERS.has(pub)) majors.add(pub);
+        if (!pub) continue;
+        pubs.add(pub);
+        if (MAJOR_PUBLISHERS.has(pub)) majors.add(pub);
       }
-      if (majors.size < MAJOR_BAR) return false;
+      const prominent = majors.size >= MAJOR_BAR || pubs.size >= HIGH_CORROBORATION;
+      if (!prominent) return false;
     }
 
     // Recency bucketing for the confirmed-news feeds, using two clocks per
@@ -341,6 +367,106 @@ export async function GET(req: Request) {
       topSignals,
     };
   });
+
+  return Response.json({ trends, count: trends.length });
+}
+
+/**
+ * Newswire — the single-source firehose. Most incoming articles are carried by
+ * only one outlet, so they never cluster into a multi-publisher trend and would
+ * otherwise be invisible (≈65% of ingested signals). Here we surface the
+ * freshest of them straight from the signals table (topic_id IS NULL = not part
+ * of any story), filler sections dropped, deduped by URL and by publisher+title.
+ * Each card is ONE article (publisher_count = 1), explicitly uncorroborated.
+ */
+async function newswireResponse(
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<Response> {
+  const sinceIso = new Date(Date.now() - NEWSWIRE_FRESH_MIN * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("signals")
+    .select(
+      "id, content, author, published_at, ingested_at, url, metadata, publisher_section, sources(source_type, name)"
+    )
+    .is("topic_id", null)
+    .gte("published_at", sinceIso)
+    .order("published_at", { ascending: false })
+    .limit(400);
+
+  if (error) {
+    return Response.json(
+      { trends: [], reason: "query_failed", error: error.message },
+      { status: 500 }
+    );
+  }
+
+  type NwRow = {
+    id: string;
+    content: string | null;
+    author: string | null;
+    published_at: string | null;
+    ingested_at: string | null;
+    url: string | null;
+    metadata: Record<string, unknown> | null;
+    publisher_section: string | null;
+    sources:
+      | { source_type: string; name: string }
+      | { source_type: string; name: string }[]
+      | null;
+  };
+
+  const rows = (data as NwRow[] | null) ?? [];
+  const seenUrl = new Set<string>();
+  const seenKey = new Set<string>();
+  const trends: Trend[] = [];
+
+  for (const r of rows) {
+    if (!isClusterEligible(r.publisher_section)) continue;
+    const title = extractTitle(r.content ?? "");
+    if (title.length < 12) continue;
+    if (r.url && seenUrl.has(r.url)) continue;
+
+    const srcRel = Array.isArray(r.sources) ? r.sources[0] : r.sources;
+    const pubName = (r.author ?? srcRel?.name ?? "Source").trim();
+    const pubKey = canonicalPublisherKey(pubName);
+    const titleKey =
+      pubKey + "|" + title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().slice(0, 48);
+    if (seenKey.has(titleKey)) continue;
+    if (r.url) seenUrl.add(r.url);
+    seenKey.add(titleKey);
+
+    const st = srcRel?.source_type;
+    const source: SourceKey = st === "twitter" ? "x" : st === "google_news" ? "gn" : "rss";
+    const tMs = effMs(r);
+
+    trends.push({
+      id: trends.length + 1,
+      section: "national",
+      tag: pubName || "Newswire",
+      title: decodeEntities(title),
+      velocityPct: 0,
+      window: "—",
+      signalCount: 1,
+      sources: [source],
+      trust: 1,
+      desk: pubName || "Newswire",
+      suggestedAngle: "",
+      storyType: "Newswire",
+      isNationalOrWorld: false,
+      lastSeenMinAgo: Math.max(0, Math.round((Date.now() - tMs) / 60000)),
+      image: imageFromMeta(r.metadata),
+      topSignals: [
+        {
+          author: pubName,
+          text: decodeEntities(title),
+          meta: timeAgoMs(tMs),
+          url: r.url ?? undefined,
+          image: imageFromMeta(r.metadata),
+        },
+      ],
+    });
+    if (trends.length >= 80) break;
+  }
 
   return Response.json({ trends, count: trends.length });
 }

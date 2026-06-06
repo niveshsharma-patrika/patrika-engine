@@ -10,7 +10,7 @@ import { TrendDrawer } from "@/components/trend-drawer";
 import { SkeletonCard } from "@/components/skeletons";
 
 // ─── Editorial feeds (the board columns) ──────────────────────
-type BucketKey = "breaking" | "trending" | "developing" | "watching" | "social";
+type BucketKey = "breaking" | "trending" | "developing" | "watching" | "newswire" | "social";
 
 const BUCKETS: Array<{
   key: BucketKey;
@@ -22,6 +22,7 @@ const BUCKETS: Array<{
   { key: "trending",   label_en: "Trending",   label_hi: "ट्रेंडिंग", hint: "Major story · last covered 30 min – 4 h ago" },
   { key: "developing", label_en: "Developing", label_hi: "जारी",     hint: "Major story · last covered 4 – 12 h ago" },
   { key: "watching",   label_en: "Watching",   label_hi: "नज़र में",  hint: "2 sources · not yet at the 3-outlet bar" },
+  { key: "newswire",   label_en: "Newswire",   label_hi: "न्यूज़वायर", hint: "Single-source · fresh wire copy, not yet corroborated" },
   { key: "social",     label_en: "Social",     label_hi: "सोशल",     hint: "Stories carried on X / social sources" },
 ];
 
@@ -52,6 +53,7 @@ export default function DashboardPage() {
     trending: [],
     developing: [],
     watching: [],
+    newswire: [],
     social: [],
   });
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
@@ -61,7 +63,7 @@ export default function DashboardPage() {
     let cancelled = false;
     async function load() {
       try {
-        const keys: BucketKey[] = ["breaking", "trending", "developing", "watching", "social"];
+        const keys: BucketKey[] = ["breaking", "trending", "developing", "watching", "newswire", "social"];
         const results = await Promise.all(
           keys.map((k) =>
             fetch(`/api/trends?window=${k}`, { cache: "no-store" })
@@ -78,7 +80,8 @@ export default function DashboardPage() {
           trending: results[1],
           developing: results[2],
           watching: results[3],
-          social: results[4],
+          newswire: results[4],
+          social: results[5],
         });
         setLoadState("ready");
       } catch {
