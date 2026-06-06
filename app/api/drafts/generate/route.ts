@@ -1,4 +1,4 @@
-import { generateText } from "ai";
+import { generateObject, generateText } from "ai";
 import { z } from "zod";
 
 import { TRENDS } from "@/lib/data/trends";
@@ -277,7 +277,7 @@ ${trend.signals.map((s, i) => `[${i + 1}] ${s.text}`).join("\n") || "(no reports
 
 ${langDirective}
 
-Write a single 8-14 word newspaper headline that reports what happened. Active voice, no clickbait, no opinion. Return ONLY the headline — no quotes, no explanation.
+Write 4 DISTINCT newspaper headline options (each 8-14 words) that report what happened. Active voice, no clickbait, no opinion. Vary the emphasis and structure across the options so the editor has real choice. Return them in the "titles" array.
 
 ${baseContext}`,
 
@@ -305,7 +305,7 @@ Rules:
 
 ${langDirective}
 
-Write a single 8-14 word newspaper headline that captures the editorial ANGLE below, not just the surface event. Headlines that drive a reader to read because of the perspective. Return ONLY the headline.
+Write 4 DISTINCT headline options (each 8-14 words) that capture the editorial ANGLE below, not just the surface event — headlines that pull a reader in via the perspective. Vary the hook across options. Return them in the "titles" array.
 
 TOPIC: ${trend.title}
 EDITORIAL ANGLE: ${angleText}
@@ -395,13 +395,16 @@ export async function POST(req: Request) {
   // single setting against the 2024-knowledge / hallucination problem.
   const TEMPERATURE = 0.2;
 
-  let headline, body;
+  let headlineRes, body;
   try {
-    headline = await generateText({
+    // Several headline OPTIONS (structured) so the editor can pick one — a
+    // little more temperature here for genuine variety across the options.
+    headlineRes = await generateObject({
       model: drafting.model,
       system: drafting.systemPrompt ?? undefined,
+      schema: z.object({ titles: z.array(z.string()).min(3).max(5) }),
       prompt: headlinePrompt,
-      temperature: TEMPERATURE,
+      temperature: 0.6,
     });
 
     body = await generateText({
@@ -423,8 +426,14 @@ export async function POST(req: Request) {
     );
   }
 
+  const titles = headlineRes.object.titles
+    .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+    .filter(Boolean)
+    .slice(0, 5);
+
   return Response.json({
-    title: headline.text.trim().replace(/^["']|["']$/g, ""),
+    title: titles[0] ?? "",
+    titles,
     body: body.text.trim(),
     mode: parsed.data.mode,
     meta: {
@@ -432,9 +441,9 @@ export async function POST(req: Request) {
       model: drafting.modelKey,
       temperature: TEMPERATURE,
       inputTokens:
-        (headline.usage?.inputTokens ?? 0) + (body.usage?.inputTokens ?? 0),
+        (headlineRes.usage?.inputTokens ?? 0) + (body.usage?.inputTokens ?? 0),
       outputTokens:
-        (headline.usage?.outputTokens ?? 0) + (body.usage?.outputTokens ?? 0),
+        (headlineRes.usage?.outputTokens ?? 0) + (body.usage?.outputTokens ?? 0),
       style: {
         guidelinesUsed: Boolean(styleAssets.guidelines),
         guidelinesChars: styleAssets.guidelines?.length ?? 0,

@@ -426,6 +426,7 @@ function Editor({
 }) {
   const { t, lang } = useLang();
   const [body, setBody] = useState("");
+  const [titleOptions, setTitleOptions] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
   const words = body.trim() ? body.trim().split(/\s+/).length : 0;
 
@@ -452,7 +453,13 @@ function Editor({
       });
       if (res.ok) {
         const json = await res.json();
-        if (json.title) setTitle(json.title);
+        const opts: string[] = Array.isArray(json.titles)
+          ? json.titles
+          : json.title
+          ? [json.title]
+          : [];
+        setTitleOptions(opts);
+        if (opts.length > 0) setTitle(opts[0]);
         if (json.body) setBody(json.body);
       } else {
         const err = await res.json().catch(() => ({}));
@@ -499,6 +506,31 @@ function Editor({
               placeholder="Article headline..."
               className="w-full text-2xl font-medium outline-none mb-3 placeholder:text-[var(--text-3)] placeholder:font-normal"
             />
+            {titleOptions.length > 1 && (
+              <div className="mb-4">
+                <div className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium mb-1.5">
+                  {lang === "hi" ? "शीर्षक विकल्प — चुनें" : "Title options — pick one"}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {titleOptions.map((opt, i) => {
+                    const active = opt === title;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setTitle(opt)}
+                        className={`text-left text-[13.5px] leading-snug px-3 py-2 rounded-lg border transition-all ${
+                          active
+                            ? "border-[var(--red)] bg-[var(--red-soft)] text-[var(--text)] font-medium"
+                            : "border-[var(--border)] bg-white text-[var(--text-2)] hover:border-[var(--text-3)] hover:text-[var(--text)]"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="border-t border-[var(--border)] pt-4 relative">
               <textarea
                 value={body}
