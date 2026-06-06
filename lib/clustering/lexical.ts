@@ -182,7 +182,7 @@ function meaningfulExcerpt(value: string): string {
   return text;
 }
 
-function tokenize(value: string): string[] {
+export function tokenize(value: string): string[] {
   const normalized = String(value || "")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")

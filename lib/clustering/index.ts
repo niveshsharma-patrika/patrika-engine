@@ -13,6 +13,7 @@ import {
   type SignalInput,
 } from "./lexical";
 import { isClusterEligible } from "./section-gate";
+import { corroborateWatching, type CorroborateStats } from "./corroborate";
 import { getPipelineSettings, type PipelineSettings } from "@/lib/pipeline-settings";
 
 /**
@@ -63,6 +64,7 @@ export type ClusterStats = {
   signals_linked: number;
   trends_reconciled: number;
   trends_archived: number;
+  corroboration?: CorroborateStats;
   duration_ms: number;
 };
 
@@ -127,7 +129,12 @@ export async function clusterAndTrend(
     }
   });
 
-  // 4. Reconcile + archive.
+  // 4. Corroborate Watching stories via Google News Full Coverage — inject
+  //    same-story articles so a 2-publisher story can cross the 3-source bar.
+  const corroboration = await corroborateWatching(supabase);
+
+  // 5. Reconcile + archive — recomputes publisher_count (incl. the injected
+  //    publishers), which auto-promotes corroborated stories.
   const recon = await reconcileTrendCounts(supabase);
 
   return {
@@ -139,6 +146,7 @@ export async function clusterAndTrend(
     signals_linked: signalsLinked,
     trends_reconciled: recon.reconciled,
     trends_archived: recon.archived,
+    corroboration,
     duration_ms: Date.now() - started,
   };
 }
