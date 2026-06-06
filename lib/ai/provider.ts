@@ -71,18 +71,31 @@ type ResolvedModel = {
  * This lets angle generation + drafting work the moment the key is set,
  * without any admin DB wiring (ai_config / ai_providers rows).
  */
-function geminiEnvFallback(): ResolvedModel | null {
-  const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  if (!key) return null;
-  // gemini-2.5-flash is the current free-tier flash model (2.0-flash now has a
-  // 0 free-tier quota). Override with GEMINI_MODEL if needed.
-  const modelKey = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
-  return {
-    model: createGoogleGenerativeAI({ apiKey: key })(modelKey),
-    providerKey: "google",
-    modelKey,
-    systemPrompt: null,
-  };
+function envFallback(): ResolvedModel | null {
+  // Zero-config default when no admin DB model is wired. Prefer OpenAI
+  // (gpt-4o-mini) when OPENAI_API_KEY is set; otherwise fall back to Gemini.
+  // Override the exact model with OPENAI_MODEL / GEMINI_MODEL.
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (openaiKey) {
+    const modelKey = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+    return {
+      model: createOpenAI({ apiKey: openaiKey })(modelKey),
+      providerKey: "openai",
+      modelKey,
+      systemPrompt: null,
+    };
+  }
+  const googleKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (googleKey) {
+    const modelKey = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+    return {
+      model: createGoogleGenerativeAI({ apiKey: googleKey })(modelKey),
+      providerKey: "google",
+      modelKey,
+      systemPrompt: null,
+    };
+  }
+  return null;
 }
 
 /**
@@ -130,7 +143,7 @@ export async function getModelFor(
     .maybeSingle();
 
   // No admin config row for this use case → fall back to Gemini if a key is set.
-  if (error || !data?.ai_models) return geminiEnvFallback();
+  if (error || !data?.ai_models) return envFallback();
 
   // Supabase joins return arrays or objects depending on relationship — coerce.
   const modelRow = Array.isArray(data.ai_models) ? data.ai_models[0] : data.ai_models;
@@ -147,7 +160,7 @@ export async function getModelFor(
     console.warn(
       `No API key configured for provider "${providerKey}" (use case: ${useCase})`
     );
-    return geminiEnvFallback();
+    return envFallback();
   }
 
   return {

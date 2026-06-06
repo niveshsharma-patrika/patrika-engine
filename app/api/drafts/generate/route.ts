@@ -416,7 +416,7 @@ export async function POST(req: Request) {
     return Response.json(
       {
         error: rateLimited
-          ? "Gemini free-tier rate limit hit — wait ~30s and hit Regenerate, or enable billing on the Google project for higher limits."
+          ? "AI rate limit hit — wait a few seconds and hit Regenerate."
           : `Generation failed: ${msg.slice(0, 200)}`,
       },
       { status: 503 }
