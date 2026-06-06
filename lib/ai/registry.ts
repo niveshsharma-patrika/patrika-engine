@@ -31,8 +31,9 @@ export const AI_PROVIDERS = {
     name: "Google Gemini",
     env_var: "GOOGLE_GENERATIVE_AI_API_KEY",
     models: [
-      { key: "gemini-2.0-flash", name: "Gemini 2.0 Flash", context: 1000000, input: 0.075, output: 0.3, vision: true },
-      { key: "gemini-2.0-pro", name: "Gemini 2.0 Pro", context: 2000000, input: 1.25, output: 5, vision: true },
+      { key: "gemini-2.5-flash", name: "Gemini 2.5 Flash", context: 1000000, input: 0.3, output: 2.5, vision: true },
+      { key: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite", context: 1000000, input: 0.1, output: 0.4, vision: true },
+      { key: "gemini-2.5-pro", name: "Gemini 2.5 Pro", context: 2000000, input: 1.25, output: 10, vision: true },
     ],
   },
   groq: {

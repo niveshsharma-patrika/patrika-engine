@@ -74,10 +74,13 @@ type ResolvedModel = {
 function geminiEnvFallback(): ResolvedModel | null {
   const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!key) return null;
+  // gemini-2.5-flash is the current free-tier flash model (2.0-flash now has a
+  // 0 free-tier quota). Override with GEMINI_MODEL if needed.
+  const modelKey = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
   return {
-    model: createGoogleGenerativeAI({ apiKey: key })("gemini-2.0-flash"),
+    model: createGoogleGenerativeAI({ apiKey: key })(modelKey),
     providerKey: "google",
-    modelKey: "gemini-2.0-flash",
+    modelKey,
     systemPrompt: null,
   };
 }
