@@ -14,6 +14,7 @@ import {
 } from "./lexical";
 import { isClusterEligible } from "./section-gate";
 import { corroborateWatching, type CorroborateStats } from "./corroborate";
+import { classifyStorySections } from "@/lib/ai/categorize";
 import { getPipelineSettings, type PipelineSettings } from "@/lib/pipeline-settings";
 
 /**
@@ -64,6 +65,7 @@ export type ClusterStats = {
   signals_linked: number;
   trends_reconciled: number;
   trends_archived: number;
+  trends_categorized?: number;
   corroboration?: CorroborateStats;
   duration_ms: number;
 };
@@ -137,6 +139,18 @@ export async function clusterAndTrend(
   //    publishers), which auto-promotes corroborated stories.
   const recon = await reconcileTrendCounts(supabase);
 
+  // 6. AI-categorise newly-seen stories (graceful — skipped without an AI key
+  //    or before migration 0027; once classified a story keeps its section).
+  let trendsCategorized = 0;
+  try {
+    trendsCategorized = (await categorizeTrends(supabase)).categorized;
+  } catch (err) {
+    console.warn(
+      "[cluster] categorize skipped:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
   return {
     signals_loaded: inputs.length,
     clusters_total: clusters.length,
@@ -146,6 +160,7 @@ export async function clusterAndTrend(
     signals_linked: signalsLinked,
     trends_reconciled: recon.reconciled,
     trends_archived: recon.archived,
+    trends_categorized: trendsCategorized,
     corroboration,
     duration_ms: Date.now() - started,
   };
@@ -393,6 +408,11 @@ async function reuseTrend(
   const prevBrokeAt = (existing as { broke_at: string | null } | null)?.broke_at ?? null;
 
   const patch: Record<string, unknown> = { ...write };
+  // Section + desk are owned by the AI categoriser (createTrend seeds a lexical
+  // guess; categorizeTrends finalises it). Don't let reuse overwrite the
+  // AI-chosen category with the lexical one on every tick.
+  delete patch.section;
+  delete patch.desk;
   if (!prevBrokeAt && pubs.length >= NEWS_PUBLISHER_BAR) {
     const broke = brokeAtMs(cluster);
     patch.broke_at = new Date(broke ?? nowMs).toISOString();
@@ -580,6 +600,62 @@ async function reconcileTrendCounts(
     );
   }
   return { reconciled, archived };
+}
+
+// ─── AI categorisation ──────────────────────────────────────────
+
+const SECTION_LABEL: Record<string, string> = {
+  national: "National",
+  world: "World",
+  politics: "Politics",
+  business: "Business",
+  sports: "Sports",
+  enter: "Entertainment",
+  tech: "Tech",
+};
+
+/**
+ * AI-categorise active trends not yet classified (categorized_at IS NULL).
+ * Runs once per story — cheap. Graceful: if the column is missing (migration
+ * 0027 not run) or no AI key is set, it no-ops and the lexical section stays.
+ * Bounded to 60/tick so any backlog drains over a few ticks.
+ */
+async function categorizeTrends(
+  supabase: SupabaseClient
+): Promise<{ categorized: number }> {
+  const { data, error } = await supabase
+    .from("trends")
+    .select("id, title")
+    .eq("status", "active")
+    .is("categorized_at", null)
+    .order("last_updated", { ascending: false })
+    .limit(60);
+  if (error || !data || data.length === 0) return { categorized: 0 };
+
+  const stories = (data as { id: string; title: string }[]).map((r) => ({
+    id: r.id,
+    title: r.title,
+  }));
+  const sections = await classifyStorySections(stories);
+  if (sections.size === 0) return { categorized: 0 };
+
+  const nowIso = new Date().toISOString();
+  let categorized = 0;
+  await Promise.all(
+    [...sections.entries()].map(async ([id, section]) => {
+      const { error: uErr } = await supabase
+        .from("trends")
+        .update({
+          section,
+          desk: SECTION_LABEL[section] ?? "National",
+          is_national_or_world: section === "national" || section === "world",
+          categorized_at: nowIso,
+        })
+        .eq("id", id);
+      if (!uErr) categorized += 1;
+    })
+  );
+  return { categorized };
 }
 
 // ─── Concurrency ────────────────────────────────────────────────
