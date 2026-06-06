@@ -391,7 +391,7 @@ async function newswireResponse(
     .is("topic_id", null)
     .gte("published_at", sinceIso)
     .order("published_at", { ascending: false })
-    .limit(400);
+    .limit(1000);
 
   if (error) {
     return Response.json(
@@ -418,6 +418,8 @@ async function newswireResponse(
   const rows = (data as NwRow[] | null) ?? [];
   const seenUrl = new Set<string>();
   const seenKey = new Set<string>();
+  const perPub = new Map<string, number>(); // cap one outlet from flooding the lane
+  const NEWSWIRE_PER_PUB = 4;
   const trends: Trend[] = [];
 
   for (const r of rows) {
@@ -432,8 +434,10 @@ async function newswireResponse(
     const titleKey =
       pubKey + "|" + title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().slice(0, 48);
     if (seenKey.has(titleKey)) continue;
+    if ((perPub.get(pubKey) ?? 0) >= NEWSWIRE_PER_PUB) continue;
     if (r.url) seenUrl.add(r.url);
     seenKey.add(titleKey);
+    perPub.set(pubKey, (perPub.get(pubKey) ?? 0) + 1);
 
     const st = srcRel?.source_type;
     const source: SourceKey = st === "twitter" ? "x" : st === "google_news" ? "gn" : "rss";
