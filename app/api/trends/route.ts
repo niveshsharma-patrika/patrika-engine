@@ -306,6 +306,24 @@ export async function GET(req: Request) {
     return true;
   });
 
+  // Sort every feed by the NEWEST article in each cluster (recency of
+  // coverage) — the most-recently-covered story sits on top. `last_updated`
+  // is only the processing time (≈ uniform within a tick), so we sort by the
+  // real article timestamps here instead.
+  const newestCache = new Map<string, number>();
+  const newestArticleMs = (row: TrendRow): number => {
+    const cached = newestCache.get(row.id);
+    if (cached !== undefined) return cached;
+    let n = 0;
+    for (const s of row.signals ?? []) {
+      const t = effMs(s);
+      if (t > n) n = t;
+    }
+    newestCache.set(row.id, n);
+    return n;
+  };
+  filtered.sort((a, b) => newestArticleMs(b) - newestArticleMs(a));
+
   const trends: Trend[] = filtered.map((row, idx) => {
     const signals = row.signals ?? [];
 
