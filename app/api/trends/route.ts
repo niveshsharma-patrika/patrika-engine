@@ -25,7 +25,8 @@ const VALID_SECTIONS: ReadonlyArray<SectionKey> = [
 // A story with 3 distinct publishers is rarely brand-new (3 newsrooms take
 // time to converge), so we bucket by how recently it was LAST covered, not
 // when it first appeared.
-const BREAKING_MAX_MIN = 30;     // last covered within 30 min
+const BREAKING_MAX_MIN = 30;      // last covered within 30 min
+const BREAKING_EMERGED_MIN = 90;  // …AND the story first appeared <90 min ago
 const TRENDING_MAX_MIN = 240;    // last covered 30 min – 4 h ago
 const DEVELOPING_MAX_MIN = 720;  // last covered 4 – 12 h ago
 const NEWS_PUBLISHER_BAR = 3;    // "3 distinct sources" = confirmed news
@@ -213,23 +214,35 @@ export async function GET(req: Request) {
       if (majors.size < MAJOR_BAR) return false;
     }
 
-    // Recency bucketing for the confirmed-news feeds — by the NEWEST article
-    // (when the story was last covered):
-    //   Breaking   <30 min · Trending 30 min–4 h · Developing 4–12 h
+    // Recency bucketing for the confirmed-news feeds, using two clocks per
+    // story — its NEWEST article (last covered) and its OLDEST article (when
+    // the story first emerged):
+    //   Breaking   = emerged <90 min ago AND last covered <30 min ago
+    //                (genuinely new + actively running — not a day-old saga
+    //                that just got one fresh update)
+    //   Trending   = anything else last covered <4 h ago
+    //   Developing = last covered 4–12 h ago
     if (
       windowParam === "breaking" ||
       windowParam === "trending" ||
       windowParam === "developing"
     ) {
       let newest = 0;
+      let oldest = Number.POSITIVE_INFINITY;
       for (const s of sigs) {
         const t = effMs(s);
         if (t > newest) newest = t;
+        if (t < oldest) oldest = t;
       }
       const ageMin = (Date.now() - newest) / (60 * 1000);
-      if (windowParam === "breaking") return ageMin < BREAKING_MAX_MIN;
-      if (windowParam === "trending")
-        return ageMin >= BREAKING_MAX_MIN && ageMin < TRENDING_MAX_MIN;
+      const emergedMin =
+        oldest === Number.POSITIVE_INFINITY
+          ? Number.POSITIVE_INFINITY
+          : (Date.now() - oldest) / (60 * 1000);
+      const isBreaking =
+        ageMin < BREAKING_MAX_MIN && emergedMin < BREAKING_EMERGED_MIN;
+      if (windowParam === "breaking") return isBreaking;
+      if (windowParam === "trending") return !isBreaking && ageMin < TRENDING_MAX_MIN;
       return ageMin >= TRENDING_MAX_MIN && ageMin < DEVELOPING_MAX_MIN;
     }
 
