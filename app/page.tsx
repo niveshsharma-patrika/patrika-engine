@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Plus,
   ChevronRight,
@@ -12,6 +12,8 @@ import {
   Rss,
   Hash,
   Loader2,
+  Sparkles,
+  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 
@@ -128,18 +130,9 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const [editorMode, setEditorMode] = useState<"factual" | "angle" | "blank">("blank");
-  const [editorAngle, setEditorAngle] = useState<StoryAngle | undefined>(undefined);
-
-  function openEditor(
-    trend: Trend | null,
-    mode: "factual" | "angle" | "blank" = "blank",
-    angle?: StoryAngle
-  ) {
+  function openEditor(trend: Trend | null) {
     setEditorTrend(trend);
     setEditorTitle(trend?.title ?? "");
-    setEditorMode(mode);
-    setEditorAngle(angle);
     setEditorOpen(true);
     setOpenTrend(null);
   }
@@ -288,15 +281,13 @@ export default function DashboardPage() {
         <TrendDrawer
           trend={openTrend}
           onClose={() => setOpenTrend(null)}
-          onGenerate={(mode, angle) => openEditor(openTrend, mode, angle)}
+          onGenerate={() => openEditor(openTrend)}
         />
       )}
 
       {editorOpen && (
         <Editor
           trend={editorTrend}
-          mode={editorMode}
-          angle={editorAngle}
           title={editorTitle}
           setTitle={setEditorTitle}
           onClose={() => setEditorOpen(false)}
@@ -413,13 +404,75 @@ function CardHero({
   );
 }
 
-// ─── Editor ───────────────────────────────────────────────────
-function Editor({
-  trend, mode, angle, title, setTitle, onClose,
-}: {
+// ─── Story-generation page (the "Content Generator") ──────────
+
+const TONES = ["Neutral", "Formal", "Conversational", "Authoritative", "Empathetic", "Punchy"];
+const VOICES = ["Brand-aligned", "Neutral", "First-person", "Investigative"];
+const HEADLINE_TYPES = ["Factual", "Emotional", "Question", "How-to", "Number/List", "Punchy"];
+const LEAD_STYLES = ["Summary", "Context", "Anecdote", "Question", "Quote"];
+const TRENDING_OPTS = ["Low", "Medium", "High"];
+const AUDIENCE_OPTS = ["Niche", "Broad", "General"];
+const URGENCY_OPTS = ["Breaking", "Ongoing", "Evergreen"];
+const PUBLICATION_OPTS = ["Theme 1", "Theme 2", "Theme 3"];
+const WRITER_OPTS = ["Author 1", "Author 2", "Author 3"];
+const READABILITY_OPTS = ["Easy", "Moderate", "Expert"];
+
+function EnhField({ label, value, onChange, options }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+}) {
+  return (
+    <div className="mb-3.5">
+      <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)] cursor-pointer"
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function EnhGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="mb-5">
+      <h4 className="text-[12px] font-semibold text-[var(--text)] mb-2.5">{title}</h4>
+      {children}
+    </div>
+  );
+}
+
+function ScoreRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[var(--text-3)]">{label}:</span>
+      <b className="text-[var(--text)] font-semibold">{value}</b>
+    </div>
+  );
+}
+
+/** Lightweight client-side CTR heuristic for the Title Score panel. */
+function ctrScore(s: string): number {
+  const v = s.trim();
+  if (!v) return 0;
+  const words = v.split(/\s+/).length;
+  let score = 45;
+  if (words >= 8 && words <= 14) score += 22;
+  else if (words <= 16) score += 10;
+  if (/\d/.test(v)) score += 8;
+  if (/[?:]/.test(v)) score += 6;
+  if (/\b(breaking|exclusive|revealed|why|how|crisis|first|major|delay|big)\b/i.test(v)) score += 8;
+  return Math.min(92, score);
+}
+
+function Editor({ trend, title, setTitle, onClose }: {
   trend: Trend | null;
-  mode: "factual" | "angle" | "blank";
-  angle?: StoryAngle;
   title: string;
   setTitle: (v: string) => void;
   onClose: () => void;
@@ -428,17 +481,52 @@ function Editor({
   const [body, setBody] = useState("");
   const [titleOptions, setTitleOptions] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
+
+  // AI Enhancement controls
+  const [tone, setTone] = useState("Neutral");
+  const [readability, setReadability] = useState(0); // 0 Easy · 1 Moderate · 2 Expert
+  const [voice, setVoice] = useState("Brand-aligned");
+  const [headlineType, setHeadlineType] = useState("Emotional");
+  const [leadStyle, setLeadStyle] = useState("Context");
+  const [trendingScore, setTrendingScore] = useState("Medium");
+  const [audienceFit, setAudienceFit] = useState("Broad");
+  const [urgency, setUrgency] = useState("Ongoing");
+  const [publication, setPublication] = useState("Theme 1");
+  const [writer, setWriter] = useState("Author 2");
+  const [numberOfTitles, setNumberOfTitles] = useState(5);
+  const [wordCount, setWordCount] = useState(800);
+
+  // Story angle (moved here from the drawer)
+  const [angles, setAngles] = useState<StoryAngle[] | undefined>(trend?.angles);
+  const [selectedAngle, setSelectedAngle] = useState<StoryAngle | null>(null);
+  const [loadingAngles, setLoadingAngles] = useState(false);
+
   const words = body.trim() ? body.trim().split(/\s+/).length : 0;
 
-  // Auto-generate immediately if opened with a mode from the drawer
   useEffect(() => {
-    if (trend && (mode === "factual" || mode === "angle")) {
-      handleGenerate(mode);
-    }
+    if (trend) handleGenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleGenerate(activeMode: "factual" | "angle" = "factual") {
+  async function generateAngles() {
+    if (!trend?.uid) return;
+    setLoadingAngles(true);
+    try {
+      const res = await fetch("/api/angles/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trendId: trend.uid, lang, regenerate: Boolean(angles?.length) }),
+      });
+      const json = await res.json();
+      if (res.ok && Array.isArray(json.angles)) setAngles(json.angles as StoryAngle[]);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingAngles(false);
+    }
+  }
+
+  async function handleGenerate() {
     setGenerating(true);
     try {
       const res = await fetch("/api/drafts/generate", {
@@ -446,9 +534,23 @@ function Editor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           trendId: trend?.uid ?? trend?.id ?? null,
-          mode: activeMode,
+          mode: selectedAngle ? "angle" : "factual",
           lang,
-          angle: activeMode === "angle" ? angle : undefined,
+          angle: selectedAngle ?? undefined,
+          params: {
+            tone,
+            readability: READABILITY_OPTS[readability],
+            voice,
+            headlineType,
+            leadStyle,
+            audienceFit,
+            urgency,
+            trendingScore,
+            publication,
+            writer,
+            numberOfTitles,
+            wordCount,
+          },
         }),
       });
       if (res.ok) {
@@ -482,9 +584,11 @@ function Editor({
           ← {t("back")}
         </button>
         <div className="text-center">
-          <div className="text-sm font-medium">{t("editorTitle")}</div>
+          <div className="text-sm font-medium">
+            {lang === "hi" ? "कंटेंट जेनरेटर" : "Content Generator"}
+          </div>
           <div className="text-[11px] text-[var(--text-3)] font-mono mt-0.5">
-            {trend ? `from trend #${trend.id}` : "New draft"}
+            {trend ? `#${trend.id}` : "New"}
           </div>
         </div>
         <div className="justify-self-end flex gap-2">
@@ -497,143 +601,249 @@ function Editor({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid grid-cols-[1fr_340px] gap-6 max-w-[1320px] mx-auto">
-          <div className="bg-white border border-[var(--border)] rounded-lg p-7">
+      <div className="flex-1 overflow-hidden grid grid-cols-[300px_1fr]">
+        {/* LEFT — AI Enhancement sidebar */}
+        <aside className="border-r border-[var(--border)] bg-[var(--surface)] overflow-y-auto p-5">
+          <div className="flex items-center gap-2 mb-5">
+            <span
+              className="w-8 h-8 rounded-lg grid place-items-center"
+              style={{ background: "color-mix(in srgb, var(--purple) 14%, white)" }}
+            >
+              <Sparkles size={16} className="text-[var(--purple)]" />
+            </span>
+            <h3 className="text-[15px] font-semibold">
+              {lang === "hi" ? "AI एन्हांसमेंट" : "AI Enhancement"}
+            </h3>
+          </div>
+
+          {trend?.uid && (
+            <EnhGroup title={lang === "hi" ? "स्टोरी एंगल" : "Story Angle"}>
+              {angles && angles.length > 0 ? (
+                <div className="space-y-1.5">
+                  {angles.map((a) => {
+                    const sel = selectedAngle?.id === a.id;
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => setSelectedAngle(sel ? null : a)}
+                        className={`w-full text-left p-2.5 rounded-lg border text-[12.5px] leading-snug transition-all ${
+                          sel
+                            ? "border-[var(--red)] bg-[var(--red-soft)] font-medium"
+                            : "border-[var(--border)] bg-white hover:border-[var(--text-3)]"
+                        }`}
+                      >
+                        <div className="text-[var(--text)]">{a.title}</div>
+                        <span className="inline-block mt-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-3)]">
+                          {a.format}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={generateAngles}
+                    disabled={loadingAngles}
+                    className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)] flex items-center gap-1 mt-1 disabled:opacity-50"
+                  >
+                    <RefreshCw size={11} className={loadingAngles ? "animate-spin" : ""} />
+                    {lang === "hi" ? "नए एंगल" : "New angles"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={generateAngles}
+                  disabled={loadingAngles}
+                  className="w-full flex items-center justify-center gap-2 bg-white border border-[var(--border)] hover:border-[var(--purple)] text-[var(--text-2)] text-[12px] px-3 py-2 rounded-lg font-medium disabled:opacity-60"
+                >
+                  {loadingAngles ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={13} />
+                  )}
+                  {loadingAngles
+                    ? lang === "hi" ? "पढ़ रहे हैं…" : "Reading…"
+                    : lang === "hi" ? "एंगल सुझाएँ" : "Suggest angles"}
+                </button>
+              )}
+            </EnhGroup>
+          )}
+
+          <EnhGroup title={lang === "hi" ? "स्टोरी प्रासंगिकता" : "Story Relevance Filter"}>
+            <EnhField label={lang === "hi" ? "ट्रेंडिंग स्कोर" : "Trending Score"} value={trendingScore} onChange={setTrendingScore} options={TRENDING_OPTS} />
+            <EnhField label={lang === "hi" ? "ऑडियंस फिट" : "Audience Fit"} value={audienceFit} onChange={setAudienceFit} options={AUDIENCE_OPTS} />
+            <EnhField label={lang === "hi" ? "तात्कालिकता" : "Urgency"} value={urgency} onChange={setUrgency} options={URGENCY_OPTS} />
+          </EnhGroup>
+
+          <EnhGroup title={lang === "hi" ? "टोन और स्टाइल" : "Tone and Style Filter"}>
+            <EnhField label={lang === "hi" ? "टोन" : "Tone"} value={tone} onChange={setTone} options={TONES} />
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">
+                {lang === "hi" ? "पठनीयता" : "Readability"}
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={2}
+                step={1}
+                value={readability}
+                onChange={(e) => setReadability(Number(e.target.value))}
+                className="w-full"
+                style={{ accentColor: "var(--blue)" }}
+              />
+              <div className="flex justify-between text-[10px] text-[var(--text-3)] mt-0.5">
+                <span>Easy</span>
+                <span>Moderate</span>
+                <span>Expert</span>
+              </div>
+            </div>
+            <EnhField label={lang === "hi" ? "वॉइस" : "Voice"} value={voice} onChange={setVoice} options={VOICES} />
+          </EnhGroup>
+
+          <EnhGroup title={lang === "hi" ? "हेडलाइन और लीड" : "Headline and Lead Style Filter"}>
+            <EnhField label={lang === "hi" ? "हेडलाइन प्रकार" : "Headline Type"} value={headlineType} onChange={setHeadlineType} options={HEADLINE_TYPES} />
+            <EnhField label={lang === "hi" ? "लीड स्टाइल" : "Lead Style"} value={leadStyle} onChange={setLeadStyle} options={LEAD_STYLES} />
+          </EnhGroup>
+
+          <EnhGroup title={lang === "hi" ? "लेखन शैली प्रेरणा" : "Writing Style Inspiration Filter"}>
+            <EnhField label={lang === "hi" ? "प्रकाशन" : "Publication"} value={publication} onChange={setPublication} options={PUBLICATION_OPTS} />
+            <EnhField label={lang === "hi" ? "लेखक" : "Writer"} value={writer} onChange={setWriter} options={WRITER_OPTS} />
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">
+                {lang === "hi" ? "शीर्षकों की संख्या" : "Number of Titles"}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={8}
+                value={numberOfTitles}
+                onChange={(e) => setNumberOfTitles(Math.max(1, Math.min(8, Number(e.target.value) || 1)))}
+                className="w-full bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)]"
+              />
+            </div>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">
+                {lang === "hi" ? "लक्ष्य शब्द संख्या" : "Target Word Count"}
+              </label>
+              <input
+                type="number"
+                min={100}
+                max={2000}
+                step={50}
+                value={wordCount}
+                onChange={(e) => setWordCount(Math.max(100, Math.min(2000, Number(e.target.value) || 100)))}
+                className="w-full bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)]"
+              />
+            </div>
+          </EnhGroup>
+
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="w-full flex items-center justify-center gap-2 text-white text-[14px] px-4 py-3 rounded-lg font-medium disabled:opacity-60"
+            style={{ background: "var(--purple)" }}
+          >
+            {generating ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+            {generating ? t("generating") : lang === "hi" ? "फिर से बनाएँ →" : "Regenerate →"}
+          </button>
+        </aside>
+
+        {/* MAIN — Write with AI */}
+        <main className="overflow-y-auto p-8">
+          <div className="max-w-[760px]">
+            <h2 className="text-[20px] font-semibold flex items-center gap-2">
+              {lang === "hi" ? "AI से लिखें" : "Write with AI"}
+              <Sparkles size={17} className="text-[var(--purple)]" />
+            </h2>
+            <p className="text-[13px] text-[var(--text-3)] mb-5">
+              {lang === "hi" ? "प्रॉम्प्ट. जेनरेट. प्रकाशन-तैयार." : "Prompt. Generate. Publish-ready."}
+            </p>
+
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Article headline..."
-              className="w-full text-2xl font-medium outline-none mb-3 placeholder:text-[var(--text-3)] placeholder:font-normal"
+              placeholder={lang === "hi" ? "शीर्षक…" : "Headline…"}
+              className="w-full text-[24px] font-bold leading-tight outline-none mb-5 placeholder:text-[var(--text-3)] placeholder:font-normal"
             />
-            {titleOptions.length > 1 && (
-              <div className="mb-4">
-                <div className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium mb-1.5">
-                  {lang === "hi" ? "शीर्षक विकल्प — चुनें" : "Title options — pick one"}
-                </div>
-                <div className="flex flex-col gap-1.5">
+
+            {titleOptions.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-[14px] font-semibold mb-2.5">
+                  {lang === "hi" ? "अनुशंसित शीर्षक" : "Recommended Titles"}
+                </h4>
+                <div className="space-y-2">
                   {titleOptions.map((opt, i) => {
                     const active = opt === title;
                     return (
                       <button
                         key={i}
                         onClick={() => setTitle(opt)}
-                        className={`text-left text-[13.5px] leading-snug px-3 py-2 rounded-lg border transition-all ${
-                          active
-                            ? "border-[var(--red)] bg-[var(--red-soft)] text-[var(--text)] font-medium"
-                            : "border-[var(--border)] bg-white text-[var(--text-2)] hover:border-[var(--text-3)] hover:text-[var(--text)]"
+                        className={`w-full flex items-start gap-2.5 text-left p-3.5 rounded-xl border transition-all ${
+                          active ? "border-[var(--purple)]" : "border-[var(--border)] bg-white hover:border-[var(--text-3)]"
                         }`}
+                        style={active ? { background: "color-mix(in srgb, var(--purple) 6%, white)" } : undefined}
                       >
-                        {opt}
+                        <span
+                          className="mt-0.5 w-4 h-4 rounded grid place-items-center shrink-0 border text-white text-[10px]"
+                          style={
+                            active
+                              ? { background: "var(--purple)", borderColor: "var(--purple)" }
+                              : { borderColor: "var(--border-2)" }
+                          }
+                        >
+                          {active ? "✓" : ""}
+                        </span>
+                        <span className="text-[14px] leading-snug text-[var(--text)]">{opt}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
             )}
-            <div className="border-t border-[var(--border)] pt-4 relative">
+
+            <div className="bg-white border border-[var(--border)] rounded-xl p-5 mb-6">
+              <h4 className="text-[14px] font-semibold flex items-center gap-1.5 mb-4">
+                <span className="text-[var(--text-3)]">ⓘ</span>
+                {lang === "hi" ? "शीर्षक स्कोर" : "Title Score"}
+              </h4>
+              <div className="grid grid-cols-2 gap-y-3.5 gap-x-6 text-[13px]">
+                <ScoreRow label={lang === "hi" ? "CTR स्कोर" : "CTR Score"} value={title.trim() ? `${ctrScore(title)}%` : "—"} />
+                <ScoreRow label="Tone" value={tone} />
+                <ScoreRow label="Sentiment" value="N/A" />
+                <ScoreRow label="Word Count" value={title.trim() ? `${title.trim().split(/\s+/).length} words` : "—"} />
+                <ScoreRow label="Audience Fit" value={audienceFit} />
+                <ScoreRow label="Headline Type" value={headlineType.toLowerCase()} />
+              </div>
+            </div>
+
+            <div className="bg-white border border-[var(--border)] rounded-xl p-6 relative">
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 disabled={generating}
-                placeholder={
-                  lang === "hi"
-                    ? "लिखना शुरू करें, या नीचे रीजेनरेट दबाएँ…"
-                    : "Start typing, or hit Regenerate below…"
-                }
+                placeholder={lang === "hi" ? "आपका लेख यहाँ बनेगा…" : "Your article will appear here…"}
                 className={`w-full min-h-[420px] outline-none text-[15px] leading-[1.7] resize-y transition-opacity ${
-                  generating ? "opacity-25" : ""
+                  generating ? "opacity-20" : ""
                 }`}
               />
               {generating && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center pointer-events-none">
-                  <Loader2 className="animate-spin text-[var(--red)]" size={30} />
+                  <Loader2 className="animate-spin text-[var(--purple)]" size={30} />
                   <div className="text-[13.5px] text-[var(--text)] font-medium">
-                    {mode === "angle"
-                      ? lang === "hi"
-                        ? "चयनित एंगल से ड्राफ़्ट लिखा जा रहा है…"
-                        : "Writing the draft from your selected angle…"
-                      : lang === "hi"
-                      ? "ड्राफ़्ट लिखा जा रहा है…"
-                      : "Writing the draft…"}
+                    {lang === "hi" ? "आपका लेख लिखा जा रहा है…" : "Writing your article…"}
                   </div>
                   <div className="text-[11px] text-[var(--text-3)]">
-                    {lang === "hi" ? "कुछ सेकंड लग सकते हैं" : "This usually takes a few seconds"}
+                    {lang === "hi" ? "कुछ सेकंड…" : "A few seconds…"}
                   </div>
                 </div>
               )}
-            </div>
-            <div className="flex gap-2 flex-wrap mt-4 pt-4 border-t border-[var(--border)]">
-              <button
-                onClick={() => handleGenerate(mode === "angle" ? "angle" : "factual")}
-                disabled={generating}
-                className="bg-[var(--text)] hover:bg-black disabled:opacity-50 text-white text-xs font-medium px-4 py-2 rounded-full flex items-center gap-1.5"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="animate-spin" size={13} />
-                    {t("generating")}
-                  </>
-                ) : (
-                  `✨ ${lang === "hi" ? "फिर से बनाएँ" : "Regenerate"}`
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="bg-white border border-[var(--border)] rounded-lg p-4.5">
-              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-3)] font-medium mb-3">{t("topicContext")}</h4>
-              {trend ? (
-                <>
-                  <div className="text-[11px] uppercase tracking-wider text-[var(--text-3)] font-medium mb-1.5 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full" style={{ background: SECTION_COLORS[trend.section] }} />
-                    {trend.tag}
-                  </div>
-                  <div className="font-mono text-sm text-[var(--red)] font-medium pb-3 mb-3 border-b border-[var(--border)]">
-                    ↑ {trend.velocityPct}% · {freshness(trend.lastSeenMinAgo, lang)}
-                  </div>
-                  <div>
-                    <strong className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium block mb-1.5">
-                      {angle
-                        ? lang === "hi" ? "इस एंगल पर लिख रहे हैं" : "Writing to this angle"
-                        : lang === "hi" ? "सुझाया गया एंगल" : "Suggested angle"}
-                    </strong>
-                    <div className="bg-[var(--red-soft)] p-2.5 rounded text-[12.5px] leading-relaxed">
-                      {angle ? (
-                        <>
-                          <div className="font-medium text-[var(--text)]">{angle.title}</div>
-                          <div className="mt-1 text-[var(--text-2)]">{angle.summary}</div>
-                          <span className="mt-1.5 inline-block text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-white/70 text-[var(--text-3)]">
-                            {angle.format}
-                          </span>
-                        </>
-                      ) : (
-                        trend.suggestedAngle
-                      )}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="text-[13px] text-[var(--text-3)] leading-relaxed">{t("noTrendSelected")}</div>
-              )}
-            </div>
-
-            <div className="bg-white border border-[var(--border)] rounded-lg p-4.5">
-              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-3)] font-medium mb-3">{t("stats")}</h4>
-              <div className="flex justify-between text-xs text-[var(--text-2)] py-1">
-                <span>{t("words")}</span>
-                <b className="text-[var(--text)] font-medium font-mono">{words} / 600</b>
-              </div>
-              <div className="flex justify-between text-xs text-[var(--text-2)] py-1">
-                <span>{t("readingTime")}</span>
-                <b className="text-[var(--text)] font-medium font-mono">
-                  {words > 0 ? Math.max(1, Math.round(words / 200)) + " min" : "—"}
-                </b>
+              <div className="flex justify-between text-[11px] text-[var(--text-3)] mt-3 pt-3 border-t border-[var(--border)]">
+                <span>
+                  {words} {lang === "hi" ? "शब्द" : "words"} · ~{wordCount} {lang === "hi" ? "लक्ष्य" : "target"}
+                </span>
+                <span>{words > 0 ? `${Math.max(1, Math.round(words / 200))} min read` : ""}</span>
               </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );

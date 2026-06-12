@@ -10,12 +10,12 @@
  *     (we don't render Editor on /today to keep that page focused on the digest)
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { X, ExternalLink, ChevronDown, Sparkles, Loader2, RefreshCw } from "lucide-react";
+import { X, ExternalLink, ChevronDown, PenLine } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
-import { SECTION_COLORS, type Trend, type StoryAngle } from "@/lib/data/trends";
+import { SECTION_COLORS, type Trend } from "@/lib/data/trends";
 import { SourcePill, TrustPips, freshness } from "@/components/trend-card";
 
 type ArticleSignal = NonNullable<Trend["topSignals"]>[number];
@@ -73,8 +73,6 @@ function ArticleCard({ sig }: { sig: ArticleSignal }) {
   );
 }
 
-export type GenerateMode = "factual" | "angle";
-
 export function TrendDrawer({
   trend,
   onClose,
@@ -83,74 +81,18 @@ export function TrendDrawer({
 }: {
   trend: Trend;
   onClose: () => void;
-  onGenerate: (mode: GenerateMode, angle?: StoryAngle) => void;
-  /** Hides the Generate buttons (used on /today digest page).
-   *  Shows an "Open on dashboard" link instead for users who want to write up. */
+  /** Opens the story-generation page for this trend (angles + AI controls live
+   *  there now). */
+  onGenerate: () => void;
+  /** Hides the generate button (used on /today digest page); shows an
+   *  "Open on dashboard" link instead. */
   readOnly?: boolean;
 }) {
   const { lang } = useLang();
   const [coverageOpen, setCoverageOpen] = useState(false);
-  const [angles, setAngles] = useState<StoryAngle[] | undefined>(trend.angles);
-  const [selectedAngleId, setSelectedAngleId] = useState<string | null>(
-    trend.angles?.[0]?.id ?? null
-  );
-  const [loadingAngles, setLoadingAngles] = useState(false);
-  const [anglesError, setAnglesError] = useState<string | null>(null);
-
-  async function generateAngles(regenerate: boolean) {
-    if (!trend.uid) return;
-    setLoadingAngles(true);
-    setAnglesError(null);
-    try {
-      const res = await fetch("/api/angles/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trendId: trend.uid, lang, regenerate }),
-      });
-      const json = await res.json();
-      if (res.ok && Array.isArray(json.angles)) {
-        setAngles(json.angles as StoryAngle[]);
-        setSelectedAngleId((json.angles as StoryAngle[])[0]?.id ?? null);
-      } else {
-        setAnglesError(json.error ?? `Failed (${res.status})`);
-      }
-    } catch (e) {
-      setAnglesError(e instanceof Error ? e.message : "Network error");
-    } finally {
-      setLoadingAngles(false);
-    }
-  }
-
-  // Lazily load any SAVED angles when the drawer opens (no generation).
-  useEffect(() => {
-    const uid = trend.uid;
-    if (!uid) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(
-          `/api/angles/generate?trendId=${encodeURIComponent(uid)}`
-        );
-        const json = await res.json();
-        if (!cancelled && Array.isArray(json.angles) && json.angles.length > 0) {
-          setAngles(json.angles as StoryAngle[]);
-          setSelectedAngleId((json.angles as StoryAngle[])[0]?.id ?? null);
-        }
-      } catch {
-        /* ignore — drawer just shows the Generate button */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [trend.uid]);
 
   const title = lang === "hi" && trend.title_hi ? trend.title_hi : trend.title;
   const tag = lang === "hi" && trend.desk_hi ? trend.desk_hi : trend.tag;
-  const angle =
-    lang === "hi" && trend.suggestedAngle_hi
-      ? trend.suggestedAngle_hi
-      : trend.suggestedAngle;
 
   return (
     <div className="fixed inset-0 z-50">
@@ -227,98 +169,9 @@ export function TrendDrawer({
             </div>
           )}
 
-          {/* Angles — AI proposes 2-3 ways to approach the story (on demand) */}
-          <div className="py-4 border-b border-[var(--border)]">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <h5 className="text-xs uppercase tracking-wider text-[var(--text-3)] font-medium">
-                {lang === "hi" ? "एंगल" : "Angles"}
-              </h5>
-              {angles && angles.length > 0 && trend.uid && !readOnly && (
-                <button
-                  onClick={() => generateAngles(true)}
-                  disabled={loadingAngles}
-                  className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)] flex items-center gap-1 disabled:opacity-50"
-                >
-                  <RefreshCw size={12} className={loadingAngles ? "animate-spin" : ""} />
-                  {lang === "hi" ? "फिर से बनाएँ" : "Regenerate"}
-                </button>
-              )}
-            </div>
-
-            {angles && angles.length > 0 ? (
-              <div className="space-y-2">
-                {angles.map((a) => {
-                  const sel = selectedAngleId === a.id;
-                  return (
-                    <button
-                      key={a.id}
-                      onClick={() => setSelectedAngleId(a.id)}
-                      className={`w-full text-left p-3 rounded-lg border transition-all ${
-                        sel
-                          ? "border-[var(--red)] bg-[var(--red-soft)] ring-1 ring-[var(--red)]"
-                          : "border-[var(--border)] hover:border-[var(--text-3)] bg-white"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="text-[13.5px] font-medium leading-snug text-[var(--text)]">
-                          {a.title}
-                        </div>
-                        <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[var(--surface-2)] text-[var(--text-3)]">
-                          {a.format}
-                        </span>
-                      </div>
-                      <div className="text-[12.5px] text-[var(--text-2)] leading-relaxed mt-1">
-                        {a.summary}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {angle && (
-                  <div className="text-[12.5px] text-[var(--text-2)] leading-relaxed bg-[var(--surface-2)] p-3 rounded-lg">
-                    <span className="text-[var(--text-3)]">
-                      {lang === "hi" ? "स्वतः सुझाव — " : "Auto hint — "}
-                    </span>
-                    {angle}
-                  </div>
-                )}
-                {trend.uid && !readOnly ? (
-                  <button
-                    onClick={() => generateAngles(false)}
-                    disabled={loadingAngles}
-                    className="w-full flex items-center justify-center gap-2 bg-[var(--text)] hover:bg-black disabled:opacity-60 text-white text-[12.5px] px-3 py-2.5 rounded-lg font-medium"
-                  >
-                    {loadingAngles ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Sparkles size={14} />
-                    )}
-                    {loadingAngles
-                      ? lang === "hi"
-                        ? "कवरेज पढ़ रहे हैं…"
-                        : "Reading coverage…"
-                      : lang === "hi"
-                      ? "AI से एंगल बनाएँ"
-                      : "Generate angles with AI"}
-                  </button>
-                ) : !trend.uid ? (
-                  <div className="text-[12px] text-[var(--text-3)]">
-                    {lang === "hi"
-                      ? "एंगल बहु-स्रोत स्टोरी के लिए हैं।"
-                      : "Angles need a multi-source story."}
-                  </div>
-                ) : null}
-                {anglesError && (
-                  <div className="text-[12px] text-[var(--red)] leading-snug">{anglesError}</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Generate draft */}
-          <div className="mt-5 pt-4 border-t border-[var(--border)] space-y-2">
+          {/* Write story — opens the full AI generation page. Angles + all the
+              AI controls live there now. */}
+          <div className="mt-6 pt-4 border-t border-[var(--border)]">
             {readOnly ? (
               <Link
                 href="/"
@@ -327,39 +180,18 @@ export function TrendDrawer({
               >
                 <ExternalLink size={14} />
                 {lang === "hi"
-                  ? "ड्राफ़्ट बनाने के लिए डैशबोर्ड खोलें"
-                  : "Open on dashboard to generate"}
+                  ? "लिखने के लिए डैशबोर्ड खोलें"
+                  : "Open on dashboard to write"}
               </Link>
             ) : (
-              <>
-                <button
-                  onClick={() => {
-                    const a = angles?.find((x) => x.id === selectedAngleId);
-                    if (a) onGenerate("angle", a);
-                  }}
-                  disabled={!selectedAngleId}
-                  className="w-full bg-[var(--red)] hover:bg-[var(--red-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white text-[13px] px-3 py-3 rounded-lg font-medium leading-tight"
-                >
-                  {lang === "hi" ? "चयनित एंगल से ड्राफ़्ट बनाएँ" : "Generate suggested story draft"}
-                  <span className="block text-[10px] font-normal text-white/70 mt-0.5">
-                    {selectedAngleId
-                      ? lang === "hi"
-                        ? "चयनित एंगल के अनुसार"
-                        : "Following the selected angle"
-                      : lang === "hi"
-                      ? "पहले ऊपर एक एंगल चुनें"
-                      : "Select an angle above first"}
-                  </span>
-                </button>
-                <button
-                  onClick={() => onGenerate("factual")}
-                  className="w-full bg-white border border-[var(--border)] hover:border-[var(--text)] text-[var(--text-2)] hover:text-[var(--text)] text-[12.5px] px-3 py-2.5 rounded-lg font-medium"
-                >
-                  {lang === "hi"
-                    ? "या सीधा समाचार ड्राफ़्ट बनाएँ"
-                    : "Or generate a straight news report"}
-                </button>
-              </>
+              <button
+                onClick={onGenerate}
+                className="w-full flex items-center justify-center gap-2 bg-[var(--red)] hover:bg-[var(--red-hover)] text-white text-[14px] px-4 py-3.5 rounded-lg font-medium transition-all hover:-translate-y-0.5"
+                style={{ boxShadow: "0 4px 12px rgba(217,48,37,0.25)" }}
+              >
+                <PenLine size={16} />
+                {lang === "hi" ? "AI से स्टोरी लिखें" : "Write story with AI"}
+              </button>
             )}
           </div>
         </div>

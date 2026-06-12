@@ -156,15 +156,48 @@ const Body = z.object({
   trendId: z.union([z.number(), z.string()]).nullable(),
   mode: z.enum(["factual", "angle"]).default("factual"),
   lang: z.enum(["en", "hi"]).default("en"),
-  // A specific AI-generated angle the editor selected in the drawer. When
-  // present (mode "angle"), the draft is written to THIS angle instead of the
-  // no-AI suggested_angle.
+  // A specific AI-generated angle the editor selected. When present (mode
+  // "angle"), the draft is written to THIS angle instead of the no-AI angle.
   angle: z
     .object({ title: z.string(), summary: z.string(), format: z.string() })
     .nullish(),
+  // The AI Enhancement controls from the story-generation page.
+  params: z
+    .object({
+      tone: z.string().optional(),
+      readability: z.string().optional(),
+      voice: z.string().optional(),
+      headlineType: z.string().optional(),
+      leadStyle: z.string().optional(),
+      audienceFit: z.string().optional(),
+      urgency: z.string().optional(),
+      trendingScore: z.string().optional(),
+      publication: z.string().optional(),
+      writer: z.string().optional(),
+      numberOfTitles: z.number().int().min(1).max(8).optional(),
+      wordCount: z.number().int().min(100).max(2000).optional(),
+    })
+    .optional(),
 });
 
 type SelectedAngle = { title: string; summary: string; format: string };
+type GenParams = NonNullable<z.infer<typeof Body>["params"]>;
+
+/** Turn the AI Enhancement controls into a directives block for the prompt. */
+function paramDirectives(p: GenParams | undefined): string {
+  if (!p) return "";
+  const lines: string[] = [];
+  if (p.tone) lines.push(`- Tone: ${p.tone}`);
+  if (p.readability) lines.push(`- Readability: ${p.readability} (pitch the vocabulary + sentence length to this level)`);
+  if (p.voice) lines.push(`- Voice: ${p.voice}`);
+  if (p.leadStyle) lines.push(`- Lead/opening style: ${p.leadStyle}`);
+  if (p.audienceFit) lines.push(`- Audience: ${p.audienceFit}`);
+  if (p.urgency) lines.push(`- Urgency framing: ${p.urgency}`);
+  if (p.publication) lines.push(`- Style inspiration (publication theme): ${p.publication}`);
+  if (p.writer) lines.push(`- Style inspiration (writer): ${p.writer}`);
+  if (lines.length === 0) return "";
+  return `WRITING CONTROLS — honour these:\n${lines.join("\n")}`;
+}
 
 type LiveTrend = {
   id: string;
@@ -245,7 +278,8 @@ function buildPrompts(
   lang: "en" | "hi",
   styleBlock: string,
   grounding: string,
-  selectedAngle?: SelectedAngle | null
+  selectedAngle?: SelectedAngle | null,
+  params?: GenParams
 ) {
   // The angle the draft follows: the editor's chosen AI angle if present,
   // otherwise the no-AI suggested angle on the trend.
@@ -253,6 +287,14 @@ function buildPrompts(
     ? `${selectedAngle.title} — ${selectedAngle.summary}`
     : trend.suggestedAngle ?? "(none specified)";
   const angleFormat = selectedAngle?.format ?? trend.storyType ?? "Analysis";
+
+  // AI Enhancement controls.
+  const nTitles = params?.numberOfTitles ?? 4;
+  const wordCount = params?.wordCount ?? (mode === "factual" ? 500 : 600);
+  const headlineHint = params?.headlineType
+    ? ` Make the headlines ${params.headlineType} in style.`
+    : "";
+  const directives = paramDirectives(params);
   const langDirective =
     lang === "hi"
       ? "Write in HINDI (Devanagari script). Match Patrika's Hindi newsroom voice."
@@ -269,7 +311,7 @@ ${trend.signals.map((s, i) => `[${i + 1}] ${s.text}`).join("\n") || "(no reports
 
   // Style assets + grounding rules go at the TOP of every prompt so the
   // model sees them before any task-specific instructions.
-  const preamble = [styleBlock, grounding].filter(Boolean).join("\n\n");
+  const preamble = [styleBlock, grounding, directives].filter(Boolean).join("\n\n");
 
   if (mode === "factual") {
     return {
@@ -277,7 +319,7 @@ ${trend.signals.map((s, i) => `[${i + 1}] ${s.text}`).join("\n") || "(no reports
 
 ${langDirective}
 
-Write 4 DISTINCT newspaper headline options (each 8-14 words) that report what happened. Active voice, no clickbait, no opinion. Vary the emphasis and structure across the options so the editor has real choice. Return them in the "titles" array.
+Write ${nTitles} DISTINCT newspaper headline options (each 8-14 words) that report what happened.${headlineHint} Active voice, no clickbait, no opinion. Vary the emphasis and structure across the options so the editor has real choice. Return them in the "titles" array.
 
 ${baseContext}`,
 
@@ -285,7 +327,7 @@ ${baseContext}`,
 
 ${langDirective}
 
-Write a 400-600 word straight news report covering this story as breaking news. Style: factual newspaper-of-record. Match the voice and structure of the Patrika sample articles above.
+Write an approximately ${wordCount}-word straight news report covering this story as breaking news. Style: factual newspaper-of-record. Match the voice and structure of the Patrika sample articles above.
 
 ${baseContext}
 
@@ -305,7 +347,7 @@ Rules:
 
 ${langDirective}
 
-Write 4 DISTINCT headline options (each 8-14 words) that capture the editorial ANGLE below, not just the surface event — headlines that pull a reader in via the perspective. Vary the hook across options. Return them in the "titles" array.
+Write ${nTitles} DISTINCT headline options (each 8-14 words) that capture the editorial ANGLE below, not just the surface event — headlines that pull a reader in via the perspective.${headlineHint} Vary the hook across options. Return them in the "titles" array.
 
 TOPIC: ${trend.title}
 EDITORIAL ANGLE: ${angleText}
@@ -315,7 +357,7 @@ STORY FORMAT: ${angleFormat}`,
 
 ${langDirective}
 
-Write a 500-700 word piece in the format of ${angleFormat}. Match the structure, density, and voice of the Patrika sample articles above.
+Write an approximately ${wordCount}-word piece in the format of ${angleFormat}. Match the structure, density, and voice of the Patrika sample articles above.
 
 This is NOT a straight news report — it's the Patrika take following the editorial angle below.
 
@@ -382,13 +424,15 @@ export async function POST(req: Request) {
   const styleBlock = styleAssetsBlock(styleAssets);
   const grounding = groundingRules(parsed.data.lang);
 
+  const nTitles = parsed.data.params?.numberOfTitles ?? 4;
   const { headlinePrompt, bodyPrompt } = buildPrompts(
     trend,
     parsed.data.mode,
     parsed.data.lang,
     styleBlock,
     grounding,
-    parsed.data.angle
+    parsed.data.angle,
+    parsed.data.params
   );
 
   // Low temperature suppresses creative invention — the most reliable
@@ -402,7 +446,7 @@ export async function POST(req: Request) {
     headlineRes = await generateObject({
       model: drafting.model,
       system: drafting.systemPrompt ?? undefined,
-      schema: z.object({ titles: z.array(z.string()).min(3).max(5) }),
+      schema: z.object({ titles: z.array(z.string()).min(2).max(8) }),
       prompt: headlinePrompt,
       temperature: 0.6,
     });
@@ -429,7 +473,7 @@ export async function POST(req: Request) {
   const titles = headlineRes.object.titles
     .map((s) => s.trim().replace(/^["']|["']$/g, ""))
     .filter(Boolean)
-    .slice(0, 5);
+    .slice(0, nTitles);
 
   return Response.json({
     title: titles[0] ?? "",
