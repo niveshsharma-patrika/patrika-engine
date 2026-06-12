@@ -413,8 +413,8 @@ const LEAD_STYLES = ["Summary", "Context", "Anecdote", "Question", "Quote"];
 const TRENDING_OPTS = ["Low", "Medium", "High"];
 const AUDIENCE_OPTS = ["Niche", "Broad", "General"];
 const URGENCY_OPTS = ["Breaking", "Ongoing", "Evergreen"];
-const PUBLICATION_OPTS = ["Theme 1", "Theme 2", "Theme 3"];
-const WRITER_OPTS = ["Author 1", "Author 2", "Author 3"];
+const PUBLICATION_OPTS = ["Patrika House", "Investigative", "Explainer-led", "Punchy / Tabloid", "Wire (neutral)", "Feature / Magazine"];
+const WRITER_OPTS = ["Senior Reporter", "Beat Correspondent", "Data Journalist", "Columnist", "Features Writer"];
 const READABILITY_OPTS = ["Easy", "Moderate", "Expert"];
 
 function EnhField({ label, value, onChange, options }: {
@@ -471,6 +471,16 @@ function ctrScore(s: string): number {
   return Math.min(92, score);
 }
 
+/** Quick lexicon-based sentiment for the Title Score panel. */
+function sentimentOf(s: string): string {
+  const v = s.toLowerCase();
+  const pos = (v.match(/\b(win|wins|won|boost|surge|record|launch|hope|relief|success|growth|gain|breakthrough|celebrate|rescue|safe|approve|revival|cheer|honour|award)\b/g) || []).length;
+  const neg = (v.match(/\b(death|dead|killed|crash|delay|delayed|crisis|fail|failed|loss|attack|fraud|scam|arrest|fire|blast|protest|ban|fear|threat|tragedy|injured|slump|fall|fell|row|clash|probe|outrage)\b/g) || []).length;
+  if (neg > pos) return "Negative";
+  if (pos > neg) return "Positive";
+  return "Neutral";
+}
+
 function Editor({ trend, title, setTitle, onClose }: {
   trend: Trend | null;
   title: string;
@@ -491,10 +501,16 @@ function Editor({ trend, title, setTitle, onClose }: {
   const [trendingScore, setTrendingScore] = useState("Medium");
   const [audienceFit, setAudienceFit] = useState("Broad");
   const [urgency, setUrgency] = useState("Ongoing");
-  const [publication, setPublication] = useState("Theme 1");
-  const [writer, setWriter] = useState("Author 2");
+  const [publication, setPublication] = useState("Patrika House");
+  const [writer, setWriter] = useState("Senior Reporter");
   const [numberOfTitles, setNumberOfTitles] = useState(5);
   const [wordCount, setWordCount] = useState(800);
+
+  // Draft persistence
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "submitting" | "submitted" | "error"
+  >("idle");
 
   // Story angle (moved here from the drawer)
   const [angles, setAngles] = useState<StoryAngle[] | undefined>(trend?.angles);
@@ -574,6 +590,50 @@ function Editor({ trend, title, setTitle, onClose }: {
     }
   }
 
+  async function handleSave(status: "in_progress" | "awaiting_review") {
+    if (!title.trim()) return;
+    setSaveState(status === "in_progress" ? "saving" : "submitting");
+    try {
+      const res = await fetch("/api/drafts/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draftId,
+          trendId: trend?.uid ?? null,
+          title,
+          body,
+          status,
+          desk: trend?.desk ?? null,
+          meta: {
+            tone,
+            readability: READABILITY_OPTS[readability],
+            voice,
+            headlineType,
+            leadStyle,
+            audienceFit,
+            urgency,
+            trendingScore,
+            publication,
+            writer,
+            wordCount,
+            angle: selectedAngle ?? null,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.id) {
+        setDraftId(json.id);
+        setSaveState(status === "in_progress" ? "saved" : "submitted");
+      } else {
+        setSaveState("error");
+      }
+    } catch {
+      setSaveState("error");
+    } finally {
+      setTimeout(() => setSaveState("idle"), 2500);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[60] bg-[var(--bg)] flex flex-col">
       <div className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
@@ -591,12 +651,24 @@ function Editor({ trend, title, setTitle, onClose }: {
             {trend ? `#${trend.id}` : "New"}
           </div>
         </div>
-        <div className="justify-self-end flex gap-2">
-          <button className="bg-white border border-[var(--border)] hover:bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--text)] text-[13px] px-4 py-2 rounded font-medium">
-            {t("saveDraft")}
+        <div className="justify-self-end flex gap-2 items-center">
+          <button
+            onClick={() => handleSave("in_progress")}
+            disabled={saveState === "saving" || saveState === "submitting" || !title.trim()}
+            className="bg-white border border-[var(--border)] hover:bg-[var(--surface-2)] disabled:opacity-50 text-[var(--text-2)] hover:text-[var(--text)] text-[13px] px-4 py-2 rounded font-medium min-w-[110px]"
+          >
+            {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : t("saveDraft")}
           </button>
-          <button className="bg-[var(--red)] hover:bg-[var(--red-hover)] text-white text-[13px] px-4 py-2 rounded font-medium">
-            {t("submitReview")}
+          <button
+            onClick={() => handleSave("awaiting_review")}
+            disabled={saveState === "saving" || saveState === "submitting" || !title.trim()}
+            className="bg-[var(--red)] hover:bg-[var(--red-hover)] disabled:opacity-50 text-white text-[13px] px-4 py-2 rounded font-medium min-w-[130px]"
+          >
+            {saveState === "submitting"
+              ? "Submitting…"
+              : saveState === "submitted"
+              ? "Submitted ✓"
+              : t("submitReview")}
           </button>
         </div>
       </div>
@@ -807,7 +879,7 @@ function Editor({ trend, title, setTitle, onClose }: {
               <div className="grid grid-cols-2 gap-y-3.5 gap-x-6 text-[13px]">
                 <ScoreRow label={lang === "hi" ? "CTR स्कोर" : "CTR Score"} value={title.trim() ? `${ctrScore(title)}%` : "—"} />
                 <ScoreRow label="Tone" value={tone} />
-                <ScoreRow label="Sentiment" value="N/A" />
+                <ScoreRow label="Sentiment" value={title.trim() ? sentimentOf(title) : "N/A"} />
                 <ScoreRow label="Word Count" value={title.trim() ? `${title.trim().split(/\s+/).length} words` : "—"} />
                 <ScoreRow label="Audience Fit" value={audienceFit} />
                 <ScoreRow label="Headline Type" value={headlineType.toLowerCase()} />

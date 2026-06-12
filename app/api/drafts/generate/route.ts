@@ -193,8 +193,23 @@ function paramDirectives(p: GenParams | undefined): string {
   if (p.leadStyle) lines.push(`- Lead/opening style: ${p.leadStyle}`);
   if (p.audienceFit) lines.push(`- Audience: ${p.audienceFit}`);
   if (p.urgency) lines.push(`- Urgency framing: ${p.urgency}`);
-  if (p.publication) lines.push(`- Style inspiration (publication theme): ${p.publication}`);
-  if (p.writer) lines.push(`- Style inspiration (writer): ${p.writer}`);
+  const PUB_DESC: Record<string, string> = {
+    "Patrika House": "Patrika's standard newsroom house style",
+    Investigative: "investigative, evidence-led, follow-the-thread framing",
+    "Explainer-led": "explainer-first — lead with what it means and why it matters",
+    "Punchy / Tabloid": "short, punchy, high-energy sentences",
+    "Wire (neutral)": "spare, neutral wire-service style",
+    "Feature / Magazine": "narrative feature/magazine style with colour and scene-setting",
+  };
+  const WRITER_DESC: Record<string, string> = {
+    "Senior Reporter": "an authoritative senior reporter",
+    "Beat Correspondent": "a beat correspondent close to the sources",
+    "Data Journalist": "a data journalist foregrounding numbers and context",
+    Columnist: "an opinionated columnist (mark opinion clearly as such)",
+    "Features Writer": "a features writer with narrative flair",
+  };
+  if (p.publication) lines.push(`- Publication style: ${PUB_DESC[p.publication] ?? p.publication}`);
+  if (p.writer) lines.push(`- Write as: ${WRITER_DESC[p.writer] ?? p.writer}`);
   if (lines.length === 0) return "";
   return `WRITING CONTROLS — honour these:\n${lines.join("\n")}`;
 }
