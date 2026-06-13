@@ -86,10 +86,11 @@ function groundingRules(lang: "en" | "hi"): string {
   if (lang === "hi") {
     return `
 ═══════════════════════════════════════════
-सख्त नियम — ये कभी न तोड़ें
+सख्त नियम — कोई मनगढ़ंत तथ्य नहीं — ये कभी न तोड़ें
 ═══════════════════════════════════════════
+• कोई मनगढ़ंत/काल्पनिक तथ्य नहीं। कुछ भी अपने आप न गढ़ें — हर तथ्य, नाम, संख्या, तारीख और उद्धरण नीचे दी गई "स्रोत रिपोर्ट" से ही आना चाहिए।
 • आज की तारीख: ${today} (भारतीय समय)
-• केवल नीचे दिए गए "स्रोत संकेतों" में मौजूद तथ्यों का उपयोग करें।
+• केवल नीचे दी गई "स्रोत रिपोर्ट" में मौजूद तथ्यों का उपयोग करें।
 • अपनी प्रशिक्षण डेटा (2024 या उससे पहले) से कोई नाम, तारीख, उद्धरण, या संख्या न जोड़ें।
 • यदि कोई जानकारी संकेतों में नहीं है तो [विवरण आवश्यक] लिखें — आविष्कार न करें।
 • यदि संकेत अपर्याप्त हैं, तो जवाब दें: "INSUFFICIENT INFORMATION: <क्या चाहिए>"
@@ -98,10 +99,12 @@ function groundingRules(lang: "en" | "hi"): string {
   }
   return `
 ═══════════════════════════════════════════
-HARD RULES — never break these
+HARD RULES — NO HALLUCINATION — never break these
 ═══════════════════════════════════════════
+• NO HALLUCINATION. Invent NOTHING. Every fact, name, number, date, quote and
+  organisation in your output MUST come from the SOURCE REPORTS below.
 • Today's date: ${today} (IST). Your training data cutoff is irrelevant.
-• Use ONLY facts present in the SOURCE SIGNALS below.
+• Use ONLY facts present in the SOURCE REPORTS below.
 • Do NOT add names, dates, quotes, numbers, organisations, or context from
   your training data — even if you "remember" them. They will be wrong or stale.
 • If a fact isn't in the signals, write "[detail needed]" instead of inventing.
@@ -183,16 +186,32 @@ const Body = z.object({
 type SelectedAngle = { title: string; summary: string; format: string };
 type GenParams = NonNullable<z.infer<typeof Body>["params"]>;
 
-/** Turn the AI Enhancement controls into a directives block for the prompt. */
+/** Turn the AI Enhancement controls into a STRONG editorial-framing block.
+ * These DEFINE the tone/voice — the identical facts must read very differently
+ * as the settings change. */
 function paramDirectives(p: GenParams | undefined): string {
   if (!p) return "";
-  const lines: string[] = [];
-  if (p.tone) lines.push(`- Tone: ${p.tone}`);
-  if (p.readability) lines.push(`- Readability: ${p.readability} (pitch the vocabulary + sentence length to this level)`);
-  if (p.voice) lines.push(`- Voice: ${p.voice}`);
-  if (p.leadStyle) lines.push(`- Lead/opening style: ${p.leadStyle}`);
-  if (p.audienceFit) lines.push(`- Audience: ${p.audienceFit}`);
-  if (p.urgency) lines.push(`- Urgency framing: ${p.urgency}`);
+  const URGENCY_DESC: Record<string, string> = {
+    Breaking: "URGENT breaking-news tone — immediacy, present tense, short high-tempo sentences, the feel of events unfolding right now.",
+    Ongoing: "a developing-story tone — current but measured; lead with 'here is the latest' and emphasise what has changed.",
+    Evergreen: "a calm, timeless explainer tone — ZERO urgency, written to read well on any day.",
+  };
+  const AUDIENCE_DESC: Record<string, string> = {
+    Niche: "a NICHE expert audience — assume domain knowledge, use precise terminology, skip the basics.",
+    Broad: "a BROAD mass audience — explain every term and piece of context in plain language, assume no prior knowledge.",
+    General: "a GENERAL news audience — clear and accessible, with light context where it helps.",
+  };
+  const TRENDING_DESC: Record<string, string> = {
+    High: "a HIGH-buzz, widely-watched story — write with momentum and energy.",
+    Medium: "a story of moderate interest — a steady, professional newsroom register.",
+    Low: "a low-buzz story — understated and matter-of-fact.",
+  };
+  const VOICE_DESC: Record<string, string> = {
+    "Brand-aligned": "Patrika's house brand voice.",
+    Neutral: "a neutral, impersonal news voice.",
+    "First-person": "a first-person reporter voice where it fits.",
+    Investigative: "a probing, investigative voice.",
+  };
   const PUB_DESC: Record<string, string> = {
     "Patrika House": "Patrika's standard newsroom house style",
     Investigative: "investigative, evidence-led, follow-the-thread framing",
@@ -208,10 +227,23 @@ function paramDirectives(p: GenParams | undefined): string {
     Columnist: "an opinionated columnist (mark opinion clearly as such)",
     "Features Writer": "a features writer with narrative flair",
   };
-  if (p.publication) lines.push(`- Publication style: ${PUB_DESC[p.publication] ?? p.publication}`);
-  if (p.writer) lines.push(`- Write as: ${WRITER_DESC[p.writer] ?? p.writer}`);
+  const lines: string[] = [];
+  if (p.tone) lines.push(`- BASE TONE: ${p.tone}. Let this dominate the writing.`);
+  if (p.urgency) lines.push(`- URGENCY: ${URGENCY_DESC[p.urgency] ?? p.urgency}`);
+  if (p.audienceFit) lines.push(`- AUDIENCE: ${AUDIENCE_DESC[p.audienceFit] ?? p.audienceFit}`);
+  if (p.trendingScore) lines.push(`- BUZZ LEVEL: ${TRENDING_DESC[p.trendingScore] ?? p.trendingScore}`);
+  if (p.voice) lines.push(`- VOICE: ${VOICE_DESC[p.voice] ?? p.voice}`);
+  if (p.readability) lines.push(`- READABILITY: write at a ${p.readability} reading level — pitch vocabulary and sentence length accordingly.`);
+  if (p.leadStyle) lines.push(`- LEAD/OPENING: open with a ${p.leadStyle}-style lead.`);
+  if (p.publication) lines.push(`- PUBLICATION STYLE: ${PUB_DESC[p.publication] ?? p.publication}.`);
+  if (p.writer) lines.push(`- WRITE AS: ${WRITER_DESC[p.writer] ?? p.writer}.`);
   if (lines.length === 0) return "";
-  return `WRITING CONTROLS — honour these:\n${lines.join("\n")}`;
+  return `═══════════════════════════════════════════
+EDITORIAL FRAMING — these DEFINE the tone & voice. Adopt them STRICTLY: the
+identical facts must read very differently as these settings change. Do NOT
+fall back to a generic newsroom tone — commit fully to the framing below.
+═══════════════════════════════════════════
+${lines.join("\n")}`;
 }
 
 type LiveTrend = {

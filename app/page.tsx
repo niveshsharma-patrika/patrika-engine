@@ -506,6 +506,9 @@ function Editor({ trend, title, setTitle, onClose }: {
   const [numberOfTitles, setNumberOfTitles] = useState(5);
   const [wordCount, setWordCount] = useState(800);
 
+  // Output language for the generated story (default Hindi — Patrika's main language)
+  const [genLang, setGenLang] = useState<"hi" | "en">("hi");
+
   // Draft persistence
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<
@@ -529,7 +532,7 @@ function Editor({ trend, title, setTitle, onClose }: {
       const res = await fetch("/api/angles/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trendId: trend.uid, lang, regenerate: Boolean(angles?.length) }),
+        body: JSON.stringify({ trendId: trend.uid, lang: genLang, regenerate: Boolean(angles?.length) }),
       });
       const json = await res.json();
       if (res.ok && Array.isArray(json.angles)) setAngles(json.angles as StoryAngle[]);
@@ -549,7 +552,7 @@ function Editor({ trend, title, setTitle, onClose }: {
         body: JSON.stringify({
           trendId: trend?.uid ?? trend?.id ?? null,
           mode: selectedAngle ? "angle" : "factual",
-          lang,
+          lang: genLang,
           angle: selectedAngle ?? undefined,
           params: {
             tone,
@@ -684,6 +687,28 @@ function Editor({ trend, title, setTitle, onClose }: {
             <h3 className="text-[15px] font-semibold">
               {lang === "hi" ? "AI एन्हांसमेंट" : "AI Enhancement"}
             </h3>
+          </div>
+
+          {/* Story language — default Hindi */}
+          <div className="mb-5">
+            <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1.5">
+              {lang === "hi" ? "स्टोरी की भाषा" : "Story language"}
+            </label>
+            <div className="flex gap-1 p-1 bg-[var(--surface-2)] rounded-lg">
+              {([["hi", "हिंदी"], ["en", "English"]] as const).map(([code, label]) => (
+                <button
+                  key={code}
+                  onClick={() => setGenLang(code)}
+                  className={`flex-1 text-[12.5px] py-1.5 rounded-md font-medium transition-all ${
+                    genLang === code
+                      ? "bg-white text-[var(--text)] shadow-sm"
+                      : "text-[var(--text-3)] hover:text-[var(--text)]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {trend?.uid && (
