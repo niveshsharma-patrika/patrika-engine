@@ -518,11 +518,9 @@ function Editor({ trend, title, setTitle, onClose }: {
   const [loadingAngles, setLoadingAngles] = useState(false);
 
   const words = body.trim() ? body.trim().split(/\s+/).length : 0;
-
-  useEffect(() => {
-    if (trend) handleGenerate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const hasGenerated = body.trim().length > 0 || titleOptions.length > 0;
+  // No auto-generate — the page opens empty so the editor can set up the AI
+  // Enhancement controls (and optionally an angle) before generating.
 
   async function generateAngles() {
     if (!trend?.uid) return;
@@ -814,7 +812,11 @@ function Editor({ trend, title, setTitle, onClose }: {
             style={{ background: "var(--purple)" }}
           >
             {generating ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-            {generating ? t("generating") : lang === "hi" ? "फिर से बनाएँ →" : "Regenerate →"}
+            {generating
+              ? t("generating")
+              : hasGenerated
+              ? lang === "hi" ? "फिर से बनाएँ →" : "Regenerate →"
+              : lang === "hi" ? "स्टोरी बनाएँ →" : "Generate story →"}
           </button>
         </aside>
 
