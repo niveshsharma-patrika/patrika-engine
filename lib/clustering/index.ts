@@ -56,6 +56,15 @@ export const TRENDING_MAX_MIN = 240; // 4 hours
 const WRITE_CONCURRENCY = 8;
 const MAX_CLUSTERS_PER_TICK = 400;
 
+// DB hygiene — stop the active-trend set + signals table growing unbounded
+// (otherwise reconcile re-scans tens of thousands of rows every tick → IOwait).
+const ARCHIVE_AFTER_HOURS = 24;    // active trends not touched this long → archived;
+                                   // also the window reconcile limits itself to.
+const SIGNAL_RETENTION_DAYS = 10;  // delete signals older than this.
+const SIGNAL_PURGE_BATCH = 500;    // max signals purged per tick — keeps the DELETE
+                                   // well under the statement timeout; any backlog
+                                   // drains over subsequent ticks (oldest first).
+
 export type ClusterStats = {
   signals_loaded: number;
   clusters_total: number;
@@ -65,6 +74,8 @@ export type ClusterStats = {
   signals_linked: number;
   trends_reconciled: number;
   trends_archived: number;
+  trends_archived_stale?: number;
+  signals_purged?: number;
   trends_categorized?: number;
   corroboration?: CorroborateStats;
   duration_ms: number;
@@ -135,11 +146,16 @@ export async function clusterAndTrend(
   //    same-story articles so a 2-publisher story can cross the 3-source bar.
   const corroboration = await corroborateWatching(supabase);
 
-  // 5. Reconcile + archive — recomputes publisher_count (incl. the injected
-  //    publishers), which auto-promotes corroborated stories.
+  // 5. DB hygiene — archive trends gone quiet + purge old signals so the active
+  //    set and signals table stay bounded (keeps reconcile + the board fast).
+  const trendsArchivedStale = await archiveStaleTrends(supabase);
+  const signalsPurged = await purgeOldSignals(supabase);
+
+  // 6. Reconcile — recomputes publisher_count (incl. the injected publishers),
+  //    which auto-promotes corroborated stories. Now scoped to recent trends.
   const recon = await reconcileTrendCounts(supabase);
 
-  // 6. AI-categorise newly-seen stories (graceful — skipped without an AI key
+  // 7. AI-categorise newly-seen stories (graceful — skipped without an AI key
   //    or before migration 0027; once classified a story keeps its section).
   let trendsCategorized = 0;
   try {
@@ -160,6 +176,8 @@ export async function clusterAndTrend(
     signals_linked: signalsLinked,
     trends_reconciled: recon.reconciled,
     trends_archived: recon.archived,
+    trends_archived_stale: trendsArchivedStale,
+    signals_purged: signalsPurged,
     trends_categorized: trendsCategorized,
     corroboration,
     duration_ms: Date.now() - started,
@@ -517,13 +535,59 @@ function firstSeenFromSignals(sigs: SigJoin[]): string | null {
  * actually linked, and archive any trend that ended up with zero signals
  * (its members got pulled into a bigger cluster on a later tick).
  */
+/**
+ * Bulk-archive active trends not touched (reused / corroborated) in
+ * ARCHIVE_AFTER_HOURS. ONE update — this is what stops the active set (and so
+ * the reconcile scan below) from growing without bound. An archived trend
+ * reactivates automatically if its cluster recurs in a later tick.
+ */
+async function archiveStaleTrends(supabase: SupabaseClient): Promise<number> {
+  const cutoff = new Date(Date.now() - ARCHIVE_AFTER_HOURS * 3_600_000).toISOString();
+  const { error, count } = await supabase
+    .from("trends")
+    .update({ status: "archived" }, { count: "exact" })
+    .eq("status", "active")
+    .lt("last_updated", cutoff);
+  if (error) {
+    console.warn("[cluster] archiveStaleTrends failed:", error.message);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+/**
+ * Delete signals published more than SIGNAL_RETENTION_DAYS ago. Keeps the signals
+ * table small so loads + reconcile scans stay fast. Safe + well-aligned: the
+ * clustering load window is only the last few hours, so a signal this old is
+ * already dead weight, and active trends' signals are far newer than the cutoff.
+ * Filters on published_at (indexed: idx_signals_published) so it never scans.
+ */
+async function purgeOldSignals(supabase: SupabaseClient): Promise<number> {
+  const cutoff = new Date(Date.now() - SIGNAL_RETENTION_DAYS * 86_400_000).toISOString();
+  const { error, count } = await supabase
+    .from("signals")
+    .delete({ count: "exact" })
+    .lt("published_at", cutoff)
+    .order("published_at", { ascending: true })
+    .limit(SIGNAL_PURGE_BATCH);
+  if (error) {
+    console.warn("[cluster] purgeOldSignals failed:", error.message);
+    return 0;
+  }
+  return count ?? 0;
+}
+
 async function reconcileTrendCounts(
   supabase: SupabaseClient
 ): Promise<{ reconciled: number; archived: number }> {
+  // Only reconcile trends touched within the archive window — older trends are
+  // archived by archiveStaleTrends() and don't need re-scanning every tick.
+  const recentCutoff = new Date(Date.now() - ARCHIVE_AFTER_HOURS * 3_600_000).toISOString();
   const { data: trends, error } = await supabase
     .from("trends")
     .select("id, signal_count, publisher_count, status, trust_score, broke_at, first_seen")
-    .neq("status", "archived");
+    .neq("status", "archived")
+    .gte("last_updated", recentCutoff);
 
   if (error || !trends) return { reconciled: 0, archived: 0 };
 
