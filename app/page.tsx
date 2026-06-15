@@ -24,6 +24,10 @@ import { TrendDrawer } from "@/components/trend-drawer";
 import { SkeletonCard } from "@/components/skeletons";
 
 // ─── Editorial feeds (the board columns) ──────────────────────
+// Injected into every generated widget so the sandboxed iframe can report its
+// content height back to the dashboard (which then auto-sizes the iframe).
+const WIDGET_HEIGHT_REPORTER = `<script>(function(){function p(){try{parent.postMessage({__patrikaWidgetHeight:Math.max(document.documentElement.scrollHeight,document.body?document.body.scrollHeight:0)},'*')}catch(e){}}addEventListener('load',p);addEventListener('resize',p);setTimeout(p,150);setTimeout(p,600);setTimeout(p,1500);try{new ResizeObserver(p).observe(document.documentElement)}catch(e){}})();</script>`;
+
 type BucketKey = "breaking" | "trending" | "developing" | "watching" | "newswire" | "social";
 
 const BUCKETS: Array<{
@@ -525,6 +529,19 @@ function Editor({ trend, title, setTitle, onClose }: {
   const [widgetType, setWidgetType] = useState<string>("");
   const [loadingWidget, setLoadingWidget] = useState(false);
   const [widgetError, setWidgetError] = useState<string | null>(null);
+  // Auto-size the widget iframe to its content (widgets post their height).
+  const [widgetHeight, setWidgetHeight] = useState(460);
+  useEffect(() => {
+    function onMsg(e: MessageEvent) {
+      const data = e.data as Record<string, unknown> | null;
+      const h = data && typeof data === "object" ? data.__patrikaWidgetHeight : null;
+      if (typeof h === "number" && h > 80) {
+        setWidgetHeight(Math.min(Math.ceil(h) + 4, 1600));
+      }
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
 
   const words = body.trim() ? body.trim().split(/\s+/).length : 0;
   const hasGenerated = body.trim().length > 0 || titleOptions.length > 0;
@@ -645,6 +662,7 @@ function Editor({ trend, title, setTitle, onClose }: {
     if (!trend?.uid) return;
     setLoadingWidget(true);
     setWidgetError(null);
+    setWidgetHeight(460);
     try {
       const res = await fetch("/api/interactive/generate", {
         method: "POST",
@@ -1019,9 +1037,10 @@ function Editor({ trend, title, setTitle, onClose }: {
                 {widgetHtml ? (
                   <iframe
                     title="Interactive widget"
-                    srcDoc={widgetHtml}
+                    srcDoc={widgetHtml + WIDGET_HEIGHT_REPORTER}
                     sandbox="allow-scripts"
-                    className="w-full h-[460px] rounded-xl border border-[var(--border)] bg-white"
+                    style={{ height: widgetHeight }}
+                    className="w-full rounded-xl border border-[var(--border)] bg-white transition-[height] duration-200"
                   />
                 ) : (
                   <div className="rounded-xl border border-dashed border-[var(--border-2)] bg-[var(--surface-2)] py-12 text-center text-[13px] text-[var(--text-3)] leading-relaxed px-4">
