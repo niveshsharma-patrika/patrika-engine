@@ -6,8 +6,9 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getModelFor } from "@/lib/ai/provider";
 
 export const dynamic = "force-dynamic";
-// gpt-4.1 emitting a full ~20KB designed widget can take ~50-60s; give it room.
-export const maxDuration = 120;
+// gpt-4.1 emitting a full ~20KB designed widget (heavier in Hindi) can take
+// ~60-110s; give it room so it finishes instead of truncating.
+export const maxDuration = 150;
 
 /**
  * POST /api/interactive/generate — design + build a premium, self-contained,
@@ -164,7 +165,7 @@ Then a blank line, then the COMPLETE raw HTML snippet (inline <style> + markup +
       model,
       prompt,
       temperature: 0.85,
-      maxOutputTokens: 8000,
+      maxOutputTokens: 12000,
     });
     // Parse: optional leading "TYPE: …" line, then the raw HTML. Defensively
     // strip any markdown fences and trim to the first real HTML tag.
@@ -177,7 +178,12 @@ Then a blank line, then the COMPLETE raw HTML snippet (inline <style> + markup +
     }
     raw = raw.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
     const htmlStart = raw.search(/<(?:div|section|style|main|article|header|figure|svg|h[1-6])/i);
-    const html = (htmlStart >= 0 ? raw.slice(htmlStart) : raw).trim();
+    let html = (htmlStart >= 0 ? raw.slice(htmlStart) : raw).trim();
+    // Safety net: if the model was cut off (token cap) mid-tag, close any
+    // dangling <style>/<script> so the truncation can't break the whole iframe.
+    const count = (re: RegExp) => (html.match(re) ?? []).length;
+    if (count(/<style\b/gi) > count(/<\/style>/gi)) html += "\n</style>";
+    if (count(/<script\b/gi) > count(/<\/script>/gi)) html += "\n</script>";
     return Response.json({
       widgetType,
       title: t.title,
