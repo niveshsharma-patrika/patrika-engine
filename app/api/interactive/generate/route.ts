@@ -7,8 +7,8 @@ import { getModelFor } from "@/lib/ai/provider";
 
 export const dynamic = "force-dynamic";
 // gpt-4.1 emitting a full ~20KB designed widget (heavier in Hindi) can take
-// ~60-110s; give it room so it finishes instead of truncating.
-export const maxDuration = 150;
+// ~60-120s; give it generous room so it finishes instead of truncating/timing out.
+export const maxDuration = 180;
 
 /**
  * POST /api/interactive/generate — design + build a premium, self-contained,
