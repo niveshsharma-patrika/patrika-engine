@@ -520,6 +520,12 @@ function Editor({ trend, title, setTitle, onClose }: {
   const [selectedAngle, setSelectedAngle] = useState<StoryAngle | null>(null);
   const [loadingAngles, setLoadingAngles] = useState(false);
 
+  // Interactive widget
+  const [widgetHtml, setWidgetHtml] = useState<string | null>(null);
+  const [widgetType, setWidgetType] = useState<string>("");
+  const [loadingWidget, setLoadingWidget] = useState(false);
+  const [widgetError, setWidgetError] = useState<string | null>(null);
+
   const words = body.trim() ? body.trim().split(/\s+/).length : 0;
   const hasGenerated = body.trim().length > 0 || titleOptions.length > 0;
   // No auto-generate — the page opens empty so the editor can set up the AI
@@ -632,6 +638,30 @@ function Editor({ trend, title, setTitle, onClose }: {
       setSaveState("error");
     } finally {
       setTimeout(() => setSaveState("idle"), 2500);
+    }
+  }
+
+  async function generateWidget() {
+    if (!trend?.uid) return;
+    setLoadingWidget(true);
+    setWidgetError(null);
+    try {
+      const res = await fetch("/api/interactive/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trendId: trend.uid, lang: genLang }),
+      });
+      const json = await res.json();
+      if (res.ok && json.html) {
+        setWidgetHtml(json.html);
+        setWidgetType(json.widgetType ?? "");
+      } else {
+        setWidgetError(json.error ?? `Failed (${res.status})`);
+      }
+    } catch (e) {
+      setWidgetError(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setLoadingWidget(false);
     }
   }
 
@@ -941,6 +971,67 @@ function Editor({ trend, title, setTitle, onClose }: {
                 <span>{words > 0 ? `${Math.max(1, Math.round(words / 200))} min read` : ""}</span>
               </div>
             </div>
+
+            {/* Interactive widget — AI picks the most engaging type for the story */}
+            {trend?.uid && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between gap-2 mb-2.5">
+                  <h4 className="text-[14px] font-semibold flex items-center gap-1.5">
+                    <Sparkles size={15} className="text-[var(--purple)]" />
+                    {lang === "hi" ? "इंटरैक्टिव विजेट" : "Interactive widget"}
+                    {widgetType && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[var(--surface-2)] text-[var(--text-3)] font-normal">
+                        {widgetType}
+                      </span>
+                    )}
+                  </h4>
+                  <div className="flex items-center gap-3">
+                    {widgetHtml && (
+                      <button
+                        onClick={() => navigator.clipboard?.writeText(widgetHtml)}
+                        className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)]"
+                      >
+                        {lang === "hi" ? "HTML कॉपी करें" : "Copy HTML"}
+                      </button>
+                    )}
+                    <button
+                      onClick={generateWidget}
+                      disabled={loadingWidget}
+                      className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg text-white disabled:opacity-60"
+                      style={{ background: "var(--purple)" }}
+                    >
+                      {loadingWidget ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={13} />
+                      )}
+                      {loadingWidget
+                        ? lang === "hi" ? "बना रहे हैं…" : "Building…"
+                        : widgetHtml
+                        ? lang === "hi" ? "फिर से बनाएँ" : "Regenerate"
+                        : lang === "hi" ? "विजेट बनाएँ" : "Generate widget"}
+                    </button>
+                  </div>
+                </div>
+                {widgetError && (
+                  <div className="text-[12px] text-[var(--red)] mb-2 leading-snug">{widgetError}</div>
+                )}
+                {widgetHtml ? (
+                  <iframe
+                    title="Interactive widget"
+                    srcDoc={widgetHtml}
+                    sandbox="allow-scripts"
+                    className="w-full h-[460px] rounded-xl border border-[var(--border)] bg-white"
+                  />
+                ) : (
+                  <div className="rounded-xl border border-dashed border-[var(--border-2)] bg-[var(--surface-2)] py-12 text-center text-[13px] text-[var(--text-3)] leading-relaxed px-4">
+                    {lang === "hi"
+                      ? "स्टोरी के लिए एक छोटा इंटरैक्टिव विजेट बनाएँ — AI सबसे उपयुक्त प्रकार चुनेगा (स्लाइडर, टाइमलाइन, चार्ट…)।"
+                      : "Build a small interactive widget for this story — AI picks the best-fit type (slider, timeline, chart…)."}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </main>
       </div>
