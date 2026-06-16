@@ -417,8 +417,17 @@ const LEAD_STYLES = ["Summary", "Context", "Anecdote", "Question", "Quote"];
 const TRENDING_OPTS = ["Low", "Medium", "High"];
 const AUDIENCE_OPTS = ["Niche", "Broad", "General"];
 const URGENCY_OPTS = ["Breaking", "Ongoing", "Evergreen"];
-const PUBLICATION_OPTS = ["Patrika House", "Investigative", "Explainer-led", "Punchy / Tabloid", "Wire (neutral)", "Feature / Magazine"];
-const WRITER_OPTS = ["Senior Reporter", "Beat Correspondent", "Data Journalist", "Columnist", "Features Writer"];
+const PUBLICATION_OPTS = ["Patrika", "New York Times", "Reuters", "Al Jazeera", "BBC", "Bloomberg"];
+// Writers shown depend on the selected publication. Keys MUST match WRITER_DESC
+// in app/api/drafts/generate/route.ts so the prompt picks up each voice.
+const WRITERS_BY_PUB: Record<string, string[]> = {
+  Patrika: ["Senior Reporter", "Beat Correspondent", "Data Journalist", "Columnist", "Features Writer"],
+  "New York Times": ["Thomas Friedman", "Maureen Dowd", "Ross Douthat", "David Brooks", "NYT National Correspondent"],
+  Reuters: ["Reuters Markets Correspondent", "Reuters World Correspondent", "Reuters Breaking Desk"],
+  "Al Jazeera": ["Marwan Bishara", "Andrew Mitrovica", "AJ Field Correspondent"],
+  BBC: ["Lyse Doucet", "Jeremy Bowen", "Faisal Islam", "BBC News Correspondent"],
+  Bloomberg: ["Matt Levine", "John Authers", "Tyler Cowen", "Bloomberg Markets Reporter"],
+};
 const READABILITY_OPTS = ["Easy", "Moderate", "Expert"];
 
 function EnhField({ label, value, onChange, options }: {
@@ -505,8 +514,14 @@ function Editor({ trend, title, setTitle, onClose }: {
   const [trendingScore, setTrendingScore] = useState("Medium");
   const [audienceFit, setAudienceFit] = useState("Broad");
   const [urgency, setUrgency] = useState("Ongoing");
-  const [publication, setPublication] = useState("Patrika House");
+  const [publication, setPublication] = useState("Patrika");
   const [writer, setWriter] = useState("Senior Reporter");
+  // Switching publication swaps the writer list; keep the writer valid.
+  function handlePublicationChange(pub: string) {
+    setPublication(pub);
+    const writers = WRITERS_BY_PUB[pub] ?? [];
+    if (writers.length && !writers.includes(writer)) setWriter(writers[0]);
+  }
   const [numberOfTitles, setNumberOfTitles] = useState(5);
   const [wordCount, setWordCount] = useState(800);
 
@@ -847,8 +862,8 @@ function Editor({ trend, title, setTitle, onClose }: {
           </EnhGroup>
 
           <EnhGroup title={lang === "hi" ? "लेखन शैली प्रेरणा" : "Writing Style Inspiration Filter"}>
-            <EnhField label={lang === "hi" ? "प्रकाशन" : "Publication"} value={publication} onChange={setPublication} options={PUBLICATION_OPTS} />
-            <EnhField label={lang === "hi" ? "लेखक" : "Writer"} value={writer} onChange={setWriter} options={WRITER_OPTS} />
+            <EnhField label={lang === "hi" ? "प्रकाशन" : "Publication"} value={publication} onChange={handlePublicationChange} options={PUBLICATION_OPTS} />
+            <EnhField label={lang === "hi" ? "लेखक" : "Writer"} value={writer} onChange={setWriter} options={WRITERS_BY_PUB[publication] ?? []} />
             <div className="mb-3.5">
               <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">
                 {lang === "hi" ? "शीर्षकों की संख्या" : "Number of Titles"}

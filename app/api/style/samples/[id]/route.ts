@@ -19,6 +19,15 @@ const VALID_STORY_TYPES = new Set([
   "Feature",
 ]);
 
+const VALID_PUBLICATIONS = new Set([
+  "Patrika",
+  "New York Times",
+  "Reuters",
+  "Al Jazeera",
+  "BBC",
+  "Bloomberg",
+]);
+
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -45,6 +54,8 @@ export async function PUT(
     title?: string;
     body?: string;
     story_type?: string;
+    publication?: string;
+    writer?: string;
     notes?: string;
   };
   try {
@@ -63,13 +74,22 @@ export async function PUT(
         ? body.story_type.trim()
         : null;
   }
+  if (body.publication !== undefined) {
+    update.publication =
+      body.publication && VALID_PUBLICATIONS.has(body.publication.trim())
+        ? body.publication.trim()
+        : "Patrika";
+  }
+  if (body.writer !== undefined) {
+    update.writer = body.writer?.toString().trim() || null;
+  }
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("style_samples")
     .update(update)
     .eq("id", id)
-    .select("id, title, body, story_type, source_url, notes, created_at, updated_at")
+    .select("id, title, body, story_type, publication, writer, source_url, notes, created_at, updated_at")
     .single();
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ sample: data });

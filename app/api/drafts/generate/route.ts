@@ -14,45 +14,56 @@ import { createAdminClient } from "@/lib/supabase/server";
  * 2 most-recent samples regardless of tag. Cap each sample at ~3000 chars
  * to keep the prompt under model context limits.
  */
-async function loadStyleAssets(storyType: string | null | undefined): Promise<{
+async function loadStyleAssets(
+  storyType: string | null | undefined,
+  publication?: string | null
+): Promise<{
   guidelines: string | null;
   samples: Array<{ title: string; body: string; story_type: string | null }>;
+  publication: string;
 }> {
+  const pub = (publication || "Patrika").trim();
+  const isPatrika = /patrika/i.test(pub);
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    return { guidelines: null, samples: [] };
+    return { guidelines: null, samples: [], publication: pub };
   }
   const supabase = createAdminClient();
 
-  // Guidelines: singleton, most-recent row
-  const { data: g } = await supabase
-    .from("style_guidelines")
-    .select("content")
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const guidelines =
-    (g as { content: string } | null)?.content?.trim() || null;
-
-  // Samples: prefer same story_type, fall back to newest 2
-  type SampleRow = { title: string; body: string; story_type: string | null };
-  let samples: SampleRow[] = [];
-  if (storyType) {
-    const { data } = await supabase
-      .from("style_samples")
-      .select("title, body, story_type")
-      .eq("story_type", storyType)
-      .order("created_at", { ascending: false })
-      .limit(2);
-    samples = (data as SampleRow[] | null) ?? [];
+  // Guidelines: only Patrika keeps long-form DB guidelines (singleton). Other
+  // outlets carry their house style via the directive block + samples below.
+  let guidelines: string | null = null;
+  if (isPatrika) {
+    const { data: g } = await supabase
+      .from("style_guidelines")
+      .select("content")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    guidelines = (g as { content: string } | null)?.content?.trim() || null;
   }
-  if (samples.length < 2) {
-    const { data: extra } = await supabase
+
+  // Samples for THIS publication: prefer same story_type, fall back to newest.
+  // The publication filter degrades gracefully if the column isn't migrated yet
+  // (the query errors → return no samples rather than crashing generation).
+  type SampleRow = { title: string; body: string; story_type: string | null };
+  async function fetchSamples(byType: boolean): Promise<SampleRow[]> {
+    let q = supabase
       .from("style_samples")
       .select("title, body, story_type")
+      .eq("publication", pub);
+    if (byType && storyType) q = q.eq("story_type", storyType);
+    const { data, error } = await q
       .order("created_at", { ascending: false })
-      .limit(5);
+      .limit(byType ? 2 : 5);
+    if (error) return [];
+    return (data as SampleRow[] | null) ?? [];
+  }
+
+  let samples: SampleRow[] = storyType ? await fetchSamples(true) : [];
+  if (samples.length < 2) {
+    const extra = await fetchSamples(false);
     const haveTitles = new Set(samples.map((s) => s.title));
-    for (const s of (extra as SampleRow[] | null) ?? []) {
+    for (const s of extra) {
       if (samples.length >= 2) break;
       if (!haveTitles.has(s.title)) samples.push(s);
     }
@@ -65,7 +76,7 @@ async function loadStyleAssets(storyType: string | null | undefined): Promise<{
     body: s.body.length > 3000 ? s.body.slice(0, 3000) + "…[truncated]" : s.body,
   }));
 
-  return { guidelines, samples };
+  return { guidelines, samples, publication: pub };
 }
 
 /**
@@ -146,7 +157,7 @@ ${s.body}`
       .join("\n\n");
     parts.push(
       `═══════════════════════════════════════════
-SAMPLE PATRIKA ARTICLES — mimic this structure, density, and voice
+SAMPLE ${assets.publication.toUpperCase()} ARTICLES — mimic this structure, density, and voice
 ═══════════════════════════════════════════
 ${samplesText}
 ═══════════════════════════════════════════`
@@ -213,19 +224,69 @@ function paramDirectives(p: GenParams | undefined): string {
     Investigative: "a probing, investigative voice.",
   };
   const PUB_DESC: Record<string, string> = {
-    "Patrika House": "Patrika's standard newsroom house style",
-    Investigative: "investigative, evidence-led, follow-the-thread framing",
-    "Explainer-led": "explainer-first — lead with what it means and why it matters",
-    "Punchy / Tabloid": "short, punchy, high-energy sentences",
-    "Wire (neutral)": "spare, neutral wire-service style",
-    "Feature / Magazine": "narrative feature/magazine style with colour and scene-setting",
+    Patrika: "Patrika's standard newsroom house style.",
+    "Patrika House": "Patrika's standard newsroom house style.",
+    "New York Times":
+      "the New York Times house style — authoritative, deeply reported and literary. Open with a vivid scene or a sharp lead, then a clear nut graf on why it matters. Long, well-built sentences; precise, sophisticated vocabulary; scrupulous sourcing; a measured, intelligent 'paper of record' tone.",
+    Reuters:
+      "Reuters wire style — a strict inverted pyramid. Put who/what/when/where/why in the first one or two sentences. Spare, neutral, impartial prose; no adjectives of opinion; attribute every claim; short paragraphs; fast and factual; ~300-600 words. Never editorialise.",
+    "Al Jazeera":
+      "Al Jazeera English style — clear, accessible global journalism told from the Global South's vantage point. Lead with the human stakes, give rich historical and geopolitical context, foreground the voices of those affected, and explain the politics plainly. Empathetic but rigorous; avoid Western-centric framing.",
+    BBC:
+      "BBC News style — calm, impartial, plain authoritative English. Lead with the verified development; attribute carefully ('officials say', 'the BBC understands'); explain clearly for a broad global audience; fairly balance viewpoints; never sensationalise. Measured and trustworthy.",
+    Bloomberg:
+      "Bloomberg style — sharp business-and-markets journalism. Lead with the development and immediately answer 'what it means for markets and investors'; foreground numbers, money and market impact; tight, brisk sentences; data-rich; a dry, knowing, professional tone.",
   };
   const WRITER_DESC: Record<string, string> = {
+    // Patrika (generic role presets — Patrika's own bylines come later)
     "Senior Reporter": "an authoritative senior reporter",
     "Beat Correspondent": "a beat correspondent close to the sources",
     "Data Journalist": "a data journalist foregrounding numbers and context",
     Columnist: "an opinionated columnist (mark opinion clearly as such)",
     "Features Writer": "a features writer with narrative flair",
+    // New York Times
+    "Thomas Friedman":
+      "in the vein of Thomas Friedman — big-picture foreign-affairs framing, vivid metaphors, a guiding thesis",
+    "Maureen Dowd":
+      "in the vein of Maureen Dowd — sharp, witty, culturally-attuned, pointed prose",
+    "Ross Douthat":
+      "in the vein of Ross Douthat — measured, philosophical, conservative-leaning analysis",
+    "David Brooks":
+      "in the vein of David Brooks — sociological, values-and-character, synthesising big ideas",
+    "NYT National Correspondent":
+      "an NYT national correspondent — scene-setting, deeply reported long-form",
+    // Reuters
+    "Reuters Markets Correspondent":
+      "a Reuters markets correspondent — numbers-first, terse, market-moving facts",
+    "Reuters World Correspondent":
+      "a Reuters world-desk correspondent — dateline-led, balanced, impartial",
+    "Reuters Breaking Desk":
+      "a Reuters breaking-news reporter — lead with the development, minimal adjectives",
+    // Al Jazeera
+    "Marwan Bishara":
+      "in the vein of Marwan Bishara — senior political analysis of geopolitics and the Middle East",
+    "Andrew Mitrovica":
+      "in the vein of Andrew Mitrovica — pointed, critical columnist voice",
+    "AJ Field Correspondent":
+      "an Al Jazeera field correspondent — human-centred, on-the-ground, Global-South context",
+    // BBC
+    "Lyse Doucet":
+      "in the vein of Lyse Doucet — humane international correspondent reporting from the ground",
+    "Jeremy Bowen":
+      "in the vein of Jeremy Bowen — analytical on-the-ground Middle East reportage",
+    "Faisal Islam":
+      "in the vein of Faisal Islam — clear, accessible economics explanation",
+    "BBC News Correspondent":
+      "a BBC news correspondent — neutral, balanced, carefully attributed",
+    // Bloomberg
+    "Matt Levine":
+      "in the vein of Matt Levine — witty, discursive, finance-explained-cleverly (Money Stuff voice)",
+    "John Authers":
+      "in the vein of John Authers — macro and markets analysis with historical context",
+    "Tyler Cowen":
+      "in the vein of Tyler Cowen — contrarian, idea-dense economics commentary",
+    "Bloomberg Markets Reporter":
+      "a Bloomberg markets reporter — numbers-led, terse, market-impact framing",
   };
   const lines: string[] = [];
   if (p.tone) lines.push(`- BASE TONE: ${p.tone}. Let this dominate the writing.`);
@@ -465,9 +526,12 @@ export async function POST(req: Request) {
     });
   }
 
-  // Load Patrika style assets (guidelines + matched samples) and build the
-  // grounding-rules preamble that anchors the model to today's date + signals.
-  const styleAssets = await loadStyleAssets(trend.storyType);
+  // Load the selected publication's style assets (guidelines + matched samples)
+  // and build the grounding-rules preamble anchoring the model to date + signals.
+  const styleAssets = await loadStyleAssets(
+    trend.storyType,
+    parsed.data.params?.publication
+  );
   const styleBlock = styleAssetsBlock(styleAssets);
   const grounding = groundingRules(parsed.data.lang);
 

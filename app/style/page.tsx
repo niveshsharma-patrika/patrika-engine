@@ -21,6 +21,8 @@ type Sample = {
   title: string;
   body: string;
   story_type: string | null;
+  publication: string | null;
+  writer: string | null;
   source_url: string | null;
   notes: string | null;
   created_at: string;
@@ -45,6 +47,18 @@ const STORY_TYPES = [
   "Sidebar",
   "Feature",
 ] as const;
+
+const PUBLICATIONS = ["Patrika", "New York Times", "Reuters", "Al Jazeera", "BBC", "Bloomberg"] as const;
+// Keep these writer lists in sync with WRITER_DESC in
+// app/api/drafts/generate/route.ts and WRITERS_BY_PUB in app/page.tsx.
+const WRITERS_BY_PUB: Record<string, string[]> = {
+  Patrika: ["Senior Reporter", "Beat Correspondent", "Data Journalist", "Columnist", "Features Writer"],
+  "New York Times": ["Thomas Friedman", "Maureen Dowd", "Ross Douthat", "David Brooks", "NYT National Correspondent"],
+  Reuters: ["Reuters Markets Correspondent", "Reuters World Correspondent", "Reuters Breaking Desk"],
+  "Al Jazeera": ["Marwan Bishara", "Andrew Mitrovica", "AJ Field Correspondent"],
+  BBC: ["Lyse Doucet", "Jeremy Bowen", "Faisal Islam", "BBC News Correspondent"],
+  Bloomberg: ["Matt Levine", "John Authers", "Tyler Cowen", "Bloomberg Markets Reporter"],
+};
 
 function fmtTime(iso: string | null): string {
   if (!iso) return "—";
@@ -372,11 +386,30 @@ export default function StylePage() {
                         <h4 className="text-[14px] font-medium leading-snug">
                           {s.title}
                         </h4>
-                        {s.story_type && (
-                          <span className="inline-block mt-1.5 text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-2)]">
-                            {s.story_type}
-                          </span>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          {s.publication && (
+                            <span
+                              className="inline-block text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border"
+                              style={{
+                                background: "color-mix(in srgb, var(--red) 10%, white)",
+                                color: "var(--red)",
+                                borderColor: "color-mix(in srgb, var(--red) 25%, white)",
+                              }}
+                            >
+                              {s.publication}
+                            </span>
+                          )}
+                          {s.story_type && (
+                            <span className="inline-block text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-2)]">
+                              {s.story_type}
+                            </span>
+                          )}
+                          {s.writer && (
+                            <span className="inline-block text-[10px] px-1.5 py-0.5 rounded text-[var(--text-3)]">
+                              {s.writer}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <button
                         onClick={() => deleteSample(s.id)}
@@ -438,6 +471,8 @@ function AddSampleModal({
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [storyType, setStoryType] = useState("");
+  const [publication, setPublication] = useState("Patrika");
+  const [writer, setWriter] = useState("");
   const [notes, setNotes] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
@@ -482,6 +517,8 @@ function AddSampleModal({
           title: title.trim(),
           body: body.trim(),
           story_type: storyType || undefined,
+          publication: publication || undefined,
+          writer: writer || undefined,
           source_url: sourceUrl ?? undefined,
           notes: notes.trim() || undefined,
         }),
@@ -578,6 +615,46 @@ function AddSampleModal({
             />
             <div className="text-[11px] text-[var(--text-3)] mt-1 font-mono">
               {body.length.toLocaleString()} chars
+            </div>
+          </div>
+
+          {/* Publication + writer */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium block mb-1.5">
+                {lang === "hi" ? "प्रकाशन" : "Publication"}
+              </label>
+              <select
+                value={publication}
+                onChange={(e) => {
+                  setPublication(e.target.value);
+                  setWriter("");
+                }}
+                className="w-full bg-white border border-[var(--border)] focus:border-[var(--text-3)] rounded px-3 py-1.5 text-[13px] outline-none"
+              >
+                {PUBLICATIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-[var(--text-3)] font-medium block mb-1.5">
+                {lang === "hi" ? "लेखक (ऐच्छिक)" : "Writer (optional)"}
+              </label>
+              <select
+                value={writer}
+                onChange={(e) => setWriter(e.target.value)}
+                className="w-full bg-white border border-[var(--border)] focus:border-[var(--text-3)] rounded px-3 py-1.5 text-[13px] outline-none"
+              >
+                <option value="">— {lang === "hi" ? "कोई नहीं" : "none"} —</option>
+                {(WRITERS_BY_PUB[publication] ?? []).map((w) => (
+                  <option key={w} value={w}>
+                    {w}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

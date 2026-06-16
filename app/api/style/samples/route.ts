@@ -15,6 +15,8 @@ type SampleRow = {
   title: string;
   body: string;
   story_type: string | null;
+  publication: string | null;
+  writer: string | null;
   source_url: string | null;
   notes: string | null;
   created_at: string;
@@ -33,6 +35,18 @@ const VALID_STORY_TYPES = new Set([
   "Feature",
 ]);
 
+const VALID_PUBLICATIONS = new Set([
+  "Patrika",
+  "New York Times",
+  "Reuters",
+  "Al Jazeera",
+  "BBC",
+  "Bloomberg",
+]);
+
+const SAMPLE_COLS =
+  "id, title, body, story_type, publication, writer, source_url, notes, created_at, updated_at";
+
 export async function GET() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return Response.json({ samples: [], reason: "supabase_not_configured" });
@@ -40,7 +54,7 @@ export async function GET() {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("style_samples")
-    .select("id, title, body, story_type, source_url, notes, created_at, updated_at")
+    .select(SAMPLE_COLS)
     .order("created_at", { ascending: false })
     .limit(200);
   return Response.json({ samples: (data as SampleRow[] | null) ?? [] });
@@ -54,6 +68,8 @@ export async function POST(req: Request) {
     title?: string;
     body?: string;
     story_type?: string;
+    publication?: string;
+    writer?: string;
     source_url?: string;
     notes?: string;
   };
@@ -78,6 +94,13 @@ export async function POST(req: Request) {
       ? body.story_type.trim()
       : null;
 
+  // publication defaults to Patrika; writer is a free-text byline/voice label
+  const publication =
+    body.publication && VALID_PUBLICATIONS.has(body.publication.trim())
+      ? body.publication.trim()
+      : "Patrika";
+  const writer = body.writer?.toString().trim() || null;
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("style_samples")
@@ -85,10 +108,12 @@ export async function POST(req: Request) {
       title,
       body: articleBody,
       story_type,
+      publication,
+      writer,
       source_url: body.source_url?.toString() || null,
       notes: body.notes?.toString() || null,
     })
-    .select("id, title, body, story_type, source_url, notes, created_at, updated_at")
+    .select(SAMPLE_COLS)
     .single();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
