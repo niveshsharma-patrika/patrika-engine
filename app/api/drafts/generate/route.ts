@@ -1,4 +1,5 @@
 import { generateObject, generateText } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 
 import { TRENDS } from "@/lib/data/trends";
@@ -510,6 +511,19 @@ export async function POST(req: Request) {
     );
   }
 
+  // A distinctive outlet house style (NYT, Reuters, Bloomberg…) needs a stronger
+  // model than the per-tick default to actually ADOPT the voice — gpt-4o-mini
+  // stays generic no matter the directives. Use gpt-4.1 for non-Patrika
+  // publications when an OpenAI key is present (Patrika keeps the cheap default).
+  const selectedPub = parsed.data.params?.publication;
+  const isDistinctivePub = !!selectedPub && !/patrika/i.test(selectedPub);
+  if (isDistinctivePub && process.env.OPENAI_API_KEY) {
+    const styleModel = process.env.STYLE_DRAFT_MODEL ?? "gpt-4.1";
+    drafting.model = createOpenAI({ apiKey: process.env.OPENAI_API_KEY })(styleModel);
+    drafting.modelKey = styleModel;
+    drafting.providerKey = "openai";
+  }
+
   // No-trend path: just stub
   if (!trend) {
     const fb = await generateText({
@@ -547,8 +561,10 @@ export async function POST(req: Request) {
   );
 
   // Low temperature suppresses creative invention — the most reliable
-  // single setting against the 2024-knowledge / hallucination problem.
-  const TEMPERATURE = 0.2;
+  // single setting against the 2024-knowledge / hallucination problem. Lift it
+  // a little for distinctive outlet styles so the voice can actually come
+  // through; the hard grounding rules still forbid inventing facts.
+  const TEMPERATURE = isDistinctivePub ? 0.4 : 0.2;
 
   let headlineRes, body;
   try {
