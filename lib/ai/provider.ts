@@ -5,6 +5,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { pool } from "@/lib/db";
 import { decryptKey } from "@/lib/crypto";
 import { AI_PROVIDERS, type ProviderKey, type UseCase } from "./registry";
 
@@ -126,33 +127,27 @@ export async function getModelFor(
     };
   }
 
-  const supabase = createAdminClient();
-
-  const { data, error } = await supabase
-    .from("ai_config")
-    .select(
-      `
-      system_prompt,
-      ai_models!model_id (
-        model_key,
-        ai_providers ( provider_key )
-      )
-    `
+  // Admin-configured model for this use case (ai_config → ai_models → ai_providers).
+  // Direct join — the compat shim handles one-level embeds; this one is two-level.
+  type ConfigRow = { system_prompt: string | null; model_key: string; provider_key: string };
+  const { rows } = await pool
+    .query<ConfigRow>(
+      `SELECT c.system_prompt, m.model_key, p.provider_key
+         FROM ai_config c
+         JOIN ai_models m ON m.id = c.model_id
+         JOIN ai_providers p ON p.id = m.provider_id
+        WHERE c.use_case = $1
+        LIMIT 1`,
+      [useCase]
     )
-    .eq("use_case", useCase)
-    .maybeSingle();
+    .catch(() => ({ rows: [] as ConfigRow[] }));
 
-  // No admin config row for this use case → fall back to Gemini if a key is set.
-  if (error || !data?.ai_models) return envFallback();
+  const row = rows[0];
+  // No admin config row for this use case → fall back to the env default.
+  if (!row) return envFallback();
 
-  // Supabase joins return arrays or objects depending on relationship — coerce.
-  const modelRow = Array.isArray(data.ai_models) ? data.ai_models[0] : data.ai_models;
-  const providerRow = Array.isArray(modelRow.ai_providers)
-    ? modelRow.ai_providers[0]
-    : modelRow.ai_providers;
-
-  const providerKey = providerRow?.provider_key as ProviderKey | undefined;
-  const modelKey = modelRow?.model_key as string | undefined;
+  const providerKey = row.provider_key as ProviderKey | undefined;
+  const modelKey = row.model_key as string | undefined;
   if (!providerKey || !modelKey) return null;
 
   const apiKey = await getApiKey(providerKey);
@@ -167,6 +162,6 @@ export async function getModelFor(
     model: instantiate(providerKey, modelKey, apiKey),
     providerKey,
     modelKey,
-    systemPrompt: data.system_prompt ?? null,
+    systemPrompt: row.system_prompt ?? null,
   };
 }

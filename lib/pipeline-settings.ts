@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient as SupabaseClient } from "@/lib/db/compat";
 
 /**
  * Pipeline switches: per-stage on/off flags read from the

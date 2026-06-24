@@ -14,7 +14,7 @@ import * as schema from "./schema";
  */
 const globalForDb = globalThis as unknown as { __patrikaPool?: Pool };
 
-const pool =
+export const pool =
   globalForDb.__patrikaPool ??
   new Pool({
     connectionString: process.env.DATABASE_URL,
