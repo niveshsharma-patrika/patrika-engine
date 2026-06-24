@@ -47,6 +47,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { lang, setLang, t } = useLang();
 
+  // Auth pages (login) render standalone — no masthead / sidebar chrome.
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       {/* Masthead */}
