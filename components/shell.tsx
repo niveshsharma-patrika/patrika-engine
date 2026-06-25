@@ -14,6 +14,8 @@ import {
   Search,
   Languages,
   Activity,
+  Users,
+  LogOut,
 } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
@@ -30,6 +32,7 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string }> = [
   { href: "/style",             icon: <Type size={16} />,          key: "navStyle" },
   { href: "/watchlist",         icon: <Eye size={16} />,           key: "navWatchlist" },
   { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin" },
+  { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers" },
 ];
 
 const NAV_BADGES: Record<string, string | undefined> = {
@@ -50,6 +53,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
   // Auth pages (login) render standalone — no masthead / sidebar chrome.
   if (pathname === "/login") {
     return <>{children}</>;
+  }
+
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
   }
 
   return (
@@ -89,6 +97,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
               placeholder={t("searchPlaceholder")}
             />
           </div>
+
+          <button
+            onClick={signOut}
+            className="flex items-center gap-1.5 bg-[var(--surface-2)] hover:bg-white border border-[var(--border)] hover:border-[var(--border-2)] rounded px-3 py-1.5 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)]"
+            title="Sign out"
+          >
+            <LogOut size={13} />
+            Sign out
+          </button>
         </div>
       </header>
 

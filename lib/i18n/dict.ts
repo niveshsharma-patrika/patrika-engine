@@ -21,6 +21,7 @@ export const DICT = {
   navStyle:           { en: "Style module",   hi: "शैली मॉड्यूल" },
   navWatchlist:       { en: "Watchlist",      hi: "वॉचलिस्ट" },
   navAdmin:           { en: "Admin",          hi: "एडमिन" },
+  navUsers:           { en: "Users",          hi: "यूज़र्स" },
 
   // Sidebar sections
   system:             { en: "System",        hi: "सिस्टम" },
