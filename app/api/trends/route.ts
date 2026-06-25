@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { pool } from "@/lib/db";
 import { decodeEntities, canonicalPublisherKey, MAJOR_PUBLISHERS } from "@/lib/clustering/lexical";
 import { isClusterEligible } from "@/lib/clustering/section-gate";
 import type { SectionKey, SourceKey, Trend } from "@/lib/data/trends";
@@ -122,7 +123,7 @@ export async function GET(req: Request) {
     return newswireResponse(supabase);
   }
   if (windowParam === "social") {
-    return socialResponse(supabase);
+    return socialResponse();
   }
 
   const baseSelect = `
@@ -520,23 +521,30 @@ async function newswireResponse(
  * dominate. The `twitter` type is supported for when a working RSS endpoint
  * (self-hosted Nitter / scraper) is added.
  */
-async function socialResponse(
-  supabase: ReturnType<typeof createAdminClient>
-): Promise<Response> {
+async function socialResponse(): Promise<Response> {
   const sinceIso = new Date(Date.now() - SOCIAL_FRESH_MIN * 60 * 1000).toISOString();
-  const { data, error } = await supabase
-    .from("signals")
-    .select(
-      "id, content, author, published_at, ingested_at, url, metadata, sources!inner(source_type, name)"
-    )
-    .in("sources.source_type", ["reddit", "youtube", "twitter"])
-    .gte("published_at", sinceIso)
-    .order("published_at", { ascending: false })
-    .limit(400);
-
-  if (error) {
+  // INNER JOIN with a filter on the joined source_type — a native query, since
+  // the compat embeds are correlated subqueries that can't be filtered upward.
+  let data: unknown[] = [];
+  try {
+    const res = await pool.query(
+      `SELECT s.id, s.content, s.author, s.published_at, s.ingested_at, s.url, s.metadata,
+              json_build_object('source_type', src.source_type, 'name', src.name) AS sources
+         FROM signals s
+         JOIN sources src ON src.id = s.source_id
+        WHERE src.source_type = ANY($1) AND s.published_at >= $2
+        ORDER BY s.published_at DESC
+        LIMIT 400`,
+      [["reddit", "youtube", "twitter"], sinceIso]
+    );
+    data = res.rows;
+  } catch (err) {
     return Response.json(
-      { trends: [], reason: "query_failed", error: error.message },
+      {
+        trends: [],
+        reason: "query_failed",
+        error: err instanceof Error ? err.message : "query failed",
+      },
       { status: 500 }
     );
   }

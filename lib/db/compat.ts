@@ -26,10 +26,16 @@ const ARRAY_COLS: Record<string, Set<string>> = {
   signals: new Set(["keywords"]),
 };
 
-// One-level embed relationships (base table → embedded table + join keys).
-const EMBED_FK: Record<string, Record<string, { fk: string; ref: string }>> = {
-  signals: { sources: { fk: "source_id", ref: "id" } },
-  ai_models: { ai_providers: { fk: "provider_id", ref: "id" } },
+// Embed relationships (parent → embedded). "one" = belongs-to (single nested
+// object); "many" = has-many (nested array). Nesting is supported: a many-embed
+// whose rows carry a one-embed (e.g. trends → signals[] → sources).
+type Rel =
+  | { kind: "one"; localKey: string; refKey: string }
+  | { kind: "many"; childKey: string; parentKey: string };
+const RELATIONS: Record<string, Record<string, Rel>> = {
+  trends: { signals: { kind: "many", childKey: "topic_id", parentKey: "id" } },
+  signals: { sources: { kind: "one", localKey: "source_id", refKey: "id" } },
+  ai_models: { ai_providers: { kind: "one", localKey: "provider_id", refKey: "id" } },
 };
 
 type Row = Record<string, unknown>;
@@ -53,7 +59,6 @@ function serialize(table: string, col: string, val: unknown): unknown {
 }
 
 type Filter = { col: string; op: string; val: unknown };
-type EmbedSpec = { table: string; cols: string[]; inner: boolean };
 
 /** Split a select string at top-level commas (commas inside () belong to embeds). */
 function splitSelect(sel: string): string[] {
@@ -70,6 +75,41 @@ function splitSelect(sel: string): string[] {
   }
   if (cur.trim()) parts.push(cur.trim());
   return parts;
+}
+
+const EMBED_RE = /^([a-z_]+)\s*(!inner)?\s*\(([\s\S]*)\)$/i;
+
+/**
+ * Build the SQL scalar expression for one embed as a correlated subquery:
+ *   one  → (SELECT json_build_object(...) FROM child WHERE child.ref = parent.fk)
+ *   many → (SELECT COALESCE(json_agg(json_build_object(...)),'[]') FROM child
+ *            WHERE child.childKey = parent.parentKey)
+ * Recurses for nested embeds (a many's rows may carry a one, etc.).
+ */
+function embedExpr(
+  parentTable: string,
+  parentRef: string,
+  embedTable: string,
+  colsStr: string,
+  nextAlias: () => string
+): string {
+  const rel = RELATIONS[parentTable]?.[embedTable];
+  if (!rel) throw new Error(`compat: unknown embed ${parentTable}->${embedTable}`);
+  const alias = q(nextAlias());
+  const pairs: string[] = [];
+  for (const part of splitSelect(colsStr)) {
+    const m = part.match(EMBED_RE);
+    if (m) {
+      pairs.push(`'${m[1]}', ${embedExpr(embedTable, alias, m[1], m[3], nextAlias)}`);
+    } else {
+      pairs.push(`'${part}', ${alias}.${q(part)}`);
+    }
+  }
+  const obj = `json_build_object(${pairs.join(", ")})`;
+  if (rel.kind === "one") {
+    return `(SELECT ${obj} FROM ${q(embedTable)} ${alias} WHERE ${alias}.${q(rel.refKey)} = ${parentRef}.${q(rel.localKey)})`;
+  }
+  return `(SELECT COALESCE(json_agg(${obj}), '[]'::json) FROM ${q(embedTable)} ${alias} WHERE ${alias}.${q(rel.childKey)} = ${parentRef}.${q(rel.parentKey)})`;
 }
 
 class PostgrestQuery implements PromiseLike<Result> {
@@ -200,43 +240,24 @@ class PostgrestQuery implements PromiseLike<Result> {
   }
 
   private buildSelect(params: unknown[]): { sql: string } {
-    const parts = splitSelect(this.columns);
-    const baseCols: string[] = [];
-    const embeds: EmbedSpec[] = [];
-    for (const p of parts) {
-      const m = p.match(/^([a-z_]+)(!inner)?\(([^)]*)\)$/i);
-      if (m) {
-        embeds.push({
-          table: m[1],
-          inner: Boolean(m[2]),
-          cols: m[3].split(",").map((c) => c.trim()).filter(Boolean),
-        });
-      } else baseCols.push(p);
-    }
-
+    let aliasN = 0;
+    const nextAlias = () => `e${++aliasN}`;
     const selectList: string[] = [];
-    if (baseCols.length === 1 && baseCols[0] === "*") {
-      selectList.push(`${q(this.table)}.*`);
-    } else if (baseCols.length) {
-      for (const c of baseCols) selectList.push(`${q(this.table)}.${q(c)}`);
+    for (const p of splitSelect(this.columns)) {
+      const m = p.match(EMBED_RE);
+      if (m) {
+        selectList.push(
+          `${embedExpr(this.table, q(this.table), m[1], m[3], nextAlias)} AS ${q(m[1])}`
+        );
+      } else if (p === "*") {
+        selectList.push(`${q(this.table)}.*`);
+      } else {
+        selectList.push(`${q(this.table)}.${q(p)}`);
+      }
     }
-
-    let joinSql = "";
-    for (const e of embeds) {
-      const rel = EMBED_FK[this.table]?.[e.table];
-      if (!rel) throw new Error(`compat: unknown embed ${this.table}->${e.table}`);
-      const alias = e.table;
-      joinSql += ` ${e.inner ? "INNER" : "LEFT"} JOIN ${q(e.table)} ${q(alias)} ON ${q(alias)}.${q(rel.ref)} = ${q(this.table)}.${q(rel.fk)}`;
-      const obj = e.cols.map((c) => `'${c}', ${q(alias)}.${q(c)}`).join(", ");
-      selectList.push(
-        `CASE WHEN ${q(alias)}.${q(rel.ref)} IS NULL THEN NULL ELSE json_build_object(${obj}) END AS ${q(alias)}`
-      );
-    }
-
     const cols = selectList.length ? selectList.join(", ") : `${q(this.table)}.*`;
     const sql =
       `SELECT ${cols} FROM ${q(this.table)}` +
-      joinSql +
       this.whereSql(params) +
       this.orderLimitSql();
     return { sql };
