@@ -14,7 +14,7 @@ type TrendRow = {
 };
 
 async function loadTrends(): Promise<TrendRow[]> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return [];
+  if (!process.env.DATABASE_URL) return [];
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("trends")

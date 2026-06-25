@@ -14,7 +14,7 @@ type WatchRow = {
 };
 
 async function loadWatchlist(): Promise<WatchRow[]> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return [];
+  if (!process.env.DATABASE_URL) return [];
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("watchlist")

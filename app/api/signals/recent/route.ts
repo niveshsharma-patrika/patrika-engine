@@ -22,7 +22,7 @@ type SignalRow = {
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const lang = url.searchParams.get("lang") === "hi" ? "hi" : "en";
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ items: [] });
   }
 

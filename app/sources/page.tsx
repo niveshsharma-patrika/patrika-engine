@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 async function loadSources(): Promise<SourceRow[]> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return [];
+  if (!process.env.DATABASE_URL) return [];
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("sources")
@@ -21,7 +21,7 @@ async function loadSources(): Promise<SourceRow[]> {
 async function loadSignalCounts(
   sourceIds: string[]
 ): Promise<Record<string, number>> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || sourceIds.length === 0) return {};
+  if (!process.env.DATABASE_URL || sourceIds.length === 0) return {};
   const supabase = createAdminClient();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 

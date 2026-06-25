@@ -48,7 +48,7 @@ const SAMPLE_COLS =
   "id, title, body, story_type, publication, writer, source_url, notes, created_at, updated_at";
 
 export async function GET() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ samples: [], reason: "supabase_not_configured" });
   }
   const supabase = createAdminClient();
@@ -61,7 +61,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ error: "Supabase not configured" }, { status: 503 });
   }
   let body: {

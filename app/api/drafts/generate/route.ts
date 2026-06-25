@@ -25,7 +25,7 @@ async function loadStyleAssets(
 }> {
   const pub = (publication || "Patrika").trim();
   const isPatrika = /patrika/i.test(pub);
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return { guidelines: null, samples: [], publication: pub };
   }
   const supabase = createAdminClient();
@@ -354,7 +354,7 @@ async function resolveTrend(
   }
 
   // Live DB path: uuid id
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return null;
+  if (!process.env.DATABASE_URL) return null;
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("trends")
@@ -486,7 +486,7 @@ Rules:
 }
 
 export async function POST(req: Request) {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json(
       { error: "Supabase is not configured." },
       { status: 503 }

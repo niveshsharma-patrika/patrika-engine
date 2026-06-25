@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * an empty list (which is the diagnostic value).
  */
 export async function GET() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ run: null, sources: [], reason: "supabase_not_configured" });
   }
 

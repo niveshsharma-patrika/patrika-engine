@@ -25,7 +25,7 @@ type RunRow = {
  * "idle"  = last run succeeded, sitting between cron ticks.
  */
 export async function GET() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ state: "never", reason: "supabase_not_configured" });
   }
 

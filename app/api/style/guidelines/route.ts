@@ -18,7 +18,7 @@ type GuidelinesRow = {
 };
 
 export async function GET() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ guidelines: null, reason: "supabase_not_configured" });
   }
   const supabase = createAdminClient();
@@ -32,7 +32,7 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ error: "Supabase not configured" }, { status: 503 });
   }
   let body: { content?: string; notes?: string };

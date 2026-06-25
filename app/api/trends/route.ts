@@ -87,7 +87,7 @@ function isFillerStory(title: string): boolean {
  * raw article counts, so the 3-source rule is honest.
  */
 export async function GET(req: Request) {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ trends: [], reason: "supabase_not_configured" });
   }
 

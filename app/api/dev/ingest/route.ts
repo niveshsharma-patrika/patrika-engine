@@ -20,11 +20,11 @@ export async function GET() {
     );
   }
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json(
       {
         error:
-          "Supabase not configured. Set NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in .env.local first.",
+          "Database not configured. Set DATABASE_URL in .env first.",
       },
       { status: 503 }
     );

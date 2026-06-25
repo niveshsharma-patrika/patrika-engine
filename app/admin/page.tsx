@@ -33,7 +33,7 @@ type UsageRow = {
 };
 
 async function loadData() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return { providers: [], models: [], profiles: [], usage: [], pipeline: [] };
   }
   const supabase = createAdminClient();

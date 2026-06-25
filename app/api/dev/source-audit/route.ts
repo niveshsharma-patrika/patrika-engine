@@ -15,7 +15,7 @@ export async function GET() {
   if (process.env.NODE_ENV === "production") {
     return Response.json({ error: "Disabled in production" }, { status: 403 });
   }
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ error: "Supabase not configured" });
   }
 

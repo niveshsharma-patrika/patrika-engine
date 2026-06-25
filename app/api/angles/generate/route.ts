@@ -27,7 +27,7 @@ type SigRow = {
  * subsequent calls return the saved set unless { regenerate: true }.
  */
 export async function POST(req: Request) {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ error: "Supabase is not configured." }, { status: 503 });
   }
 
@@ -119,7 +119,7 @@ export async function POST(req: Request) {
  */
 export async function GET(req: Request) {
   const trendId = new URL(req.url).searchParams.get("trendId");
-  if (!trendId || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!trendId || !process.env.DATABASE_URL) {
     return Response.json({ angles: null });
   }
   try {

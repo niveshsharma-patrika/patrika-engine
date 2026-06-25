@@ -60,7 +60,7 @@ function pickStoryType(raw: string | undefined): string | null {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.DATABASE_URL) {
     return Response.json({ error: "Supabase not configured" }, { status: 503 });
   }
 
