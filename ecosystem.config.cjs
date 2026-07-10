@@ -8,7 +8,7 @@
 module.exports = {
   apps: [
     {
-      name: "patrika-engine",
+      name: "patrika-news-engine",
       script: ".next/standalone/server.js",
       cwd: __dirname,
       instances: 1,
