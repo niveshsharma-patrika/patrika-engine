@@ -17,7 +17,6 @@ import { pool } from "./index";
 const JSONB_COLS: Record<string, Set<string>> = {
   trends: new Set(["angles"]),
   ai_models: new Set(["capabilities"]),
-  watchlist: new Set(["handles"]),
   drafts: new Set(["generation_metadata"]),
   signals: new Set(["metadata"]),
   source_candidates: new Set(["evidence"]),

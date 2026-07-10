@@ -19,13 +19,11 @@ export const DICT = {
   navLastRun:         { en: "Today's news",   hi: "आज की ख़बरें" },
   navStats:           { en: "Stats",          hi: "आँकड़े" },
   navStyle:           { en: "Style module",   hi: "शैली मॉड्यूल" },
-  navWatchlist:       { en: "Watchlist",      hi: "वॉचलिस्ट" },
   navAdmin:           { en: "Admin",          hi: "एडमिन" },
   navUsers:           { en: "Users",          hi: "यूज़र्स" },
 
   // Sidebar sections
   system:             { en: "System",        hi: "सिस्टम" },
-  watchlistHits:      { en: "Watchlist hits", hi: "वॉचलिस्ट हिट्स" },
 
   // Section column heads
   trendingNow:        { en: "Trending now",  hi: "अभी ट्रेंडिंग" },
@@ -79,7 +77,6 @@ export const DICT = {
   pageSuggestions:     { en: "Editorial Suggestions", hi: "संपादकीय सुझाव" },
   pageSources:         { en: "Sources",               hi: "स्रोत" },
   pageStyle:           { en: "Style Module",          hi: "शैली मॉड्यूल" },
-  pageWatchlist:       { en: "Watchlist",             hi: "वॉचलिस्ट" },
   pageAdmin:           { en: "Admin",                 hi: "एडमिन" },
 
   // Trends Today page

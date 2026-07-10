@@ -9,7 +9,6 @@ import {
   Rss,
   History,
   Type,
-  Eye,
   ShieldCheck,
   Search,
   Languages,
@@ -30,14 +29,11 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string }> = [
   { href: "/sources/last-run",  icon: <History size={16} />,       key: "navLastRun" },
   { href: "/stats",             icon: <Activity size={16} />,      key: "navStats" },
   { href: "/style",             icon: <Type size={16} />,          key: "navStyle" },
-  { href: "/watchlist",         icon: <Eye size={16} />,           key: "navWatchlist" },
   { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin" },
   { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers" },
 ];
 
-const NAV_BADGES: Record<string, string | undefined> = {
-  "/watchlist": "42",
-};
+const NAV_BADGES: Record<string, string | undefined> = {};
 
 const SYSTEM_ROWS: Array<[string, string, "live" | "warn"]> = [
   ["Twitter / X", "—", "warn"],

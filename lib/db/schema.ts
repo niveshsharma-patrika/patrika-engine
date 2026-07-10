@@ -114,19 +114,6 @@ export const aiConfig = pgTable("ai_config", {
 		}),
 ]);
 
-export const watchlist = pgTable("watchlist", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	name: text().notNull(),
-	entityType: text("entity_type").notNull(),
-	handles: jsonb().default([]).notNull(),
-	alertsEnabled: boolean("alerts_enabled").default(true).notNull(),
-	hits30D: integer("hits_30d").default(0).notNull(),
-	lastHit: timestamp("last_hit", { withTimezone: true, mode: 'string' }),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
-}, (table) => [
-	check("watchlist_entity_type_check", sql`entity_type = ANY (ARRAY['person'::text, 'organization'::text, 'brand'::text])`),
-]);
-
 export const drafts = pgTable("drafts", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	trendId: uuid("trend_id"),
@@ -329,7 +316,6 @@ export const signals = pgTable("signals", {
 	ingestedAt: timestamp("ingested_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	metadata: jsonb().default({}),
 	topicId: uuid("topic_id"),
-	watchlistId: uuid("watchlist_id"),
 	description: text(),
 	keywords: text().array(),
 	publisherSection: text("publisher_section"),
@@ -349,11 +335,6 @@ export const signals = pgTable("signals", {
 			columns: [table.topicId],
 			foreignColumns: [trends.id],
 			name: "signals_topic_id_fkey"
-		}).onDelete("set null"),
-	foreignKey({
-			columns: [table.watchlistId],
-			foreignColumns: [watchlist.id],
-			name: "signals_watchlist_id_fkey"
 		}).onDelete("set null"),
 	unique("signals_source_external_unique").on(table.sourceId, table.externalId),
 ]);

@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { aiProviders, aiModels, aiConfig, trends, drafts, profiles, styleGuides, aiUsage, trendSearches, sources, signals, watchlist } from "./schema";
+import { aiProviders, aiModels, aiConfig, trends, drafts, profiles, styleGuides, aiUsage, trendSearches, sources, signals } from "./schema";
 
 export const aiModelsRelations = relations(aiModels, ({one, many}) => ({
 	aiProvider: one(aiProviders, {
@@ -110,16 +110,8 @@ export const signalsRelations = relations(signals, ({one}) => ({
 		fields: [signals.topicId],
 		references: [trends.id]
 	}),
-	watchlist: one(watchlist, {
-		fields: [signals.watchlistId],
-		references: [watchlist.id]
-	}),
 }));
 
 export const sourcesRelations = relations(sources, ({many}) => ({
-	signals: many(signals),
-}));
-
-export const watchlistRelations = relations(watchlist, ({many}) => ({
 	signals: many(signals),
 }));
