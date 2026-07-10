@@ -1,42 +1,72 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Copy data from the old Supabase Postgres into the new (Azure) Postgres.
+# Copy the CONFIG + CONTENT tables from the old Supabase Postgres into the new
+# Azure Postgres. Uses psql \copy (client-side COPY) — no pg_dump, so there is
+# NO client/server version dependency; it works across Postgres major versions.
 #
-#   SOURCE_URL   = Supabase direct connection string
-#                  (Supabase Dashboard → Project Settings → Database → Connection string → URI)
-#   DATABASE_URL = the new target Postgres (same value the app uses)
+# What it copies (everything that does NOT regenerate on its own), FK-safe order:
+#   ai_providers → ai_models → ai_config    AI model routing + system prompts
+#   sources                                 your RSS / Google-News feeds (~137)
+#   style_samples, style_guidelines         per-publication writing style
+#   pipeline_settings                       ingest feature toggles
+#   source_candidates, source_denylist      source-discovery state
 #
-#   SOURCE_URL='postgres://...' DATABASE_URL='postgres://...' bash deploy/migrate-data.sh
+# Deliberately NOT copied:
+#   trends, signals        — the live news; the ingest cron rebuilds these fresh
+#                            (copying them would just show stale, hours-old news)
+#   drafts, ai_usage       — reference old users/trends we don't carry over
+#   style_guides           — file links point at Supabase Storage (dead here)
+#   ingest_runs, trend_searches, watchlist — run history / removed feature
+#   profiles               — users are recreated natively via the admin UI
 #
-# Run AFTER the target schema is loaded:  psql "$DATABASE_URL" -f deploy/schema.sql
+# Assumes the target tables were freshly loaded and are EMPTY (schema.sql, no
+# data). To re-run cleanly, TRUNCATE the tables below first.
 #
-# It copies per table using the TARGET's column list, so the dropped
-# embedding/embedded_at columns are skipped automatically. `profiles` is NOT
-# copied — there are no Supabase users; create the admin with create-admin.ts.
+# Usage (from anywhere on the server):
+#   bash ~/patrika-news-engine/deploy/migrate-data.sh
+# It reads DATABASE_URL from the app's .env and prompts (hidden) for the
+# Supabase connection URI. SSL is forced for both ends.
 
-: "${SOURCE_URL:?set SOURCE_URL to the Supabase connection string}"
-: "${DATABASE_URL:?set DATABASE_URL to the target Postgres}"
+cd "$(dirname "$0")/.."
 
-# Parents before children (FK-safe).
+# Target = the app's own database (read from .env). Source = Supabase (prompted).
+if [ -z "${DATABASE_URL:-}" ]; then
+  DATABASE_URL=$(grep -E '^DATABASE_URL=' .env | head -1 | cut -d= -f2- \
+                 | sed -e 's/^["'\'']//' -e 's/["'\'']$//')
+fi
+: "${DATABASE_URL:?could not read DATABASE_URL from .env}"
+
+if [ -z "${SOURCE_URL:-}" ]; then
+  read -r -s -p "Supabase connection URI (Session pooler, port 5432): " SOURCE_URL
+  echo
+fi
+: "${SOURCE_URL:?SOURCE_URL (the Supabase connection URI) is required}"
+
+# Encrypt both connections; require (not verify-full) matches how the app connects.
+export PGSSLMODE="${PGSSLMODE:-require}"
+
 TABLES=(
   ai_providers ai_models ai_config
-  sources trends watchlist
-  signals drafts ai_usage
-  style_guides style_guidelines style_samples
-  pipeline_settings ingest_runs
-  source_candidates source_denylist api_keys trend_searches
+  sources
+  style_samples style_guidelines
+  pipeline_settings
+  source_candidates source_denylist
 )
 
+echo "── copying ${#TABLES[@]} tables, Supabase → Azure ──"
 for t in "${TABLES[@]}"; do
+  # Use the TARGET's column list so any source-only columns are ignored and the
+  # order always matches the destination.
   cols=$(psql "$DATABASE_URL" -tAc \
     "SELECT string_agg(quote_ident(column_name), ',' ORDER BY ordinal_position)
        FROM information_schema.columns
       WHERE table_schema='public' AND table_name='$t'")
-  if [ -z "$cols" ]; then echo "skip $t (not in target schema)"; continue; fi
-  echo "→ copying $t"
-  psql "$SOURCE_URL" -c "\copy (SELECT $cols FROM public.$t) TO STDOUT" \
+  if [ -z "$cols" ]; then echo "  skip $t (not in target schema)"; continue; fi
+  psql "$SOURCE_URL"     -c "\copy (SELECT $cols FROM public.$t) TO STDOUT" \
     | psql "$DATABASE_URL" -c "\copy public.$t ($cols) FROM STDIN"
+  n=$(psql "$DATABASE_URL" -tAc "SELECT count(*) FROM public.$t")
+  printf "  ✓ %-20s %s rows\n" "$t" "$n"
 done
 
 echo "✓ data copy complete"
