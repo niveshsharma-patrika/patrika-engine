@@ -15,7 +15,14 @@ export async function setSessionCookie(token: string): Promise<void> {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // Secure cookies are only kept by browsers over HTTPS. Default to secure in
+    // production, but allow COOKIE_SECURE=false to run over plain HTTP (e.g.
+    // behind a raw IP:port before a domain + TLS is set up). Flip it back once
+    // HTTPS is in place.
+    secure:
+      process.env.COOKIE_SECURE === "false"
+        ? false
+        : process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE,
