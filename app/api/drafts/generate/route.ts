@@ -436,7 +436,7 @@ ${baseContext}`,
 
 ${langDirective}
 
-Write an approximately ${wordCount}-word straight news report covering this story as breaking news. Style: factual newspaper-of-record. Match the voice and structure of the Patrika sample articles above.
+Write a full ${wordCount}-word straight news report covering this story as breaking news — write the complete piece and do not stop short of ${wordCount} words. Style: factual newspaper-of-record. Match the voice and structure of the Patrika sample articles above.
 
 ${baseContext}
 
@@ -466,7 +466,7 @@ STORY FORMAT: ${angleFormat}`,
 
 ${langDirective}
 
-Write an approximately ${wordCount}-word piece in the format of ${angleFormat}. Match the structure, density, and voice of the Patrika sample articles above.
+Write a full ${wordCount}-word piece in the format of ${angleFormat} — write the complete piece and do not stop short of ${wordCount} words. Match the structure, density, and voice of the Patrika sample articles above.
 
 This is NOT a straight news report — it's the Patrika take following the editorial angle below.
 
@@ -566,6 +566,19 @@ export async function POST(req: Request) {
   // through; the hard grounding rules still forbid inventing facts.
   const TEMPERATURE = isDistinctivePub ? 0.4 : 0.2;
 
+  // Token budget for the body. Without an explicit cap the AI SDK applies a
+  // small default (~1k tokens ≈ 250-300 words), so long drafts were silently
+  // truncated no matter what word count the editor asked for. maxOutputTokens is
+  // only a CEILING — the model writes to the requested length and stops — so we
+  // provision generously. Hindi (Devanagari) tokenizes to many more tokens per
+  // word than English, so the budget must scale with language or Hindi drafts clip.
+  const targetWords =
+    parsed.data.params?.wordCount ?? (parsed.data.mode === "factual" ? 500 : 600);
+  const bodyMaxTokens = Math.min(
+    12000,
+    Math.ceil(targetWords * (parsed.data.lang === "hi" ? 6 : 2)) + 400
+  );
+
   let headlineRes, body;
   try {
     // Several headline OPTIONS (structured) so the editor can pick one — a
@@ -583,6 +596,7 @@ export async function POST(req: Request) {
       system: drafting.systemPrompt ?? undefined,
       prompt: bodyPrompt,
       temperature: TEMPERATURE,
+      maxOutputTokens: bodyMaxTokens,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Generation failed.";
