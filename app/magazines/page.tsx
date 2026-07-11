@@ -1,12 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Lightbulb, Loader2, FileText, Copy, Check } from "lucide-react";
+import {
+  ArrowLeft, Lightbulb, Loader2, FileText, Copy, Check,
+  ShieldAlert, Landmark, Building2, Wheat, Scale, HeartHandshake,
+  HeartPulse, GraduationCap, Trophy, UtensilsCrossed, BookOpen,
+  type LucideIcon,
+} from "lucide-react";
 
 import { MAGAZINES } from "@/lib/magazines";
 import { useLang } from "@/lib/i18n/context";
 
 type Idea = { headline: string; subVertical: string; hook: string; benefit: string };
+
+// Themed cover per magazine (gradient + icon) — a stand-in visual until real
+// artwork is added.
+const VISUALS: Record<string, { from: string; to: string; Icon: LucideIcon }> = {
+  "crime-files":     { from: "#991b1b", to: "#450a0a", Icon: ShieldAlert },
+  "politics-power":  { from: "#4338ca", to: "#1e1b4b", Icon: Landmark },
+  "city-pulse":      { from: "#0d9488", to: "#134e4a", Icon: Building2 },
+  "rural-panchayat": { from: "#16a34a", to: "#14532d", Icon: Wheat },
+  "public-guide":    { from: "#2563eb", to: "#172554", Icon: Scale },
+  "nari-shakti":     { from: "#db2777", to: "#500724", Icon: HeartHandshake },
+  "health-plus":     { from: "#059669", to: "#064e3b", Icon: HeartPulse },
+  "ai-education":    { from: "#7c3aed", to: "#2e1065", Icon: GraduationCap },
+  "game-on":         { from: "#ea580c", to: "#7c2d12", Icon: Trophy },
+  "food-culture":    { from: "#d97706", to: "#78350f", Icon: UtensilsCrossed },
+};
+const FALLBACK_VISUAL = { from: "#6b7280", to: "#374151", Icon: BookOpen };
 
 export default function MagazinesPage() {
   const { lang } = useLang();
@@ -85,18 +106,29 @@ export default function MagazinesPage() {
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {MAGAZINES.map((m) => (
-            <button
-              key={m.key}
-              onClick={() => open(m.key)}
-              className="text-left bg-white border border-[var(--border)] rounded-lg p-4 hover:border-[var(--red)] hover:shadow-sm transition-colors"
-            >
-              <div className="text-[15px] font-semibold text-[var(--text)]">{m.nameHi}</div>
-              <div className="text-[11px] text-[var(--text-3)] uppercase tracking-wide mb-1.5">{m.nameEn}</div>
-              <div className="text-[12.5px] text-[var(--text-2)] leading-snug">{m.tagline}</div>
-              <div className="text-[11px] text-[var(--text-3)] mt-2">{m.reader} · {m.age}</div>
-            </button>
-          ))}
+          {MAGAZINES.map((m) => {
+            const v = VISUALS[m.key] ?? FALLBACK_VISUAL;
+            return (
+              <button
+                key={m.key}
+                onClick={() => open(m.key)}
+                className="text-left bg-white border border-[var(--border)] rounded-lg overflow-hidden hover:border-[var(--red)] hover:shadow-sm transition-colors"
+              >
+                <div
+                  className="h-24 flex items-center justify-center"
+                  style={{ background: `linear-gradient(135deg, ${v.from}, ${v.to})` }}
+                >
+                  <v.Icon size={34} strokeWidth={1.5} className="text-white/90" />
+                </div>
+                <div className="p-4">
+                  <div className="text-[15px] font-semibold text-[var(--text)]">{m.nameHi}</div>
+                  <div className="text-[11px] text-[var(--text-3)] uppercase tracking-wide mb-1.5">{m.nameEn}</div>
+                  <div className="text-[12.5px] text-[var(--text-2)] leading-snug">{m.tagline}</div>
+                  <div className="text-[11px] text-[var(--text-3)] mt-2">{m.reader} · {m.age}</div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </>
     );
