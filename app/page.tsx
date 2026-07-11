@@ -14,6 +14,8 @@ import {
   Loader2,
   Sparkles,
   RefreshCw,
+  Image as ImageIcon,
+  Download,
   type LucideIcon,
 } from "lucide-react";
 
@@ -513,6 +515,10 @@ export function Editor({ trend, title, setTitle, onClose }: {
   const [widgetError, setWidgetError] = useState<string | null>(null);
   // Auto-size the widget iframe to its content (widgets post their height).
   const [widgetHeight, setWidgetHeight] = useState(460);
+  // Article hero image (AI-generated, held as a data URL).
+  const [articleImage, setArticleImage] = useState<string | null>(null);
+  const [loadingImage, setLoadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const data = e.data as Record<string, unknown> | null;
@@ -637,6 +643,27 @@ export function Editor({ trend, title, setTitle, onClose }: {
       setSaveState("error");
     } finally {
       setTimeout(() => setSaveState("idle"), 2500);
+    }
+  }
+
+  async function genImage() {
+    const t = title.trim();
+    if (!t || loadingImage) return;
+    setLoadingImage(true);
+    setImageError(null);
+    try {
+      const res = await fetch("/api/drafts/image", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title: t }),
+      });
+      const json = await res.json();
+      if (res.ok && json.image) setArticleImage(json.image);
+      else setImageError(json.error ?? `Failed (${res.status})`);
+    } catch (e) {
+      setImageError(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setLoadingImage(false);
     }
   }
 
@@ -955,6 +982,50 @@ export function Editor({ trend, title, setTitle, onClose }: {
                 </span>
                 <span>{words > 0 ? `${Math.max(1, Math.round(words / 200))} min read` : ""}</span>
               </div>
+            </div>
+
+            {/* Article hero image — AI-generated from the headline */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-[14px] font-semibold flex items-center gap-1.5">
+                  <ImageIcon size={15} className="text-[var(--purple)]" />
+                  {lang === "hi" ? "आर्टिकल इमेज" : "Article image"}
+                </h4>
+                <div className="flex items-center gap-2">
+                  {articleImage && (
+                    <a
+                      href={articleImage}
+                      download="patrika-article.png"
+                      className="text-[12px] text-[var(--text-3)] hover:text-[var(--text)] flex items-center gap-1"
+                    >
+                      <Download size={13} /> {lang === "hi" ? "डाउनलोड" : "Download"}
+                    </a>
+                  )}
+                  <button
+                    onClick={genImage}
+                    disabled={loadingImage || !title.trim()}
+                    className="bg-[var(--purple)] text-white text-[12px] font-medium px-3 py-1.5 rounded flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {loadingImage ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                    {loadingImage
+                      ? lang === "hi" ? "बना रहे हैं…" : "Generating…"
+                      : articleImage
+                      ? lang === "hi" ? "फिर से बनाएँ" : "Regenerate"
+                      : lang === "hi" ? "इमेज बनाएँ" : "Generate image"}
+                  </button>
+                </div>
+              </div>
+              {imageError && <div className="text-[12px] text-[var(--red)] mb-2">{imageError}</div>}
+              {articleImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={articleImage} alt="" className="w-full rounded-xl border border-[var(--border)]" />
+              ) : (
+                <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center text-[12px] text-[var(--text-3)]">
+                  {lang === "hi"
+                    ? "हेडलाइन से एक आर्टिकल इमेज बनाएँ (उसमें कोई टेक्स्ट नहीं होगा)।"
+                    : "Generate an article image from the headline (no text baked in)."}
+                </div>
+              )}
             </div>
 
             {/* Interactive widget — AI picks the most engaging type for the story */}

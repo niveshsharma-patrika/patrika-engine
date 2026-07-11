@@ -377,6 +377,7 @@ Rules:
 - Attribute claims to the people / institutions in the story (police, officials, the company) — NEVER to the news outlets or agencies that reported it
 - Do NOT invent quotes or facts beyond the signals above
 - Do NOT use the suggested editorial angle — this draft is the straight report
+- Unless it is under ~300 words, break the report into sections with 2–4 short, descriptive subheadings — each on its own line, prefixed with "## " — so it is scannable
 - End with: [Factual draft · edit and verify before publishing.]`,
     };
   }
@@ -412,6 +413,7 @@ Rules:
 - Avoid generic news framing — the reader should know within 2 paragraphs why Patrika is covering this from THIS angle
 - Attribute factual claims to the people / institutions in the story, never to the outlets that carried them; opinion can come from the analysis itself but mark it as such
 - Don't invent quotes
+- Unless it is under ~300 words, break the piece into sections with 2–4 short, descriptive subheadings — each on its own line, prefixed with "## " — so it is scannable
 - End with: [Angle-driven draft (${angleFormat}) · edit and verify before publishing.]`,
   };
 }
@@ -433,6 +435,7 @@ DO:
 - Vary sentence length and rhythm — mix short, punchy lines with longer ones.
 - Use plain, direct newsroom language and concrete detail.
 - Keep EVERY fact, name, number and quote, the opening DATELINE, and the final bracketed [ … ] marker line exactly as they are.
+- Keep any "## " subheadings exactly as they are — same words, same positions.
 - Keep roughly the same length.
 
 DON'T:

@@ -34,6 +34,7 @@ type Row = {
   publisher_section: string | null;
   published_at: string | null;
   ingested_at: string | null;
+  metadata: Record<string, unknown> | null;
   source_name: string | null;
 };
 
@@ -76,7 +77,7 @@ export async function GET() {
   try {
     const res = await pool.query(
       `SELECT s.content, s.url, s.author, s.publisher_section, s.published_at, s.ingested_at,
-              src.name AS source_name
+              s.metadata, src.name AS source_name
          FROM signals s
          LEFT JOIN sources src ON src.id = s.source_id
         WHERE COALESCE(s.published_at, s.ingested_at) >= $1
@@ -92,7 +93,7 @@ export async function GET() {
     );
   }
 
-  type Story = { title: string; earliestMs: number; sources: Set<string>; url: string | null; section: string | null };
+  type Story = { title: string; earliestMs: number; sources: Set<string>; url: string | null; section: string | null; image: string | null };
   const byKey = new Map<string, Story>();
 
   for (const r of rows) {
@@ -103,6 +104,8 @@ export async function GET() {
     const key = titleKey(title);
     if (!key) continue;
     const pub = canonicalPublisherKey((r.author ?? r.source_name ?? "").trim()) || (r.source_name ?? "src");
+    const rawImg = r.metadata?.image;
+    const img = typeof rawImg === "string" && rawImg.startsWith("http") ? rawImg : null;
 
     const story = byKey.get(key);
     if (!story) {
@@ -112,15 +115,17 @@ export async function GET() {
         sources: new Set([pub]),
         url: r.url ?? null,
         section: r.publisher_section ?? null,
+        image: img,
       });
     } else {
       story.sources.add(pub);
       if (eff < story.earliestMs) story.earliestMs = eff;
       if (!story.url && r.url) story.url = r.url;
+      if (!story.image && img) story.image = img;
     }
   }
 
-  type OutStory = { title: string; sources: number; section: string | null; url: string | null; time: string; timeMs: number };
+  type OutStory = { title: string; sources: number; section: string | null; url: string | null; image: string | null; time: string; timeMs: number };
   const buckets = new Map<string, { sortKey: string; label: string; isToday: boolean; stories: OutStory[] }>();
 
   for (const s of byKey.values()) {
@@ -135,6 +140,7 @@ export async function GET() {
       sources: s.sources.size,
       section: s.section,
       url: s.url,
+      image: s.image,
       time: istClock(s.earliestMs),
       timeMs: s.earliestMs,
     });
@@ -150,7 +156,7 @@ export async function GET() {
         label: b.label,
         isToday: b.isToday,
         count: b.stories.length,
-        stories: b.stories.slice(0, 400).map(({ timeMs: _timeMs, ...rest }) => rest),
+        stories: b.stories.slice(0, 150).map(({ timeMs: _timeMs, ...rest }) => rest),
       };
     });
 
