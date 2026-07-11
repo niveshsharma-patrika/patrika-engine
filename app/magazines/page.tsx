@@ -115,10 +115,20 @@ export default function MagazinesPage() {
                 className="text-left bg-white border border-[var(--border)] rounded-lg overflow-hidden hover:border-[var(--red)] hover:shadow-sm transition-colors"
               >
                 <div
-                  className="h-24 flex items-center justify-center"
+                  className="h-24 flex items-center justify-center relative overflow-hidden"
                   style={{ background: `linear-gradient(135deg, ${v.from}, ${v.to})` }}
                 >
                   <v.Icon size={34} strokeWidth={1.5} className="text-white/90" />
+                  {/* AI-generated cover overlays the gradient; falls back to it if absent. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/magazines/${m.key}.png`}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                    }}
+                  />
                 </div>
                 <div className="p-4">
                   <div className="text-[15px] font-semibold text-[var(--text)]">{m.nameHi}</div>
