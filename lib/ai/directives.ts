@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { MAGAZINES, defaultIdeaPrompt, defaultContentPrompt } from "@/lib/magazines";
 
 /**
  * Writing Directives — the prompt text each generation control expands into.
@@ -36,6 +37,8 @@ export const DIRECTIVE_CONTROLS: Array<{ key: string; label: string; options: st
     "Lyse Doucet", "Jeremy Bowen", "Faisal Islam", "BBC News Correspondent",
     "Matt Levine", "John Authers", "Tyler Cowen", "Bloomberg Markets Reporter",
   ] },
+  { key: "magazineIdea",    label: "Magazine — Idea prompts",    options: MAGAZINES.map((m) => m.key) },
+  { key: "magazineContent", label: "Magazine — Content prompts", options: MAGAZINES.map((m) => m.key) },
 ];
 
 export const DEFAULT_DIRECTIVES: DirectiveMap = {
@@ -136,6 +139,8 @@ export const DEFAULT_DIRECTIVES: DirectiveMap = {
     "Tyler Cowen": "in the vein of Tyler Cowen — contrarian, idea-dense economics commentary",
     "Bloomberg Markets Reporter": "a Bloomberg markets reporter — numbers-led, terse, market-impact framing",
   },
+  magazineIdea: Object.fromEntries(MAGAZINES.map((m) => [m.key, defaultIdeaPrompt(m)])),
+  magazineContent: Object.fromEntries(MAGAZINES.map((m) => [m.key, defaultContentPrompt(m)])),
 };
 
 type OverrideRow = { control: string; option_value: string; directive: string };

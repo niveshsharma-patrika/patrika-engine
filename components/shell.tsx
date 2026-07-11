@@ -16,6 +16,7 @@ import {
   Activity,
   Users,
   Newspaper,
+  BookOpen,
   LogOut,
 } from "lucide-react";
 
@@ -34,6 +35,7 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: E
   { href: "/stats",             icon: <Activity size={16} />,      key: "navStats",       editions: ["digital"] },
   { href: "/style",             icon: <Type size={16} />,          key: "navStyle",       editions: ["digital"] },
   { href: "/directives",        icon: <SlidersHorizontal size={16} />, key: "navDirectives", editions: ["digital"] },
+  { href: "/magazines",         icon: <BookOpen size={16} />,      key: "navMagazines",   editions: ["digital"] },
   { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin",       editions: ["digital"] },
   { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers",       editions: ["digital"] },
 ];
