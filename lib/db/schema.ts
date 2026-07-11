@@ -363,3 +363,16 @@ export const styleSamples = pgTable("style_samples", {
 	index("idx_style_samples_publication").using("btree", table.publication.asc().nullsLast().op("text_ops")),
 	index("idx_style_samples_story_type").using("btree", table.storyType.asc().nullsLast().op("text_ops")),
 ]);
+
+// Per-(control, optionValue) OVERRIDES for the generation control prompts,
+// edited from the /directives page. Built-in wording lives in lib/ai/directives.ts;
+// only customised rows are stored here. See getEffectiveDirectives().
+export const writingDirectives = pgTable("writing_directives", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	control: text().notNull(),
+	optionValue: text("option_value").notNull(),
+	directive: text().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	unique("writing_directives_control_option_key").on(table.control, table.optionValue),
+]);

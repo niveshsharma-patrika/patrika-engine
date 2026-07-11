@@ -1,4 +1,6 @@
 import { generateObject, generateText } from "ai";
+
+import { getEffectiveDirectives, type DirectiveMap } from "@/lib/ai/directives";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 
@@ -201,104 +203,32 @@ type GenParams = NonNullable<z.infer<typeof Body>["params"]>;
 /** Turn the AI Enhancement controls into a STRONG editorial-framing block.
  * These DEFINE the tone/voice — the identical facts must read very differently
  * as the settings change. */
-function paramDirectives(p: GenParams | undefined): string {
+function paramDirectives(p: GenParams | undefined, D: DirectiveMap): string {
   if (!p) return "";
-  const URGENCY_DESC: Record<string, string> = {
-    Breaking: "URGENT breaking-news tone — immediacy, present tense, short high-tempo sentences, the feel of events unfolding right now.",
-    Ongoing: "a developing-story tone — current but measured; lead with 'here is the latest' and emphasise what has changed.",
-    Evergreen: "a calm, timeless explainer tone — ZERO urgency, written to read well on any day.",
-  };
-  const AUDIENCE_DESC: Record<string, string> = {
-    Niche: "a NICHE expert audience — assume domain knowledge, use precise terminology, skip the basics.",
-    Broad: "a BROAD mass audience — explain every term and piece of context in plain language, assume no prior knowledge.",
-    General: "a GENERAL news audience — clear and accessible, with light context where it helps.",
-  };
-  const TRENDING_DESC: Record<string, string> = {
-    High: "a HIGH-buzz, widely-watched story — write with momentum and energy.",
-    Medium: "a story of moderate interest — a steady, professional newsroom register.",
-    Low: "a low-buzz story — understated and matter-of-fact.",
-  };
-  const VOICE_DESC: Record<string, string> = {
-    "Brand-aligned": "Patrika's house brand voice.",
-    Neutral: "a neutral, impersonal news voice.",
-    "First-person": "a first-person reporter voice where it fits.",
-    Investigative: "a probing, investigative voice.",
-  };
-  const PUB_DESC: Record<string, string> = {
-    Patrika: "Patrika's standard newsroom house style.",
-    "Patrika House": "Patrika's standard newsroom house style.",
-    "New York Times":
-      "the New York Times house style — authoritative, deeply reported and literary. Open with a vivid scene or a sharp lead, then a clear nut graf on why it matters. Long, well-built sentences; precise, sophisticated vocabulary; scrupulous sourcing; a measured, intelligent 'paper of record' tone.",
-    Reuters:
-      "Reuters wire style — a strict inverted pyramid. Put who/what/when/where/why in the first one or two sentences. Spare, neutral, impartial prose; no adjectives of opinion; attribute every claim; short paragraphs; fast and factual; ~300-600 words. Never editorialise.",
-    "Al Jazeera":
-      "Al Jazeera English style — clear, accessible global journalism told from the Global South's vantage point. Lead with the human stakes, give rich historical and geopolitical context, foreground the voices of those affected, and explain the politics plainly. Empathetic but rigorous; avoid Western-centric framing.",
-    BBC:
-      "BBC News style — calm, impartial, plain authoritative English. Lead with the verified development; attribute carefully ('officials say', 'the BBC understands'); explain clearly for a broad global audience; fairly balance viewpoints; never sensationalise. Measured and trustworthy.",
-    Bloomberg:
-      "Bloomberg style — sharp business-and-markets journalism. Lead with the development and immediately answer 'what it means for markets and investors'; foreground numbers, money and market impact; tight, brisk sentences; data-rich; a dry, knowing, professional tone.",
-  };
-  const WRITER_DESC: Record<string, string> = {
-    // Patrika (generic role presets — Patrika's own bylines come later)
-    "Senior Reporter": "an authoritative senior reporter",
-    "Beat Correspondent": "a beat correspondent close to the sources",
-    "Data Journalist": "a data journalist foregrounding numbers and context",
-    Columnist: "an opinionated columnist (mark opinion clearly as such)",
-    "Features Writer": "a features writer with narrative flair",
-    // New York Times
-    "Thomas Friedman":
-      "in the vein of Thomas Friedman — big-picture foreign-affairs framing, vivid metaphors, a guiding thesis",
-    "Maureen Dowd":
-      "in the vein of Maureen Dowd — sharp, witty, culturally-attuned, pointed prose",
-    "Ross Douthat":
-      "in the vein of Ross Douthat — measured, philosophical, conservative-leaning analysis",
-    "David Brooks":
-      "in the vein of David Brooks — sociological, values-and-character, synthesising big ideas",
-    "NYT National Correspondent":
-      "an NYT national correspondent — scene-setting, deeply reported long-form",
-    // Reuters
-    "Reuters Markets Correspondent":
-      "a Reuters markets correspondent — numbers-first, terse, market-moving facts",
-    "Reuters World Correspondent":
-      "a Reuters world-desk correspondent — dateline-led, balanced, impartial",
-    "Reuters Breaking Desk":
-      "a Reuters breaking-news reporter — lead with the development, minimal adjectives",
-    // Al Jazeera
-    "Marwan Bishara":
-      "in the vein of Marwan Bishara — senior political analysis of geopolitics and the Middle East",
-    "Andrew Mitrovica":
-      "in the vein of Andrew Mitrovica — pointed, critical columnist voice",
-    "AJ Field Correspondent":
-      "an Al Jazeera field correspondent — human-centred, on-the-ground, Global-South context",
-    // BBC
-    "Lyse Doucet":
-      "in the vein of Lyse Doucet — humane international correspondent reporting from the ground",
-    "Jeremy Bowen":
-      "in the vein of Jeremy Bowen — analytical on-the-ground Middle East reportage",
-    "Faisal Islam":
-      "in the vein of Faisal Islam — clear, accessible economics explanation",
-    "BBC News Correspondent":
-      "a BBC news correspondent — neutral, balanced, carefully attributed",
-    // Bloomberg
-    "Matt Levine":
-      "in the vein of Matt Levine — witty, discursive, finance-explained-cleverly (Money Stuff voice)",
-    "John Authers":
-      "in the vein of John Authers — macro and markets analysis with historical context",
-    "Tyler Cowen":
-      "in the vein of Tyler Cowen — contrarian, idea-dense economics commentary",
-    "Bloomberg Markets Reporter":
-      "a Bloomberg markets reporter — numbers-led, terse, market-impact framing",
-  };
+  // Expand a control value into its directive text — the editor's override
+  // (already merged into D) if any, otherwise the built-in default (also in D),
+  // falling back to the bare value. Wording lives in lib/ai/directives.ts.
+  const g = (control: string, val?: string | null): string | undefined =>
+    val ? D[control]?.[val] ?? val : undefined;
   const lines: string[] = [];
-  if (p.tone) lines.push(`- BASE TONE: ${p.tone}. Let this dominate the writing.`);
-  if (p.urgency) lines.push(`- URGENCY: ${URGENCY_DESC[p.urgency] ?? p.urgency}`);
-  if (p.audienceFit) lines.push(`- AUDIENCE: ${AUDIENCE_DESC[p.audienceFit] ?? p.audienceFit}`);
-  if (p.trendingScore) lines.push(`- BUZZ LEVEL: ${TRENDING_DESC[p.trendingScore] ?? p.trendingScore}`);
-  if (p.voice) lines.push(`- VOICE: ${VOICE_DESC[p.voice] ?? p.voice}`);
-  if (p.readability) lines.push(`- READABILITY: write at a ${p.readability} reading level — pitch vocabulary and sentence length accordingly.`);
-  if (p.leadStyle) lines.push(`- LEAD/OPENING: open with a ${p.leadStyle}-style lead.`);
-  if (p.publication) lines.push(`- PUBLICATION STYLE: ${PUB_DESC[p.publication] ?? p.publication}.`);
-  if (p.writer) lines.push(`- WRITE AS: ${WRITER_DESC[p.writer] ?? p.writer}.`);
+  const tone = g("tone", p.tone);
+  if (tone) lines.push(`- BASE TONE: ${tone} Let this dominate the writing.`);
+  const urgency = g("urgency", p.urgency);
+  if (urgency) lines.push(`- URGENCY: ${urgency}`);
+  const audience = g("audience", p.audienceFit);
+  if (audience) lines.push(`- AUDIENCE: ${audience}`);
+  const trending = g("trending", p.trendingScore);
+  if (trending) lines.push(`- BUZZ LEVEL: ${trending}`);
+  const voice = g("voice", p.voice);
+  if (voice) lines.push(`- VOICE: ${voice}`);
+  const readability = g("readability", p.readability);
+  if (readability) lines.push(`- READABILITY: ${readability}`);
+  const leadStyle = g("leadStyle", p.leadStyle);
+  if (leadStyle) lines.push(`- LEAD/OPENING: ${leadStyle}`);
+  const publication = g("publication", p.publication);
+  if (publication) lines.push(`- PUBLICATION STYLE: ${publication}`);
+  const writer = g("writer", p.writer);
+  if (writer) lines.push(`- WRITE AS: ${writer}.`);
   if (lines.length === 0) return "";
   return `═══════════════════════════════════════════
 EDITORIAL FRAMING — these DEFINE the tone & voice. Adopt them STRICTLY: the
@@ -387,6 +317,7 @@ function buildPrompts(
   lang: "en" | "hi",
   styleBlock: string,
   grounding: string,
+  directives: DirectiveMap,
   selectedAngle?: SelectedAngle | null,
   params?: GenParams
 ) {
@@ -401,9 +332,9 @@ function buildPrompts(
   const nTitles = params?.numberOfTitles ?? 4;
   const wordCount = params?.wordCount ?? (mode === "factual" ? 500 : 600);
   const headlineHint = params?.headlineType
-    ? ` Make the headlines ${params.headlineType} in style.`
+    ? ` ${directives.headlineType?.[params.headlineType] ?? `Make the headlines ${params.headlineType} in style.`}`
     : "";
-  const directives = paramDirectives(params);
+  const framing = paramDirectives(params, directives);
   const langDirective =
     lang === "hi"
       ? "Write in HINDI (Devanagari script). Match Patrika's Hindi newsroom voice."
@@ -420,7 +351,7 @@ ${trend.signals.map((s, i) => `[${i + 1}] ${s.text}`).join("\n") || "(no reports
 
   // Style assets + grounding rules go at the TOP of every prompt so the
   // model sees them before any task-specific instructions.
-  const preamble = [styleBlock, grounding, directives].filter(Boolean).join("\n\n");
+  const preamble = [styleBlock, grounding, framing].filter(Boolean).join("\n\n");
 
   if (mode === "factual") {
     return {
@@ -550,12 +481,14 @@ export async function POST(req: Request) {
   const grounding = groundingRules(parsed.data.lang);
 
   const nTitles = parsed.data.params?.numberOfTitles ?? 4;
+  const directives = await getEffectiveDirectives();
   const { headlinePrompt, bodyPrompt } = buildPrompts(
     trend,
     parsed.data.mode,
     parsed.data.lang,
     styleBlock,
     grounding,
+    directives,
     parsed.data.angle,
     parsed.data.params
   );

@@ -19,6 +19,7 @@ export const DICT = {
   navLastRun:         { en: "Today's news",   hi: "आज की ख़बरें" },
   navStats:           { en: "Stats",          hi: "आँकड़े" },
   navStyle:           { en: "Style module",   hi: "शैली मॉड्यूल" },
+  navDirectives:      { en: "Writing Directives", hi: "लेखन निर्देश" },
   navAdmin:           { en: "Admin",          hi: "एडमिन" },
   navUsers:           { en: "Users",          hi: "यूज़र्स" },
 

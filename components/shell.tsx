@@ -9,6 +9,7 @@ import {
   Rss,
   History,
   Type,
+  SlidersHorizontal,
   ShieldCheck,
   Search,
   Languages,
@@ -29,6 +30,7 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string }> = [
   { href: "/sources/last-run",  icon: <History size={16} />,       key: "navLastRun" },
   { href: "/stats",             icon: <Activity size={16} />,      key: "navStats" },
   { href: "/style",             icon: <Type size={16} />,          key: "navStyle" },
+  { href: "/directives",        icon: <SlidersHorizontal size={16} />, key: "navDirectives" },
   { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin" },
   { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers" },
 ];
