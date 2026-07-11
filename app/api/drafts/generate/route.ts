@@ -416,6 +416,31 @@ Rules:
   };
 }
 
+const HUMANIZE_SYSTEM =
+  "You are a senior newspaper sub-editor. You rewrite AI-generated copy so it reads like a human staff journalist wrote it — natural, varied and publishable — without changing any facts.";
+
+/** Instruction for the humanizer pass — rewrite for a natural human voice while
+ * preserving every fact, the dateline, the closing [ … ] marker and the language. */
+function humanizeInstruction(lang: "en" | "hi"): string {
+  const langLine =
+    lang === "hi"
+      ? "The article is in HINDI — keep it entirely in Hindi (Devanagari)."
+      : "The article is in ENGLISH — keep it entirely in English.";
+  return `Rewrite the news article below so it reads like a human journalist wrote it, not an AI.
+${langLine}
+
+DO:
+- Vary sentence length and rhythm — mix short, punchy lines with longer ones.
+- Use plain, direct newsroom language and concrete detail.
+- Keep EVERY fact, name, number and quote, the opening DATELINE, and the final bracketed [ … ] marker line exactly as they are.
+- Keep roughly the same length.
+
+DON'T:
+- Don't add any new fact, name, number or quote.
+- Don't use AI-tell phrases such as "in conclusion", "moreover", "furthermore", "it is important to note", "delve", "tapestry", "in today's fast-paced world", "navigate the landscape", "plays a crucial role".
+- Don't add headings, labels or commentary. Return ONLY the rewritten article.`;
+}
+
 export async function POST(req: Request) {
   if (!process.env.DATABASE_URL) {
     return Response.json(
@@ -549,10 +574,28 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .slice(0, nTitles);
 
+  // Auto-humanize: a second pass rewrites the draft to read like a human wrote
+  // it (facts, dateline and the closing marker preserved by the prompt).
+  // Best-effort — if it fails or comes back too short, keep the original draft.
+  let bodyText = body.text.trim();
+  try {
+    const humanized = await generateText({
+      model: drafting.model,
+      system: HUMANIZE_SYSTEM,
+      prompt: `${humanizeInstruction(parsed.data.lang)}\n\n---\n${bodyText}`,
+      temperature: 0.75,
+      maxOutputTokens: bodyMaxTokens,
+    });
+    const cleaned = humanized.text.trim();
+    if (cleaned.length >= Math.min(120, bodyText.length * 0.5)) bodyText = cleaned;
+  } catch {
+    // keep the original draft
+  }
+
   return Response.json({
     title: titles[0] ?? "",
     titles,
-    body: body.text.trim(),
+    body: bodyText,
     mode: parsed.data.mode,
     meta: {
       provider: drafting.providerKey,

@@ -461,39 +461,6 @@ function EnhGroup({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function ScoreRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-[var(--text-3)]">{label}:</span>
-      <b className="text-[var(--text)] font-semibold">{value}</b>
-    </div>
-  );
-}
-
-/** Lightweight client-side CTR heuristic for the Title Score panel. */
-function ctrScore(s: string): number {
-  const v = s.trim();
-  if (!v) return 0;
-  const words = v.split(/\s+/).length;
-  let score = 45;
-  if (words >= 8 && words <= 14) score += 22;
-  else if (words <= 16) score += 10;
-  if (/\d/.test(v)) score += 8;
-  if (/[?:]/.test(v)) score += 6;
-  if (/\b(breaking|exclusive|revealed|why|how|crisis|first|major|delay|big)\b/i.test(v)) score += 8;
-  return Math.min(92, score);
-}
-
-/** Quick lexicon-based sentiment for the Title Score panel. */
-function sentimentOf(s: string): string {
-  const v = s.toLowerCase();
-  const pos = (v.match(/\b(win|wins|won|boost|surge|record|launch|hope|relief|success|growth|gain|breakthrough|celebrate|rescue|safe|approve|revival|cheer|honour|award)\b/g) || []).length;
-  const neg = (v.match(/\b(death|dead|killed|crash|delay|delayed|crisis|fail|failed|loss|attack|fraud|scam|arrest|fire|blast|protest|ban|fear|threat|tragedy|injured|slump|fall|fell|row|clash|probe|outrage)\b/g) || []).length;
-  if (neg > pos) return "Negative";
-  if (pos > neg) return "Positive";
-  return "Neutral";
-}
-
 function Editor({ trend, title, setTitle, onClose }: {
   trend: Trend | null;
   title: string;
@@ -960,21 +927,6 @@ function Editor({ trend, title, setTitle, onClose }: {
                 </div>
               </div>
             )}
-
-            <div className="bg-white border border-[var(--border)] rounded-xl p-5 mb-6">
-              <h4 className="text-[14px] font-semibold flex items-center gap-1.5 mb-4">
-                <span className="text-[var(--text-3)]">ⓘ</span>
-                {lang === "hi" ? "शीर्षक स्कोर" : "Title Score"}
-              </h4>
-              <div className="grid grid-cols-2 gap-y-3.5 gap-x-6 text-[13px]">
-                <ScoreRow label={lang === "hi" ? "CTR स्कोर" : "CTR Score"} value={title.trim() ? `${ctrScore(title)}%` : "—"} />
-                <ScoreRow label="Tone" value={tone} />
-                <ScoreRow label="Sentiment" value={title.trim() ? sentimentOf(title) : "N/A"} />
-                <ScoreRow label="Word Count" value={title.trim() ? `${title.trim().split(/\s+/).length} words` : "—"} />
-                <ScoreRow label="Audience Fit" value={audienceFit} />
-                <ScoreRow label="Headline Type" value={headlineType.toLowerCase()} />
-              </div>
-            </div>
 
             <div className="bg-white border border-[var(--border)] rounded-xl p-6 relative">
               <textarea
