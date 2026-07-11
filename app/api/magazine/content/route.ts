@@ -9,9 +9,6 @@ import { MAGAZINE_BY_KEY } from "@/lib/magazines";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const HUMANIZE =
-  "इस लेख को फिर से लिखो ताकि यह किसी अनुभवी इंसानी पत्रकार का लिखा लगे, AI का नहीं — वाक्यों की लंबाई और लय में विविधता, सहज प्रवाह। कोई भी तथ्य, नाम, आंकड़ा या '[सोर्स/लिंक जोड़ें]' मार्कर न बदलें; वही भाषा (हिंदी) और लगभग वही लंबाई रखें। सिर्फ फिर से लिखा हुआ लेख लौटाओ, कोई टिप्पणी नहीं।";
-
 /**
  * POST /api/magazine/content — Layer 3: write a full premium article on a chosen
  * topic using the magazine's (editable) content-generation prompt, then run the
@@ -61,23 +58,6 @@ export async function POST(req: Request) {
       { error: rateLimited ? "AI rate limit — wait a few seconds and retry." : `Failed: ${msg.slice(0, 200)}` },
       { status: 503 }
     );
-  }
-
-  // Auto-humanize (best-effort — keep original if it fails or comes back short).
-  try {
-    const h = await generateText({
-      model: model.model,
-      prompt: `${HUMANIZE}\n\n---\n${text}`,
-      temperature: 0.9,
-      topP: 0.92,
-      frequencyPenalty: 0.4,
-      presencePenalty: 0.3,
-      maxOutputTokens,
-    });
-    const cleaned = h.text.trim();
-    if (cleaned.length >= Math.min(200, text.length * 0.5)) text = cleaned;
-  } catch {
-    /* keep original */
   }
 
   return Response.json({ body: text, magazine: mag.nameEn });

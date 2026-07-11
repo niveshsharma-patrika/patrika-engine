@@ -23,8 +23,9 @@ export async function POST(req: Request) {
 
   const model = process.env.IMAGE_MODEL ?? "gpt-image-1";
   const prompt =
-    `A clean, modern editorial news illustration for this story: "${title}". ` +
-    `Tasteful, publishable as an article hero image, realistic Indian context where relevant. ` +
+    `A realistic editorial news PHOTOGRAPH illustrating this story: "${title}". ` +
+    `Photojournalistic press photo — natural lighting, real people and real settings, authentic Indian context, shot on a DSLR with shallow depth of field. ` +
+    `NOT an illustration, NOT a cartoon, NOT 3D-rendered, NOT a painting. ` +
     `Absolutely NO text, no words, no letters, no numbers, no watermark, no logos.`;
 
   try {

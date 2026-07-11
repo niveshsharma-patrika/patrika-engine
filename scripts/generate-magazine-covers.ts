@@ -24,19 +24,19 @@ const FORCE = process.env.FORCE === "1";
 const OUT_DIR = join(process.cwd(), "public", "magazines");
 
 const STYLE =
-  "flat modern editorial magazine cover illustration, premium Indian newsroom aesthetic, rich saturated colours, clean composition, absolutely NO text, no words, no letters, no numbers, no watermark, no logos";
+  "realistic editorial photograph, photojournalistic, natural lighting, authentic Indian context, shot on a DSLR with shallow depth of field, premium magazine cover photo — NOT an illustration, not a cartoon, not 3D-rendered, not a painting; absolutely NO text, no words, no letters, no numbers, no watermark, no logos";
 
 const COVERS: Array<{ key: string; prompt: string }> = [
-  { key: "crime-files", prompt: `a magnifying glass over case files with a night city skyline, investigative crime mood, deep crimson and charcoal, ${STYLE}` },
-  { key: "politics-power", prompt: `an Indian legislative assembly building with a podium and ballot-box motifs, indigo and slate blue, ${STYLE}` },
-  { key: "city-pulse", prompt: `a busy Indian city street with traffic signals and apartment buildings, teal and dark green, ${STYLE}` },
-  { key: "rural-panchayat", prompt: `an Indian village landscape with green fields, a water well and a panchayat building, warm greens, ${STYLE}` },
-  { key: "public-guide", prompt: `government documents, a rupee coin, scales of justice and a checklist, royal blue, ${STYLE}` },
-  { key: "nari-shakti", prompt: `a confident Indian woman silhouette surrounded by symbols of career, finance and health, magenta and rose, ${STYLE}` },
-  { key: "health-plus", prompt: `wellness motifs — a heartbeat line, a healthy Indian thali and a yoga pose, emerald green, ${STYLE}` },
-  { key: "ai-education", prompt: `students with books and a laptop with abstract AI neural-network motifs, violet and deep purple, ${STYLE}` },
-  { key: "game-on", prompt: `athletes on a running track with a trophy and cricket and kabaddi motifs, energetic orange, ${STYLE}` },
-  { key: "food-culture", prompt: `a traditional Indian food thali with spices in a bustling bazaar, warm amber and saffron, ${STYLE}` },
+  { key: "crime-files", prompt: `a detective's desk at night with paper case files and a magnifying glass, a city skyline glowing through a window, moody investigative atmosphere, ${STYLE}` },
+  { key: "politics-power", prompt: `the grand facade of an Indian state legislative assembly building at dusk, columns and flags, ${STYLE}` },
+  { key: "city-pulse", prompt: `a busy Indian city street at rush hour with traffic, an auto-rickshaw and signals, apartment buildings behind, ${STYLE}` },
+  { key: "rural-panchayat", prompt: `an Indian village at golden hour — green wheat fields, a hand-pump well and a farmer walking a dirt path, ${STYLE}` },
+  { key: "public-guide", prompt: `an ordinary Indian citizen holding documents at a government service counter, a helpful clerk across the desk, ${STYLE}` },
+  { key: "nari-shakti", prompt: `a confident Indian woman professional in her thirties in a bright modern office, looking to camera, ${STYLE}` },
+  { key: "health-plus", prompt: `a fit Indian woman doing yoga on a mat at sunrise beside a healthy home-cooked thali, ${STYLE}` },
+  { key: "ai-education", prompt: `Indian school and college students studying together around a laptop in a bright classroom, ${STYLE}` },
+  { key: "game-on", prompt: `an Indian athlete sprinting on a stadium running track under floodlights, motion and effort, ${STYLE}` },
+  { key: "food-culture", prompt: `a colourful traditional Indian thali of regional dishes and spices on a wooden table, top-down food photography, ${STYLE}` },
 ];
 
 async function generate(prompt: string): Promise<Buffer> {
