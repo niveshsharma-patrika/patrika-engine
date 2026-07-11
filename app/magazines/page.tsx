@@ -98,7 +98,7 @@ export default function MagazinesPage() {
     return (
       <>
         <div className="pb-4 mb-6 border-b border-[var(--border)]">
-          <h1 className="text-2xl font-medium">{lang === "hi" ? "मैगज़ीन" : "Magazines"}</h1>
+          <h1 className="text-2xl font-medium">{lang === "hi" ? "पत्रिका+ विशेष कंटेंट" : "Patrika+ Special Content"}</h1>
           <p className="text-[13px] text-[var(--text-3)] mt-1 max-w-2xl">
             {lang === "hi"
               ? "10 प्रीमियम कंटेंट पॉकेट्स — मैगज़ीन चुनें, टॉपिक-आइडिया जनरेट करें, फिर पूरा आर्टिकल लिखवाएं। प्रॉम्प्ट Writing Directives में एडिट करें।"
@@ -151,7 +151,7 @@ export default function MagazinesPage() {
         onClick={() => setSelected(null)}
         className="flex items-center gap-1.5 text-[13px] text-[var(--text-3)] hover:text-[var(--text)] mb-4"
       >
-        <ArrowLeft size={14} /> {lang === "hi" ? "सभी मैगज़ीन" : "All magazines"}
+        <ArrowLeft size={14} /> {lang === "hi" ? "वापस" : "Back"}
       </button>
 
       <div className="pb-4 mb-5 border-b border-[var(--border)]">

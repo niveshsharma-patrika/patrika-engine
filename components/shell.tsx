@@ -24,6 +24,7 @@ import type { Edition } from "@/lib/auth/jwt";
 import { useLang } from "@/lib/i18n/context";
 import { IngestStatus } from "@/components/ingest-status";
 import { LiveTicker } from "@/components/live-ticker";
+import { KairosMark } from "@/components/kairos-logo";
 
 const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: Edition[] }> = [
   { href: "/",                  icon: <LayoutGrid size={16} />,    key: "navDashboard",   editions: ["digital"] },
@@ -69,15 +70,18 @@ export function Shell({ children, edition }: { children: React.ReactNode; editio
       {/* Masthead */}
       <header className="sticky top-0 z-50 flex items-center justify-between gap-8 px-6 py-3.5 bg-[var(--surface)] border-b border-[var(--border)]">
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-11 h-11 grid place-items-center bg-[var(--red)] text-white font-bold text-[26px] rounded leading-none shadow-[inset_0_-3px_0_rgba(0,0,0,0.18)] group-hover:bg-[var(--red-hover)] transition-colors">
-            P
-          </div>
+          <KairosMark size={44} />
           <div className="leading-tight">
-            <h1 className="text-[22px] font-bold tracking-tight text-[var(--text)] leading-none">
-              {lang === "hi" ? "पत्रिका" : "Patrika"}
+            <h1 className="text-[21px] tracking-tight text-[var(--text)] leading-none">
+              <span className="font-medium text-[var(--text-2)]">
+                {lang === "hi" ? "पत्रिका " : "Patrika "}
+              </span>
+              <span className="font-bold text-[var(--red)]">
+                {lang === "hi" ? "कैरोस" : "Kairos"}
+              </span>
             </h1>
-            <p className="text-[11px] text-[var(--text-3)] mt-1 tracking-wide uppercase font-medium">
-              {lang === "hi" ? "न्यूज़ इंजन" : "News engine"}
+            <p className="text-[10px] text-[var(--text-3)] mt-1.5 tracking-[0.2em] uppercase font-semibold">
+              {lang === "hi" ? "न्यूज़ इंजन" : "News Engine"}
             </p>
           </div>
         </Link>

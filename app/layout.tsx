@@ -20,7 +20,7 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Patrika Engine — Editorial Command",
+  title: "Patrika Kairos — News Engine",
   description:
     "Trends, suggestions, and AI-assisted drafting for the Patrika newsroom.",
 };

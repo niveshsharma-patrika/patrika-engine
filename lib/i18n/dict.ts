@@ -21,7 +21,7 @@ export const DICT = {
   navStats:           { en: "Stats",          hi: "आँकड़े" },
   navStyle:           { en: "Style module",   hi: "शैली मॉड्यूल" },
   navDirectives:      { en: "Writing Directives", hi: "लेखन निर्देश" },
-  navMagazines:       { en: "Magazines",      hi: "मैगज़ीन" },
+  navMagazines:       { en: "Patrika+ Special Content", hi: "पत्रिका+ विशेष कंटेंट" },
   navAdmin:           { en: "Admin",          hi: "एडमिन" },
   navUsers:           { en: "Users",          hi: "यूज़र्स" },
 

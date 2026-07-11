@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { KairosMark } from "@/components/kairos-logo";
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -40,10 +42,17 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[var(--surface-2)] px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="text-2xl font-bold tracking-tight text-[var(--text-1)]">
-            Patrika Engine
+          <div className="flex justify-center mb-3">
+            <KairosMark size={52} />
           </div>
-          <div className="text-[13px] text-[var(--text-3)] mt-1">
+          <div className="text-2xl tracking-tight">
+            <span className="font-medium text-[var(--text-2)]">Patrika </span>
+            <span className="font-bold text-[var(--red)]">Kairos</span>
+          </div>
+          <div className="text-[10px] text-[var(--text-3)] mt-1 tracking-[0.2em] uppercase font-semibold">
+            News Engine
+          </div>
+          <div className="text-[13px] text-[var(--text-3)] mt-3">
             Sign in to continue
           </div>
         </div>
