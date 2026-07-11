@@ -19,7 +19,7 @@ if (!KEY) {
   console.error("Set OPENAI_API_KEY.");
   process.exit(1);
 }
-const MODEL = process.env.IMAGE_MODEL ?? "dall-e-3";
+const MODEL = process.env.IMAGE_MODEL ?? "gpt-image-1";
 const FORCE = process.env.FORCE === "1";
 const OUT_DIR = join(process.cwd(), "public", "magazines");
 
@@ -41,17 +41,14 @@ const COVERS: Array<{ key: string; prompt: string }> = [
 
 async function generate(prompt: string): Promise<Buffer> {
   const isGpt = MODEL.startsWith("gpt-image");
+  // Minimal body — the images API rejects extra params like response_format.
+  // dall-e-3 returns a temporary URL; gpt-image-1 returns b64_json. Handle both.
   const body: Record<string, unknown> = {
     model: MODEL,
     prompt,
     n: 1,
     size: isGpt ? "1536x1024" : "1792x1024",
   };
-  if (isGpt) body.quality = "medium";
-  else {
-    body.response_format = "b64_json";
-    body.quality = "standard";
-  }
 
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
@@ -59,10 +56,15 @@ async function generate(prompt: string): Promise<Buffer> {
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 300)}`);
-  const json = (await res.json()) as { data?: Array<{ b64_json?: string }> };
-  const b64 = json.data?.[0]?.b64_json;
-  if (!b64) throw new Error("no image in response");
-  return Buffer.from(b64, "base64");
+  const json = (await res.json()) as { data?: Array<{ b64_json?: string; url?: string }> };
+  const item = json.data?.[0];
+  if (item?.b64_json) return Buffer.from(item.b64_json, "base64");
+  if (item?.url) {
+    const img = await fetch(item.url);
+    if (!img.ok) throw new Error(`image download ${img.status}`);
+    return Buffer.from(await img.arrayBuffer());
+  }
+  throw new Error("no image in response");
 }
 
 async function main() {
@@ -88,7 +90,9 @@ async function main() {
       console.log(`FAILED: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  console.log("done.");
+  console.log("done. Raw PNGs written to public/magazines/.");
+  console.log("Now optimise to .jpg for the web — the cards load /magazines/<key>.jpg (macOS):");
+  console.log('  for f in public/magazines/*.png; do sips -Z 1024 -s format jpeg "$f" --out "${f%.png}.jpg" && rm "$f"; done');
 }
 
 main();

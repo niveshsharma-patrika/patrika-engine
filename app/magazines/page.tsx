@@ -122,7 +122,7 @@ export default function MagazinesPage() {
                   {/* AI-generated cover overlays the gradient; falls back to it if absent. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/magazines/${m.key}.png`}
+                    src={`/magazines/${m.key}.jpg`}
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={(e) => {
