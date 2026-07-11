@@ -7,6 +7,7 @@ type User = {
   email: string | null;
   fullName: string;
   role: string;
+  edition: string;
   desk: string | null;
   isActive: boolean;
   createdAt: string | null;
@@ -19,6 +20,8 @@ const ROLE_LABEL: Record<string, string> = {
   sub_editor: "Sub editor",
   reporter: "Reporter",
 };
+const EDITIONS = ["digital", "print"];
+const EDITION_LABEL: Record<string, string> = { digital: "Digital", print: "Print" };
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -30,6 +33,7 @@ export default function UsersPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("reporter");
+  const [edition, setEdition] = useState("digital");
   const [password, setPassword] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -56,7 +60,7 @@ export default function UsersPage() {
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, email, role, password }),
+        body: JSON.stringify({ fullName, email, role, edition, password }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -65,6 +69,7 @@ export default function UsersPage() {
         setFullName("");
         setEmail("");
         setRole("reporter");
+        setEdition("digital");
         setPassword("");
         await load();
       }
@@ -126,7 +131,7 @@ export default function UsersPage() {
       {/* Add user */}
       <form
         onSubmit={addUser}
-        className="bg-white border border-[var(--border)] rounded-xl p-4 mb-6 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end"
+        className="bg-white border border-[var(--border)] rounded-xl p-4 mb-6 grid grid-cols-1 sm:grid-cols-6 gap-3 items-end"
       >
         <div className="sm:col-span-1">
           <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">Full name</label>
@@ -145,6 +150,14 @@ export default function UsersPage() {
           </select>
         </div>
         <div className="sm:col-span-1">
+          <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">Edition</label>
+          <select className={input} value={edition} onChange={(e) => setEdition(e.target.value)}>
+            {EDITIONS.map((ed) => (
+              <option key={ed} value={ed}>{EDITION_LABEL[ed]}</option>
+            ))}
+          </select>
+        </div>
+        <div className="sm:col-span-1">
           <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">Initial password</label>
           <input className={input} type="text" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
         </div>
@@ -158,7 +171,7 @@ export default function UsersPage() {
             {adding ? "Adding…" : "Add user"}
           </button>
         </div>
-        {err && <div className="sm:col-span-5 text-[12px] text-red-600">{err}</div>}
+        {err && <div className="sm:col-span-6 text-[12px] text-red-600">{err}</div>}
       </form>
 
       {/* User list */}
@@ -172,6 +185,7 @@ export default function UsersPage() {
                 <th className="text-left font-medium px-4 py-2.5">Name</th>
                 <th className="text-left font-medium px-4 py-2.5">Email</th>
                 <th className="text-left font-medium px-4 py-2.5">Role</th>
+                <th className="text-left font-medium px-4 py-2.5">Edition</th>
                 <th className="text-left font-medium px-4 py-2.5">Status</th>
                 <th className="text-right font-medium px-4 py-2.5">Actions</th>
               </tr>
@@ -189,6 +203,17 @@ export default function UsersPage() {
                     >
                       {ROLES.map((r) => (
                         <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <select
+                      value={u.edition}
+                      onChange={(e) => patch(u.id, { edition: e.target.value })}
+                      className="bg-transparent border border-[var(--border)] rounded-md px-2 py-1 text-[12px]"
+                    >
+                      {EDITIONS.map((ed) => (
+                        <option key={ed} value={ed}>{EDITION_LABEL[ed]}</option>
                       ))}
                     </select>
                   </td>

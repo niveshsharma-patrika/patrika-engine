@@ -3,6 +3,7 @@ import { Roboto, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { LangProvider } from "@/lib/i18n/context";
 import { Shell } from "@/components/shell";
+import { getSession } from "@/lib/auth/session";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -24,9 +25,10 @@ export const metadata: Metadata = {
     "Trends, suggestions, and AI-assisted drafting for the Patrika newsroom.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const session = await getSession();
   return (
     <html
       lang="en"
@@ -34,7 +36,7 @@ export default function RootLayout({
     >
       <body className="min-h-full antialiased">
         <LangProvider>
-          <Shell>{children}</Shell>
+          <Shell edition={session?.edition ?? "digital"}>{children}</Shell>
         </LangProvider>
       </body>
     </html>

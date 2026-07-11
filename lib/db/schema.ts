@@ -167,6 +167,7 @@ export const profiles = pgTable("profiles", {
 	isActive: boolean("is_active").default(true).notNull(),
 	fullName: text("full_name").notNull(),
 	role: text().default('reporter').notNull(),
+	edition: text().default('digital').notNull(),
 	desk: text(),
 	telegramHandle: text("telegram_handle"),
 	telegramChatId: text("telegram_chat_id"),
@@ -175,6 +176,7 @@ export const profiles = pgTable("profiles", {
 }, (table) => [
 	unique("profiles_email_key").on(table.email),
 	check("profiles_role_check", sql`role = ANY (ARRAY['admin'::text, 'desk_head'::text, 'sub_editor'::text, 'reporter'::text])`),
+	check("profiles_edition_check", sql`edition = ANY (ARRAY['print'::text, 'digital'::text])`),
 ]);
 
 export const styleGuides = pgTable("style_guides", {

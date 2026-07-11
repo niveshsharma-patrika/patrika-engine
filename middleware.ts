@@ -33,6 +33,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Print-edition users get a reduced surface — only Trends today + All Stories
+  // (plus the APIs their pages call). Any other page redirects to /today.
+  if (session.edition === "print" && !pathname.startsWith("/api/")) {
+    const printOk =
+      pathname === "/today" ||
+      pathname === "/all-stories" ||
+      pathname.startsWith("/today/") ||
+      pathname.startsWith("/all-stories/");
+    if (!printOk) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/today";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   return NextResponse.next();
 }
 

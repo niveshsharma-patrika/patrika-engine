@@ -21,6 +21,7 @@ import { useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n/context";
 import { TrendCard } from "@/components/trend-card";
 import { TrendDrawer } from "@/components/trend-drawer";
+import { Editor } from "@/app/page";
 import type { Trend } from "@/lib/data/trends";
 
 // Threshold above which a trend on /today is shown as "dimmed" (no longer live).
@@ -32,6 +33,11 @@ export default function TodayPage() {
   const [trends, setTrends] = useState<Trend[]>([]);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [openTrend, setOpenTrend] = useState<Trend | null>(null);
+  // Writing (with angles) is available from here too — Print-edition users only
+  // have Trends today + All Stories, so the Editor must be reachable on /today.
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorTrend, setEditorTrend] = useState<Trend | null>(null);
+  const [editorTitle, setEditorTitle] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -107,8 +113,21 @@ export default function TodayPage() {
         <TrendDrawer
           trend={openTrend}
           onClose={() => setOpenTrend(null)}
-          onGenerate={() => {}}
-          readOnly
+          onGenerate={() => {
+            setEditorTrend(openTrend);
+            setEditorTitle(openTrend.title);
+            setEditorOpen(true);
+            setOpenTrend(null);
+          }}
+        />
+      )}
+
+      {editorOpen && (
+        <Editor
+          trend={editorTrend}
+          title={editorTitle}
+          setTitle={setEditorTitle}
+          onClose={() => setEditorOpen(false)}
         />
       )}
     </>

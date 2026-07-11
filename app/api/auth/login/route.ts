@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
-import { createSessionToken, type Role } from "@/lib/auth/jwt";
+import { createSessionToken, type Role, type Edition } from "@/lib/auth/jwt";
 import { setSessionCookie } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -40,10 +40,11 @@ export async function POST(req: Request) {
     email: user.email ?? email,
     name: user.fullName,
     role: user.role as Role,
+    edition: (user.edition as Edition) ?? "digital",
   });
   await setSessionCookie(token);
   return Response.json({
     ok: true,
-    user: { name: user.fullName, role: user.role },
+    user: { name: user.fullName, role: user.role, edition: user.edition },
   });
 }

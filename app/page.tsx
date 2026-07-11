@@ -461,7 +461,7 @@ function EnhGroup({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Editor({ trend, title, setTitle, onClose }: {
+export function Editor({ trend, title, setTitle, onClose }: {
   trend: Trend | null;
   title: string;
   setTitle: (v: string) => void;

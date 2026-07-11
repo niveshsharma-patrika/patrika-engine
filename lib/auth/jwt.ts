@@ -8,11 +8,13 @@ export const SESSION_COOKIE = "patrika_session";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 export type Role = "admin" | "desk_head" | "sub_editor" | "reporter";
+export type Edition = "print" | "digital";
 export type Session = {
   userId: string;
   email: string;
   name: string;
   role: Role;
+  edition: Edition;
 };
 
 function secret(): Uint8Array {
@@ -22,7 +24,7 @@ function secret(): Uint8Array {
 }
 
 export async function createSessionToken(s: Session): Promise<string> {
-  return new SignJWT({ email: s.email, name: s.name, role: s.role })
+  return new SignJWT({ email: s.email, name: s.name, role: s.role, edition: s.edition })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(s.userId)
     .setIssuedAt()
@@ -38,6 +40,7 @@ export async function verifySessionToken(token: string): Promise<Session | null>
       email: String(payload.email ?? ""),
       name: String(payload.name ?? ""),
       role: (payload.role as Role) ?? "reporter",
+      edition: (payload.edition as Edition) ?? "digital",
     };
   } catch {
     return null;

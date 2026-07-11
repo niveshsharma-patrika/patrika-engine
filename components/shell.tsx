@@ -15,24 +15,27 @@ import {
   Languages,
   Activity,
   Users,
+  Newspaper,
   LogOut,
 } from "lucide-react";
 
+import type { Edition } from "@/lib/auth/jwt";
 import { useLang } from "@/lib/i18n/context";
 import { IngestStatus } from "@/components/ingest-status";
 import { LiveTicker } from "@/components/live-ticker";
 
-const NAV: Array<{ href: string; icon: React.ReactNode; key: string }> = [
-  { href: "/",                  icon: <LayoutGrid size={16} />,    key: "navDashboard" },
-  { href: "/today",             icon: <CalendarDays size={16} />,  key: "navToday" },
-  { href: "/suggestions",       icon: <Lightbulb size={16} />,     key: "navSuggestions" },
-  { href: "/sources",           icon: <Rss size={16} />,           key: "navSources" },
-  { href: "/sources/last-run",  icon: <History size={16} />,       key: "navLastRun" },
-  { href: "/stats",             icon: <Activity size={16} />,      key: "navStats" },
-  { href: "/style",             icon: <Type size={16} />,          key: "navStyle" },
-  { href: "/directives",        icon: <SlidersHorizontal size={16} />, key: "navDirectives" },
-  { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin" },
-  { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers" },
+const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: Edition[] }> = [
+  { href: "/",                  icon: <LayoutGrid size={16} />,    key: "navDashboard",   editions: ["digital"] },
+  { href: "/today",             icon: <CalendarDays size={16} />,  key: "navToday",       editions: ["digital", "print"] },
+  { href: "/all-stories",       icon: <Newspaper size={16} />,     key: "navAllStories",  editions: ["digital", "print"] },
+  { href: "/suggestions",       icon: <Lightbulb size={16} />,     key: "navSuggestions", editions: ["digital"] },
+  { href: "/sources",           icon: <Rss size={16} />,           key: "navSources",     editions: ["digital"] },
+  { href: "/sources/last-run",  icon: <History size={16} />,       key: "navLastRun",     editions: ["digital"] },
+  { href: "/stats",             icon: <Activity size={16} />,      key: "navStats",       editions: ["digital"] },
+  { href: "/style",             icon: <Type size={16} />,          key: "navStyle",       editions: ["digital"] },
+  { href: "/directives",        icon: <SlidersHorizontal size={16} />, key: "navDirectives", editions: ["digital"] },
+  { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin",       editions: ["digital"] },
+  { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers",       editions: ["digital"] },
 ];
 
 const NAV_BADGES: Record<string, string | undefined> = {};
@@ -44,9 +47,10 @@ const SYSTEM_ROWS: Array<[string, string, "live" | "warn"]> = [
   ["Style module", "v2.4", "live"],
 ];
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children, edition }: { children: React.ReactNode; edition: Edition }) {
   const pathname = usePathname();
   const { lang, setLang, t } = useLang();
+  const nav = NAV.filter((n) => n.editions.includes(edition));
 
   // Auth pages (login) render standalone — no masthead / sidebar chrome.
   if (pathname === "/login") {
@@ -114,10 +118,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <aside className="border-r border-[var(--border)] bg-[var(--surface)] py-4 flex flex-col gap-4">
           <div className="px-3">
             <ul className="space-y-0.5 list-none">
-              {NAV.map((item) => {
+              {nav.map((item) => {
                 // Pick the longest matching href so /sources/last-run highlights
                 // only "Last run" and not also "Sources".
-                const candidates = NAV.filter((n) =>
+                const candidates = nav.filter((n) =>
                   n.href === "/" ? pathname === "/" : pathname.startsWith(n.href)
                 );
                 const bestMatch = candidates.reduce(

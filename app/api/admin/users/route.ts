@@ -23,6 +23,7 @@ export async function GET() {
       email: schema.profiles.email,
       fullName: schema.profiles.fullName,
       role: schema.profiles.role,
+      edition: schema.profiles.edition,
       desk: schema.profiles.desk,
       isActive: schema.profiles.isActive,
       createdAt: schema.profiles.createdAt,
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
   const email = (body?.email ?? "").toString().trim().toLowerCase();
   const fullName = (body?.fullName ?? "").toString().trim();
   const role = ROLES.includes(body?.role) ? body.role : "reporter";
+  const edition = body?.edition === "print" ? "print" : "digital";
   const password = (body?.password ?? "").toString();
   const desk = body?.desk ? body.desk.toString().trim() : null;
 
@@ -61,12 +63,13 @@ export async function POST(req: Request) {
   const passwordHash = await hashPassword(password);
   const [user] = await db
     .insert(schema.profiles)
-    .values({ email, fullName, role, desk, passwordHash, isActive: true })
+    .values({ email, fullName, role, edition, desk, passwordHash, isActive: true })
     .returning({
       id: schema.profiles.id,
       email: schema.profiles.email,
       fullName: schema.profiles.fullName,
       role: schema.profiles.role,
+      edition: schema.profiles.edition,
     });
   return Response.json({ user });
 }

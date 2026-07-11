@@ -26,6 +26,7 @@ export async function PATCH(
   if (typeof body?.fullName === "string") update.fullName = body.fullName.trim();
   if (typeof body?.desk === "string") update.desk = body.desk.trim() || null;
   if (ROLES.includes(body?.role)) update.role = body.role;
+  if (body?.edition === "print" || body?.edition === "digital") update.edition = body.edition;
   if (typeof body?.isActive === "boolean") update.isActive = body.isActive;
   if (typeof body?.password === "string" && body.password.length >= 6) {
     update.passwordHash = await hashPassword(body.password);
