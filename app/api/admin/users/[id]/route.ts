@@ -32,13 +32,16 @@ export async function PATCH(
     update.passwordHash = await hashPassword(body.password);
   }
 
-  // Lockout guard: an admin can't demote or disable their own account.
+  // Lockout guard: an admin can't demote, switch to Print (loses admin nav),
+  // or disable their own account.
   if (
     id === admin.userId &&
-    ((update.role && update.role !== "admin") || update.isActive === false)
+    ((update.role && update.role !== "admin") ||
+      update.isActive === false ||
+      update.edition === "print")
   ) {
     return Response.json(
-      { error: "You can't change your own admin role or disable your own account." },
+      { error: "You can't change your own admin role or edition, or disable your own account." },
       { status: 400 }
     );
   }
