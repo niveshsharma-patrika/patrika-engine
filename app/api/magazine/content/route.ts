@@ -68,7 +68,10 @@ export async function POST(req: Request) {
     const h = await generateText({
       model: model.model,
       prompt: `${HUMANIZE}\n\n---\n${text}`,
-      temperature: 0.75,
+      temperature: 0.9,
+      topP: 0.92,
+      frequencyPenalty: 0.4,
+      presencePenalty: 0.3,
       maxOutputTokens,
     });
     const cleaned = h.text.trim();

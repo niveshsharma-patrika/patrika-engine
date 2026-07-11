@@ -419,29 +419,40 @@ Rules:
 }
 
 const HUMANIZE_SYSTEM =
-  "You are a senior newspaper sub-editor. You rewrite AI-generated copy so it reads like a human staff journalist wrote it — natural, varied and publishable — without changing any facts.";
+  "You are a veteran Indian newspaper sub-editor who rewrites copy so it reads unmistakably like a human staff journalist — uneven, textured, alive — never like polished AI output. You never change a single fact.";
 
-/** Instruction for the humanizer pass — rewrite for a natural human voice while
- * preserving every fact, the dateline, the closing [ … ] marker and the language. */
+/** Instruction for the humanizer pass — rewrite for a genuinely human, hard-to-
+ * detect voice while preserving every fact, dateline, subheading, marker + language. */
 function humanizeInstruction(lang: "en" | "hi"): string {
   const langLine =
     lang === "hi"
-      ? "The article is in HINDI — keep it entirely in Hindi (Devanagari)."
+      ? "The article is in HINDI — keep it entirely in Hindi (Devanagari), and write the way a Rajasthan-desk reporter actually speaks (bolchaal), not stiff textbook शुद्ध Hindi."
       : "The article is in ENGLISH — keep it entirely in English.";
-  return `Rewrite the news article below so it reads like a human journalist wrote it, not an AI.
-${langLine}
+  const hindiTells =
+    lang === "hi"
+      ? "\n- हिंदी के AI-टेल भी हटाओ: 'गौरतलब है कि' की भरमार, 'निष्कर्षतः', 'यह ध्यान देने योग्य है कि', 'एक ओर… वहीं दूसरी ओर' जैसा संतुलित ढाँचा, और ज़रूरत से ज़्यादा किताबी/औपचारिक हिंदी।"
+      : "";
+  return `Rewrite the news article below so a careful reader — AND an AI-detection tool — would take it as human-written, not AI-generated. ${langLine}
 
-DO:
-- Vary sentence length and rhythm — mix short, punchy lines with longer ones.
-- Use plain, direct newsroom language and concrete detail.
-- Keep EVERY fact, name, number and quote, the opening DATELINE, and the final bracketed [ … ] marker line exactly as they are.
-- Keep any "## " subheadings exactly as they are — same words, same positions.
-- Keep roughly the same length.
+Make it HUMAN and UNEVEN (this is what defeats detectors — high burstiness, high perplexity):
+- Vary sentence length HARD. Follow a long, winding sentence with a blunt three-word one. Never let two sentences in a row share the same rhythm.
+- Vary paragraph length too — some a single line, some four or five.
+- Use everyday, spoken words, contractions, the odd sentence fragment, a rhetorical question, a direct aside to the reader.
+- Choose the specific, slightly unexpected word over the smooth predictable one. Name the concrete thing.
+- Active voice, strong plain verbs.
 
-DON'T:
-- Don't add any new fact, name, number or quote.
-- Don't use AI-tell phrases such as "in conclusion", "moreover", "furthermore", "it is important to note", "delve", "tapestry", "in today's fast-paced world", "navigate the landscape", "plays a crucial role".
-- Don't add headings, labels or commentary. Return ONLY the rewritten article.`;
+KILL every AI tell:
+- No "moreover / furthermore / in conclusion / it is important to note / delve / tapestry / navigate the landscape / plays a crucial role / in today's fast-paced world / a testament to".
+- No tidy rule-of-three lists, no balanced this-vs-that constructions, no closing sentence that just restates the opening.
+- Don't be perfectly organised or perfectly smooth — a little human unevenness is the whole point.${hindiTells}
+
+KEEP EXACT — do not touch:
+- Every fact, name, number, date and quote.
+- The opening DATELINE and the final bracketed [ … ] marker line.
+- Every "## " subheading — same words, same place.
+- Roughly the same length and the same language.
+
+Return ONLY the rewritten article — no preamble, no notes.`;
 }
 
 export async function POST(req: Request) {
@@ -581,16 +592,32 @@ export async function POST(req: Request) {
   // it (facts, dateline and the closing marker preserved by the prompt).
   // Best-effort — if it fails or comes back too short, keep the original draft.
   let bodyText = body.text.trim();
+  let humanized = false;
+  // The humanize pass matters most for detection, so use the strongest model
+  // available (gpt-4.1) with high temperature + penalties for real burstiness
+  // and perplexity — a same-model, low-temp rewrite barely shifts the AI
+  // fingerprint. Falls back to the drafting model if there's no OpenAI key.
+  const humanizeModel = process.env.OPENAI_API_KEY
+    ? createOpenAI({ apiKey: process.env.OPENAI_API_KEY })(
+        process.env.HUMANIZE_MODEL ?? "gpt-4.1"
+      )
+    : drafting.model;
   try {
-    const humanized = await generateText({
-      model: drafting.model,
+    const rewrite = await generateText({
+      model: humanizeModel,
       system: HUMANIZE_SYSTEM,
       prompt: `${humanizeInstruction(parsed.data.lang)}\n\n---\n${bodyText}`,
-      temperature: 0.75,
+      temperature: 0.9,
+      topP: 0.92,
+      frequencyPenalty: 0.4,
+      presencePenalty: 0.3,
       maxOutputTokens: bodyMaxTokens,
     });
-    const cleaned = humanized.text.trim();
-    if (cleaned.length >= Math.min(120, bodyText.length * 0.5)) bodyText = cleaned;
+    const cleaned = rewrite.text.trim();
+    if (cleaned.length >= Math.min(120, bodyText.length * 0.5)) {
+      bodyText = cleaned;
+      humanized = true;
+    }
   } catch {
     // keep the original draft
   }
@@ -604,6 +631,7 @@ export async function POST(req: Request) {
       provider: drafting.providerKey,
       model: drafting.modelKey,
       temperature: TEMPERATURE,
+      humanized,
       inputTokens:
         (headlineRes.usage?.inputTokens ?? 0) + (body.usage?.inputTokens ?? 0),
       outputTokens:
