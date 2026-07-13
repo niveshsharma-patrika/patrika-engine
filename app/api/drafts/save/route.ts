@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,10 @@ export async function POST(req: Request) {
   if (!process.env.DATABASE_URL) {
     return Response.json({ error: "Supabase is not configured." }, { status: 503 });
   }
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const json = await req.json().catch(() => null);
   const parsed = Body.safeParse(json);
   if (!parsed.success) {
@@ -34,14 +39,21 @@ export async function POST(req: Request) {
 
   const supabase = createAdminClient();
   const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
+  // Pull the (large) image data-URL into its own column so the list query can
+  // cheaply flag "has image" without reading it; keep settings + widget in meta.
+  const metaObj: Record<string, unknown> = { ...(meta ?? {}) };
+  const image = typeof metaObj.image === "string" ? (metaObj.image as string) : null;
+  delete metaObj.image;
   const row = {
     trend_id: trendId ?? null,
+    author_id: session.userId,
     title,
     body,
     status,
     desk: desk ?? null,
     word_count: wordCount,
-    generation_metadata: meta ?? {},
+    image_url: image,
+    generation_metadata: metaObj,
     updated_at: new Date().toISOString(),
   };
 
@@ -50,6 +62,7 @@ export async function POST(req: Request) {
       .from("drafts")
       .update(row)
       .eq("id", draftId)
+      .eq("author_id", session.userId)
       .select("id")
       .maybeSingle();
     if (error) return Response.json({ error: error.message }, { status: 500 });

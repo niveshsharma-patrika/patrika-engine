@@ -629,6 +629,9 @@ export function Editor({ trend, title, setTitle, onClose }: {
             writer,
             wordCount,
             angle: selectedAngle ?? null,
+            image: articleImage,
+            widgetHtml,
+            widgetType,
           },
         }),
       });

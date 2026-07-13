@@ -39,8 +39,10 @@ export async function middleware(request: NextRequest) {
     const printOk =
       pathname === "/today" ||
       pathname === "/all-stories" ||
+      pathname === "/generated" ||
       pathname.startsWith("/today/") ||
-      pathname.startsWith("/all-stories/");
+      pathname.startsWith("/all-stories/") ||
+      pathname.startsWith("/generated/");
     if (!printOk) {
       const url = request.nextUrl.clone();
       url.pathname = "/today";

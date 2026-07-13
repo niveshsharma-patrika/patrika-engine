@@ -15,6 +15,7 @@ export const DICT = {
   navDashboard:       { en: "Dashboard",      hi: "डैशबोर्ड" },
   navToday:           { en: "Trends today",   hi: "आज के ट्रेंड" },
   navAllStories:      { en: "All Stories",    hi: "सभी ख़बरें" },
+  navGenerated:       { en: "My Articles",    hi: "मेरे लेख" },
   navSuggestions:     { en: "Suggestions",    hi: "सुझाव" },
   navSources:         { en: "Sources",        hi: "स्रोत" },
   navLastRun:         { en: "Today's news",   hi: "आज की ख़बरें" },
