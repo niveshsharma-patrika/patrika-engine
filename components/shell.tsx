@@ -172,25 +172,28 @@ export function Shell({ children, edition, role }: { children: React.ReactNode; 
             </ul>
           </div>
 
-          <div className="px-3">
-            <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-3)] font-medium mx-3 mb-2">
-              {t("system")}
-            </h4>
-            <ul className="space-y-2 px-3 text-[13px] text-[var(--text-2)] list-none">
-              {SYSTEM_ROWS.map(([name, count, state]) => (
-                <li key={name} className="flex items-center gap-2.5">
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ background: state === "warn" ? "var(--amber)" : "var(--green)" }}
-                  />
-                  {name}
-                  <span className="ml-auto font-mono text-[11px] text-[var(--text-3)]">
-                    {count}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* System status is an admin-only glance — editors/writers don't see it. */}
+          {role === "admin" && (
+            <div className="px-3">
+              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-3)] font-medium mx-3 mb-2">
+                {t("system")}
+              </h4>
+              <ul className="space-y-2 px-3 text-[13px] text-[var(--text-2)] list-none">
+                {SYSTEM_ROWS.map(([name, count, state]) => (
+                  <li key={name} className="flex items-center gap-2.5">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ background: state === "warn" ? "var(--amber)" : "var(--green)" }}
+                    />
+                    {name}
+                    <span className="ml-auto font-mono text-[11px] text-[var(--text-3)]">
+                      {count}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </aside>
 
         <main className="p-7 pb-20 min-w-0">{children}</main>
