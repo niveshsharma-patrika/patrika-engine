@@ -15,7 +15,11 @@ module.exports = {
       exec_mode: "fork",
       node_args: "--env-file=.env",
       env: { NODE_ENV: "production" },
-      max_memory_restart: "600M",
+      // Image generation holds a ~2 MB base64 payload in memory; a 600M cap let
+      // PM2 kill the process mid-request, so nginx returned an HTML error page
+      // and the client saw "Unexpected token '<'". 1.5G gives headroom.
+      // (If the VM is small — check `free -m` — lower this to ~1024M.)
+      max_memory_restart: "1500M",
       time: true,
     },
   ],

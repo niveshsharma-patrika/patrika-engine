@@ -47,7 +47,8 @@ cp -r public       .next/standalone/public
 pm2 start ecosystem.config.cjs
 pm2 save
 ```
-Check it: `pm2 logs patrika-engine` and `curl -I http://127.0.0.1:3007`
+Check it: `pm2 logs patrika-news-engine` and `curl -I http://127.0.0.1:3007`
+(The PM2 process is named **patrika-news-engine** — from `ecosystem.config.cjs`. Run `pm2 list` any time you're unsure.)
 
 ## 5. Create the first admin
 ```bash
@@ -74,15 +75,31 @@ crontab -e
 
 ## 8. Verify
 - Visit `https://engine.patrika.com` → sign in → the six feed tabs load.
-- `pm2 logs patrika-engine` shows ingest ticks every 5 min with no errors.
+- `pm2 logs patrika-news-engine` shows ingest ticks every 5 min with no errors.
 - Generate a draft + an interactive widget to confirm the AI keys work.
 
 ## Redeploying after a code change
 ```bash
-git pull
-npm ci && npm run build
+# 1. get the new code — confirm the branch + a clean tree first, verify the pull landed
+git branch --show-current            # aws-rds-migration
+git status --porcelain               # must be empty (else `git stash` first)
+git pull --ff-only origin aws-rds-migration
+git log -1 --oneline                 # confirm the commit you expect is now HEAD
+
+# 2. build FIRST — if this fails, STOP here; the running app is untouched and stays up
+npm ci && npm run build              # must print "Compiled successfully"
 cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public
-pm2 restart patrika-engine
+
+# 3. if this deploy ships a DB migration, run it now — after the build, right before the restart
+#    (minimises the window where the old code meets the new schema)
+#    psql '<DATABASE_URL from .env, single-quoted>' -f deploy/<migration>.sql
+
+# 4. restart (single fork process → expect a ~2-3s 502 blip; deploy off-peak)
+pm2 restart patrika-news-engine
+#    ...but if you changed ecosystem.config.cjs (e.g. max_memory_restart), the plain
+#    restart won't re-read it — use this instead so the new settings apply:
+#    pm2 restart ecosystem.config.cjs --update-env && pm2 save
+pm2 logs patrika-news-engine --lines 40
 ```
 
 ## Rollback
