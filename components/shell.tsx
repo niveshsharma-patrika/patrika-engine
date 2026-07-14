@@ -21,26 +21,27 @@ import {
   LogOut,
 } from "lucide-react";
 
-import type { Edition } from "@/lib/auth/jwt";
+import type { Edition, Role } from "@/lib/auth/jwt";
 import { useLang } from "@/lib/i18n/context";
 import { IngestStatus } from "@/components/ingest-status";
 import { LiveTicker } from "@/components/live-ticker";
 import { KairosMark } from "@/components/kairos-logo";
 
-const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: Edition[] }> = [
+// `roles` omitted = visible to everyone; otherwise only those roles see it.
+const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: Edition[]; roles?: Role[] }> = [
   { href: "/",                  icon: <LayoutGrid size={16} />,    key: "navDashboard",   editions: ["digital"] },
   { href: "/today",             icon: <CalendarDays size={16} />,  key: "navToday",       editions: ["digital", "print"] },
   { href: "/all-stories",       icon: <Newspaper size={16} />,     key: "navAllStories",  editions: ["digital", "print"] },
   { href: "/generated",         icon: <FileText size={16} />,      key: "navGenerated",   editions: ["digital", "print"] },
   { href: "/suggestions",       icon: <Lightbulb size={16} />,     key: "navSuggestions", editions: ["digital"] },
-  { href: "/sources",           icon: <Rss size={16} />,           key: "navSources",     editions: ["digital"] },
+  { href: "/sources",           icon: <Rss size={16} />,           key: "navSources",     editions: ["digital"], roles: ["admin"] },
   { href: "/sources/last-run",  icon: <History size={16} />,       key: "navLastRun",     editions: ["digital"] },
-  { href: "/stats",             icon: <Activity size={16} />,      key: "navStats",       editions: ["digital"] },
-  { href: "/style",             icon: <Type size={16} />,          key: "navStyle",       editions: ["digital"] },
-  { href: "/directives",        icon: <SlidersHorizontal size={16} />, key: "navDirectives", editions: ["digital"] },
+  { href: "/stats",             icon: <Activity size={16} />,      key: "navStats",       editions: ["digital"], roles: ["admin", "editor"] },
+  { href: "/style",             icon: <Type size={16} />,          key: "navStyle",       editions: ["digital"], roles: ["admin", "editor"] },
+  { href: "/directives",        icon: <SlidersHorizontal size={16} />, key: "navDirectives", editions: ["digital"], roles: ["admin"] },
   { href: "/magazines",         icon: <BookOpen size={16} />,      key: "navMagazines",   editions: ["digital"] },
-  { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin",       editions: ["digital"] },
-  { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers",       editions: ["digital"] },
+  { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin",       editions: ["digital"], roles: ["admin"] },
+  { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers",       editions: ["digital"], roles: ["admin", "editor"] },
 ];
 
 const NAV_BADGES: Record<string, string | undefined> = {};
@@ -52,10 +53,12 @@ const SYSTEM_ROWS: Array<[string, string, "live" | "warn"]> = [
   ["Style module", "v2.4", "live"],
 ];
 
-export function Shell({ children, edition }: { children: React.ReactNode; edition: Edition }) {
+export function Shell({ children, edition, role }: { children: React.ReactNode; edition: Edition; role: Role }) {
   const pathname = usePathname();
   const { lang, setLang, t } = useLang();
-  const nav = NAV.filter((n) => n.editions.includes(edition));
+  const nav = NAV.filter(
+    (n) => n.editions.includes(edition) && (!n.roles || n.roles.includes(role))
+  );
 
   // Auth pages (login) render standalone — no masthead / sidebar chrome.
   if (pathname === "/login") {

@@ -13,18 +13,18 @@ type User = {
   createdAt: string | null;
 };
 
-const ROLES = ["admin", "desk_head", "sub_editor", "reporter"];
+const ROLES = ["admin", "editor", "writer"];
 const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
-  desk_head: "Desk head",
-  sub_editor: "Sub editor",
-  reporter: "Reporter",
+  editor: "Editor",
+  writer: "Writer",
 };
 const EDITIONS = ["digital", "print"];
 const EDITION_LABEL: Record<string, string> = { digital: "Digital", print: "Print" };
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [viewerRole, setViewerRole] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export default function UsersPage() {
   // add-user form
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("reporter");
+  const [role, setRole] = useState("writer");
   const [edition, setEdition] = useState("digital");
   const [password, setPassword] = useState("");
   const [adding, setAdding] = useState(false);
@@ -46,6 +46,7 @@ export default function UsersPage() {
     }
     const json = await res.json();
     setUsers(json.users ?? []);
+    setViewerRole(json.viewerRole ?? "");
     setLoading(false);
   }
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function UsersPage() {
       } else {
         setFullName("");
         setEmail("");
-        setRole("reporter");
+        setRole("writer");
         setEdition("digital");
         setPassword("");
         await load();
@@ -118,6 +119,7 @@ export default function UsersPage() {
     );
   }
 
+  const isAdmin = viewerRole === "admin";
   const input =
     "w-full bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)]";
 
@@ -125,7 +127,9 @@ export default function UsersPage() {
     <div className="p-6 max-w-5xl">
       <h1 className="text-lg font-semibold text-[var(--text-1)] mb-1">Users</h1>
       <p className="text-[13px] text-[var(--text-3)] mb-5">
-        Add and manage who can sign in. New accounts are created here — there is no public sign-up.
+        {isAdmin
+          ? "Add and manage who can sign in. New accounts are created here — there is no public sign-up."
+          : "Add writers to your team. New accounts are created here — there is no public sign-up. Only an admin can change roles or remove accounts."}
       </p>
 
       {/* Add user */}
@@ -143,11 +147,15 @@ export default function UsersPage() {
         </div>
         <div className="sm:col-span-1">
           <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">Role</label>
-          <select className={input} value={role} onChange={(e) => setRole(e.target.value)}>
-            {ROLES.map((r) => (
-              <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-            ))}
-          </select>
+          {isAdmin ? (
+            <select className={input} value={role} onChange={(e) => setRole(e.target.value)}>
+              {ROLES.map((r) => (
+                <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+              ))}
+            </select>
+          ) : (
+            <div className={`${input} text-[var(--text-3)] bg-[var(--surface-2)]`}>Writer</div>
+          )}
         </div>
         <div className="sm:col-span-1">
           <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">Edition</label>
@@ -187,7 +195,7 @@ export default function UsersPage() {
                 <th className="text-left font-medium px-4 py-2.5">Role</th>
                 <th className="text-left font-medium px-4 py-2.5">Edition</th>
                 <th className="text-left font-medium px-4 py-2.5">Status</th>
-                <th className="text-right font-medium px-4 py-2.5">Actions</th>
+                {isAdmin && <th className="text-right font-medium px-4 py-2.5">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -196,43 +204,61 @@ export default function UsersPage() {
                   <td className="px-4 py-2.5 text-[var(--text-1)] font-medium">{u.fullName}</td>
                   <td className="px-4 py-2.5 text-[var(--text-2)]">{u.email}</td>
                   <td className="px-4 py-2.5">
-                    <select
-                      value={u.role}
-                      onChange={(e) => patch(u.id, { role: e.target.value })}
-                      className="bg-transparent border border-[var(--border)] rounded-md px-2 py-1 text-[12px]"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-                      ))}
-                    </select>
+                    {isAdmin ? (
+                      <select
+                        value={u.role}
+                        onChange={(e) => patch(u.id, { role: e.target.value })}
+                        className="bg-transparent border border-[var(--border)] rounded-md px-2 py-1 text-[12px]"
+                      >
+                        {ROLES.map((r) => (
+                          <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-[12px] text-[var(--text-2)]">{ROLE_LABEL[u.role] ?? u.role}</span>
+                    )}
                   </td>
                   <td className="px-4 py-2.5">
-                    <select
-                      value={u.edition}
-                      onChange={(e) => patch(u.id, { edition: e.target.value })}
-                      className="bg-transparent border border-[var(--border)] rounded-md px-2 py-1 text-[12px]"
-                    >
-                      {EDITIONS.map((ed) => (
-                        <option key={ed} value={ed}>{EDITION_LABEL[ed]}</option>
-                      ))}
-                    </select>
+                    {isAdmin ? (
+                      <select
+                        value={u.edition}
+                        onChange={(e) => patch(u.id, { edition: e.target.value })}
+                        className="bg-transparent border border-[var(--border)] rounded-md px-2 py-1 text-[12px]"
+                      >
+                        {EDITIONS.map((ed) => (
+                          <option key={ed} value={ed}>{EDITION_LABEL[ed]}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-[12px] text-[var(--text-2)]">{EDITION_LABEL[u.edition] ?? u.edition}</span>
+                    )}
                   </td>
                   <td className="px-4 py-2.5">
-                    <button
-                      onClick={() => patch(u.id, { isActive: !u.isActive })}
-                      className={`text-[12px] px-2 py-0.5 rounded-full ${u.isActive ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}
-                    >
-                      {u.isActive ? "Active" : "Disabled"}
-                    </button>
+                    {isAdmin ? (
+                      <button
+                        onClick={() => patch(u.id, { isActive: !u.isActive })}
+                        className={`text-[12px] px-2 py-0.5 rounded-full ${u.isActive ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}
+                      >
+                        {u.isActive ? "Active" : "Disabled"}
+                      </button>
+                    ) : (
+                      <span
+                        className={`text-[12px] px-2 py-0.5 rounded-full ${u.isActive ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}
+                      >
+                        {u.isActive ? "Active" : "Disabled"}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                    <button onClick={() => resetPassword(u)} className="text-[12px] text-[var(--purple)] mr-3 hover:underline">
-                      Reset password
-                    </button>
-                    <button onClick={() => remove(u)} className="text-[12px] text-red-600 hover:underline">
-                      Delete
-                    </button>
-                  </td>
+                  {isAdmin && (
+                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                      <button onClick={() => resetPassword(u)} className="text-[12px] text-[var(--purple)] mr-3 hover:underline">
+                        Reset password
+                      </button>
+                      <button onClick={() => remove(u)} className="text-[12px] text-red-600 hover:underline">
+                        Delete
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

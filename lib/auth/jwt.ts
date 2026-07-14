@@ -7,7 +7,7 @@ import { SignJWT, jwtVerify } from "jose";
 export const SESSION_COOKIE = "patrika_session";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
-export type Role = "admin" | "desk_head" | "sub_editor" | "reporter";
+export type Role = "admin" | "editor" | "writer";
 export type Edition = "print" | "digital";
 export type Session = {
   userId: string;
@@ -39,7 +39,7 @@ export async function verifySessionToken(token: string): Promise<Session | null>
       userId: String(payload.sub ?? ""),
       email: String(payload.email ?? ""),
       name: String(payload.name ?? ""),
-      role: (payload.role as Role) ?? "reporter",
+      role: (payload.role as Role) ?? "writer",
       edition: (payload.edition as Edition) ?? "digital",
     };
   } catch {

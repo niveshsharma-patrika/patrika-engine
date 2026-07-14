@@ -6,7 +6,7 @@ import { hashPassword } from "@/lib/auth/password";
 
 export const dynamic = "force-dynamic";
 
-const ROLES = ["admin", "desk_head", "sub_editor", "reporter"];
+const ROLES = ["admin", "editor", "writer"];
 
 async function requireAdmin() {
   const session = await getSession();

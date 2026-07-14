@@ -42,8 +42,8 @@ type Update = { control: string; value: string; directive: string };
 export async function PUT(req: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  if (session.role !== "admin" && session.role !== "desk_head") {
-    return Response.json({ error: "Forbidden — admin or desk head only" }, { status: 403 });
+  if (session.role !== "admin") {
+    return Response.json({ error: "Forbidden — admin only" }, { status: 403 });
   }
 
   const json = (await req.json().catch(() => null)) as { updates?: Update[] } | null;

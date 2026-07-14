@@ -166,7 +166,7 @@ export const profiles = pgTable("profiles", {
 	passwordHash: text("password_hash"),
 	isActive: boolean("is_active").default(true).notNull(),
 	fullName: text("full_name").notNull(),
-	role: text().default('reporter').notNull(),
+	role: text().default('writer').notNull(),
 	edition: text().default('digital').notNull(),
 	desk: text(),
 	telegramHandle: text("telegram_handle"),
@@ -175,7 +175,7 @@ export const profiles = pgTable("profiles", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	unique("profiles_email_key").on(table.email),
-	check("profiles_role_check", sql`role = ANY (ARRAY['admin'::text, 'desk_head'::text, 'sub_editor'::text, 'reporter'::text])`),
+	check("profiles_role_check", sql`role = ANY (ARRAY['admin'::text, 'editor'::text, 'writer'::text])`),
 	check("profiles_edition_check", sql`edition = ANY (ARRAY['print'::text, 'digital'::text])`),
 ]);
 

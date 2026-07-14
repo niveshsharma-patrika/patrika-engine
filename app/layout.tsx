@@ -36,7 +36,9 @@ export default async function RootLayout({
     >
       <body className="min-h-full antialiased">
         <LangProvider>
-          <Shell edition={session?.edition ?? "digital"}>{children}</Shell>
+          <Shell edition={session?.edition ?? "digital"} role={session?.role ?? "writer"}>
+            {children}
+          </Shell>
         </LangProvider>
       </body>
     </html>

@@ -6,15 +6,17 @@ import { hashPassword } from "@/lib/auth/password";
 
 export const dynamic = "force-dynamic";
 
-const ROLES = ["admin", "desk_head", "sub_editor", "reporter"];
+const ROLES = ["admin", "editor", "writer"];
 
-async function requireAdmin() {
+// Admin and editor can manage users; editors may only add Writers.
+async function requireStaff() {
   const session = await getSession();
-  return session?.role === "admin" ? session : null;
+  return session?.role === "admin" || session?.role === "editor" ? session : null;
 }
 
 export async function GET() {
-  if (!(await requireAdmin())) {
+  const staff = await requireStaff();
+  if (!staff) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   const users = await db
@@ -30,17 +32,24 @@ export async function GET() {
     })
     .from(schema.profiles)
     .orderBy(desc(schema.profiles.createdAt));
-  return Response.json({ users });
+  return Response.json({ users, viewerRole: staff.role });
 }
 
 export async function POST(req: Request) {
-  if (!(await requireAdmin())) {
+  const staff = await requireStaff();
+  if (!staff) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = await req.json().catch(() => null);
   const email = (body?.email ?? "").toString().trim().toLowerCase();
   const fullName = (body?.fullName ?? "").toString().trim();
-  const role = ROLES.includes(body?.role) ? body.role : "reporter";
+  // Editors can only create Writers; admins can create any role.
+  const role =
+    staff.role === "editor"
+      ? "writer"
+      : ROLES.includes(body?.role)
+        ? body.role
+        : "writer";
   const edition = body?.edition === "print" ? "print" : "digital";
   const password = (body?.password ?? "").toString();
   const desk = body?.desk ? body.desk.toString().trim() : null;

@@ -51,6 +51,29 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Role gate — admin-only / editor-only sections are enforced here (server-side)
+  // so a hidden nav item can't be reached by typing the URL. APIs enforce their
+  // own role checks. Editors keep Users (to add writers); writers lose the most.
+  if (session.role !== "admin" && !pathname.startsWith("/api/")) {
+    const sourcesBlocked =
+      pathname === "/sources" ||
+      (pathname.startsWith("/sources/") && !pathname.startsWith("/sources/last-run"));
+    const blocked =
+      session.role === "editor"
+        ? pathname === "/admin" || pathname.startsWith("/directives") || sourcesBlocked
+        : pathname.startsWith("/admin") ||
+          pathname.startsWith("/directives") ||
+          pathname.startsWith("/stats") ||
+          pathname.startsWith("/style") ||
+          sourcesBlocked;
+    if (blocked) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   return NextResponse.next();
 }
 
