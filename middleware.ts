@@ -62,7 +62,7 @@ export async function middleware(request: NextRequest) {
       (pathname.startsWith("/sources/") && !pathname.startsWith("/sources/last-run"));
     const blocked =
       session.role === "editor"
-        ? pathname === "/admin" || pathname.startsWith("/directives") || sourcesBlocked
+        ? pathname.startsWith("/admin") || pathname.startsWith("/directives") || sourcesBlocked
         : pathname.startsWith("/admin") ||
           pathname.startsWith("/directives") ||
           pathname.startsWith("/stats") ||

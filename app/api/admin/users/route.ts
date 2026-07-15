@@ -8,15 +8,15 @@ export const dynamic = "force-dynamic";
 
 const ROLES = ["admin", "editor", "writer"];
 
-// Admin and editor can manage users; editors may only add Writers.
-async function requireStaff() {
+// User management is admin-only.
+async function requireAdmin() {
   const session = await getSession();
-  return session?.role === "admin" || session?.role === "editor" ? session : null;
+  return session?.role === "admin" ? session : null;
 }
 
 export async function GET() {
-  const staff = await requireStaff();
-  if (!staff) {
+  const admin = await requireAdmin();
+  if (!admin) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   const users = await db
@@ -32,24 +32,18 @@ export async function GET() {
     })
     .from(schema.profiles)
     .orderBy(desc(schema.profiles.createdAt));
-  return Response.json({ users, viewerRole: staff.role });
+  return Response.json({ users, viewerRole: admin.role });
 }
 
 export async function POST(req: Request) {
-  const staff = await requireStaff();
-  if (!staff) {
+  const admin = await requireAdmin();
+  if (!admin) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = await req.json().catch(() => null);
   const email = (body?.email ?? "").toString().trim().toLowerCase();
   const fullName = (body?.fullName ?? "").toString().trim();
-  // Editors can only create Writers; admins can create any role.
-  const role =
-    staff.role === "editor"
-      ? "writer"
-      : ROLES.includes(body?.role)
-        ? body.role
-        : "writer";
+  const role = ROLES.includes(body?.role) ? body.role : "writer";
   const edition = body?.edition === "print" ? "print" : "digital";
   const password = (body?.password ?? "").toString();
   const desk = body?.desk ? body.desk.toString().trim() : null;
