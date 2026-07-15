@@ -378,3 +378,24 @@ export const writingDirectives = pgTable("writing_directives", {
 }, (table) => [
 	unique("writing_directives_control_option_key").on(table.control, table.optionValue),
 ]);
+
+// User feedback. Anyone signed in can submit; only admins read it. Image
+// attachments are stored inline as data-URLs in `attachments` (capped by the API).
+export const feedback = pgTable("feedback", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	category: text().notNull(),
+	message: text().notNull(),
+	attachments: jsonb().default([]).notNull(),
+	status: text().default('open').notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_feedback_created").using("btree", table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [profiles.id],
+			name: "feedback_user_id_fkey"
+		}).onDelete("cascade"),
+	check("feedback_category_check", sql`category = ANY (ARRAY['bug'::text, 'feature'::text, 'content'::text, 'ui'::text, 'other'::text])`),
+	check("feedback_status_check", sql`status = ANY (ARRAY['open'::text, 'reviewed'::text])`),
+]);

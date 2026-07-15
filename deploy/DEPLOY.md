@@ -20,6 +20,16 @@ psql "postgres://USER:PASS@your-db.postgres.database.azure.com:5432/patrika_engi
      -f deploy/schema.sql
 ```
 
+### 1b. Apply the incremental migrations
+`schema.sql` is the original snapshot; schema changes made since then live in
+their own files. On a fresh install run them all (each is idempotent, so this is
+safe to re-run). `$DATABASE_URL` is the same connection string as above.
+```bash
+for m in editions writing-directives roles feedback; do
+  psql "$DATABASE_URL" -f "deploy/$m.sql"
+done
+```
+
 ## 2. Copy the data over from Supabase
 Get the Supabase **direct** connection string (Supabase Dashboard → Project
 Settings → Database → Connection string → URI).

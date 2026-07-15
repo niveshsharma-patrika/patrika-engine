@@ -40,9 +40,11 @@ export async function middleware(request: NextRequest) {
       pathname === "/today" ||
       pathname === "/all-stories" ||
       pathname === "/generated" ||
+      pathname === "/feedback" ||
       pathname.startsWith("/today/") ||
       pathname.startsWith("/all-stories/") ||
-      pathname.startsWith("/generated/");
+      pathname.startsWith("/generated/") ||
+      pathname.startsWith("/feedback/");
     if (!printOk) {
       const url = request.nextUrl.clone();
       url.pathname = "/today";
