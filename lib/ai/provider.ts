@@ -14,7 +14,7 @@ import { AI_PROVIDERS, type ProviderKey, type UseCase } from "./registry";
  *   1. Encrypted key stored in `ai_providers` table
  *   2. Environment variable fallback
  */
-async function getApiKey(provider: ProviderKey): Promise<string | null> {
+export async function getApiKey(provider: ProviderKey): Promise<string | null> {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("ai_providers")
@@ -72,11 +72,13 @@ type ResolvedModel = {
  * This lets angle generation + drafting work the moment the key is set,
  * without any admin DB wiring (ai_config / ai_providers rows).
  */
-function envFallback(): ResolvedModel | null {
-  // Zero-config default when no admin DB model is wired. Prefer OpenAI
-  // (gpt-4o-mini) when OPENAI_API_KEY is set; otherwise fall back to Gemini.
+async function envFallback(): Promise<ResolvedModel | null> {
+  // Zero-config default when no admin DB model is wired. getApiKey prefers a
+  // panel-stored (DB) key over the env var, so the Admin → API Keys key is
+  // authoritative even without an ai_config row. Prefer OpenAI (gpt-4o-mini)
+  // when a key is available; otherwise fall back to Gemini.
   // Override the exact model with OPENAI_MODEL / GEMINI_MODEL.
-  const openaiKey = process.env.OPENAI_API_KEY;
+  const openaiKey = await getApiKey("openai");
   if (openaiKey) {
     const modelKey = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
     return {
@@ -86,7 +88,7 @@ function envFallback(): ResolvedModel | null {
       systemPrompt: null,
     };
   }
-  const googleKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  const googleKey = await getApiKey("google");
   if (googleKey) {
     const modelKey = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
     return {

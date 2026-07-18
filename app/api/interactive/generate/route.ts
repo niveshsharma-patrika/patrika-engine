@@ -3,7 +3,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { getModelFor } from "@/lib/ai/provider";
+import { getModelFor, getApiKey } from "@/lib/ai/provider";
 
 export const dynamic = "force-dynamic";
 // gpt-4.1 emitting a full ~20KB designed widget (heavier in Hindi) can take
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
   // Falls back to the configured drafting model when no OpenAI key is present.
   let model: LanguageModel;
   let modelLabel: string;
-  const openaiKey = process.env.OPENAI_API_KEY;
+  const openaiKey = await getApiKey("openai");
   if (openaiKey) {
     modelLabel = process.env.WIDGET_MODEL ?? "gpt-4.1";
     model = createOpenAI({ apiKey: openaiKey })(modelLabel);

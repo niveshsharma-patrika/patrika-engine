@@ -5,7 +5,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 
 import { TRENDS } from "@/lib/data/trends";
-import { getModelFor } from "@/lib/ai/provider";
+import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { createAdminClient } from "@/lib/supabase/server";
 
 /**
@@ -450,9 +450,10 @@ export async function POST(req: Request) {
   // publications when an OpenAI key is present (Patrika keeps the cheap default).
   const selectedPub = parsed.data.params?.publication;
   const isDistinctivePub = !!selectedPub && !/patrika/i.test(selectedPub);
-  if (isDistinctivePub && process.env.OPENAI_API_KEY) {
+  const styleOpenaiKey = isDistinctivePub ? await getApiKey("openai") : null;
+  if (isDistinctivePub && styleOpenaiKey) {
     const styleModel = process.env.STYLE_DRAFT_MODEL ?? "gpt-4.1";
-    drafting.model = createOpenAI({ apiKey: process.env.OPENAI_API_KEY })(styleModel);
+    drafting.model = createOpenAI({ apiKey: styleOpenaiKey })(styleModel);
     drafting.modelKey = styleModel;
     drafting.providerKey = "openai";
   }

@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/auth/session";
 import { pool } from "@/lib/db";
+import { getApiKey } from "@/lib/ai/provider";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
@@ -15,8 +16,12 @@ const IMAGE_QUOTA: Record<string, number> = { admin: Infinity, editor: 5, writer
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  if (!process.env.OPENAI_API_KEY) {
-    return Response.json({ error: "No OpenAI key configured on the server." }, { status: 503 });
+  const openaiKey = await getApiKey("openai");
+  if (!openaiKey) {
+    return Response.json(
+      { error: "No OpenAI key configured (set it in Admin → API Keys, or in the env)." },
+      { status: 503 }
+    );
   }
 
   const body = (await req.json().catch(() => null)) as { title?: string } | null;
@@ -58,7 +63,7 @@ export async function POST(req: Request) {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        authorization: `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({ model, prompt, n: 1, size: "1536x1024" }),
     });
