@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import {
   Plus,
   ChevronRight,
@@ -83,10 +82,12 @@ const CATEGORIES: Array<{ key: SectionKey | "all"; en: string; hi: string }> = [
 // ─── Page ─────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { t, lang } = useLang();
-  const router = useRouter();
   const [filter, setFilter] = useState<SectionKey | "all">("all");
   const [tab, setTab] = useState<BucketKey>("breaking");
   const [openTrend, setOpenTrend] = useState<Trend | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorTrend, setEditorTrend] = useState<Trend | null>(null);
+  const [editorTitle, setEditorTitle] = useState("");
   const [buckets, setBuckets] = useState<Record<BucketKey, Trend[]>>({
     breaking: [],
     trending: [],
@@ -135,17 +136,11 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // Generation now lives on its own page. Stash the trend (if any) so /generate
-  // can import its context, then navigate there.
   function openEditor(trend: Trend | null) {
-    try {
-      if (trend) sessionStorage.setItem("patrika.generateTrend", JSON.stringify(trend));
-      else sessionStorage.removeItem("patrika.generateTrend");
-    } catch {
-      /* sessionStorage unavailable — the page just opens blank */
-    }
+    setEditorTrend(trend);
+    setEditorTitle(trend?.title ?? "");
+    setEditorOpen(true);
     setOpenTrend(null);
-    router.push("/generate");
   }
 
   // One section (tab) at a time. Category chips filter WITHIN the active tab.
@@ -296,6 +291,14 @@ export default function DashboardPage() {
         />
       )}
 
+      {editorOpen && (
+        <Editor
+          trend={editorTrend}
+          title={editorTitle}
+          setTitle={setEditorTitle}
+          onClose={() => setEditorOpen(false)}
+        />
+      )}
     </>
   );
 }
@@ -460,14 +463,11 @@ function EnhGroup({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function Editor({ trend, title, setTitle, onClose, asPage = false }: {
+export function Editor({ trend, title, setTitle, onClose }: {
   trend: Trend | null;
   title: string;
   setTitle: (v: string) => void;
   onClose: () => void;
-  // asPage: render in-flow inside the shell (the /generate route) instead of as
-  // a fixed full-screen overlay.
-  asPage?: boolean;
 }) {
   const { t, lang } = useLang();
   const [body, setBody] = useState("");
@@ -696,14 +696,7 @@ export function Editor({ trend, title, setTitle, onClose, asPage = false }: {
   }
 
   return (
-    <div
-      className={
-        asPage
-          ? // Fill the shell's main area (bleed its padding) and scroll columns internally.
-            "-mt-7 -mx-7 -mb-20 h-[calc(100vh-96px)] bg-[var(--bg)] flex flex-col"
-          : "fixed inset-0 z-[60] bg-[var(--bg)] flex flex-col"
-      }
-    >
+    <div className="fixed inset-0 z-[60] bg-[var(--bg)] flex flex-col">
       <div className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
         <button
           onClick={onClose}

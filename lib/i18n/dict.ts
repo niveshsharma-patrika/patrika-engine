@@ -13,7 +13,6 @@ export const DICT = {
 
   // Nav
   navDashboard:       { en: "Dashboard",      hi: "डैशबोर्ड" },
-  navGenerate:        { en: "Generate",       hi: "जनरेट करें" },
   navToday:           { en: "Trends today",   hi: "आज के ट्रेंड" },
   navAllStories:      { en: "All Stories",    hi: "सभी ख़बरें" },
   navGenerated:       { en: "My Articles",    hi: "मेरे लेख" },

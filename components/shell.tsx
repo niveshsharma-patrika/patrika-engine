@@ -19,7 +19,6 @@ import {
   Newspaper,
   BookOpen,
   MessageSquare,
-  PenSquare,
   LogOut,
 } from "lucide-react";
 
@@ -32,7 +31,6 @@ import { KairosMark } from "@/components/kairos-logo";
 // `roles` omitted = visible to everyone; otherwise only those roles see it.
 const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: Edition[]; roles?: Role[] }> = [
   { href: "/",                  icon: <LayoutGrid size={16} />,    key: "navDashboard",   editions: ["digital"] },
-  { href: "/generate",          icon: <PenSquare size={16} />,     key: "navGenerate",    editions: ["digital"] },
   { href: "/today",             icon: <CalendarDays size={16} />,  key: "navToday",       editions: ["digital", "print"] },
   { href: "/all-stories",       icon: <Newspaper size={16} />,     key: "navAllStories",  editions: ["digital", "print"] },
   { href: "/generated",         icon: <FileText size={16} />,      key: "navGenerated",   editions: ["digital", "print"] },
