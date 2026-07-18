@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  ArrowLeft, Lightbulb, Loader2, FileText, Copy, Check,
+  ArrowLeft, Lightbulb, Loader2, FileText, PenSquare,
   ShieldAlert, Landmark, Building2, Wheat, Scale, HeartHandshake,
   HeartPulse, GraduationCap, Trophy, UtensilsCrossed, BookOpen,
   type LucideIcon,
@@ -10,6 +10,7 @@ import {
 
 import { MAGAZINES } from "@/lib/magazines";
 import { useLang } from "@/lib/i18n/context";
+import { Editor } from "@/app/page";
 
 type Idea = { headline: string; subVertical: string; hook: string; benefit: string };
 
@@ -36,10 +37,8 @@ export default function MagazinesPage() {
   const [loadingIdeas, setLoadingIdeas] = useState(false);
   const [ideasErr, setIdeasErr] = useState<string | null>(null);
   const [topic, setTopic] = useState("");
-  const [article, setArticle] = useState("");
-  const [loadingArticle, setLoadingArticle] = useState(false);
-  const [articleErr, setArticleErr] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerTitle, setComposerTitle] = useState("");
 
   const mag = MAGAZINES.find((m) => m.key === selected) ?? null;
 
@@ -48,8 +47,13 @@ export default function MagazinesPage() {
     setIdeas([]);
     setIdeasErr(null);
     setTopic("");
-    setArticle("");
-    setArticleErr(null);
+  }
+
+  // Open the full article composer (the same one used from trending) seeded
+  // with a topic or a generated idea.
+  function openComposer(seed: string) {
+    setComposerTitle(seed.trim());
+    setComposerOpen(true);
   }
 
   async function genIdeas() {
@@ -69,27 +73,6 @@ export default function MagazinesPage() {
       setIdeasErr("Network error");
     } finally {
       setLoadingIdeas(false);
-    }
-  }
-
-  async function genArticle() {
-    if (!mag || !topic.trim()) return;
-    setLoadingArticle(true);
-    setArticleErr(null);
-    setArticle("");
-    try {
-      const r = await fetch("/api/magazine/content", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ magazine: mag.key, topic }),
-      });
-      const d = await r.json();
-      if (!r.ok) setArticleErr(d.error ?? "Failed");
-      else setArticle(d.body ?? "");
-    } catch {
-      setArticleErr("Network error");
-    } finally {
-      setLoadingArticle(false);
     }
   }
 
@@ -202,62 +185,54 @@ export default function MagazinesPage() {
                   {idea.subVertical} · {idea.hook}
                 </div>
                 <button
-                  onClick={() => setTopic(idea.headline)}
-                  className="text-[11px] text-[var(--red)] mt-1.5 hover:underline"
+                  onClick={() => openComposer(idea.headline)}
+                  className="text-[11px] text-[var(--red)] mt-1.5 hover:underline font-medium"
                 >
-                  {lang === "hi" ? "इस पर लिखें →" : "Write this →"}
+                  {lang === "hi" ? "आर्टिकल बनाएँ →" : "Generate article →"}
                 </button>
               </div>
             ))}
           </div>
         </section>
 
-        {/* Article generator (Layer 3) */}
+        {/* Article generator — opens the full composer (same as trending) */}
         <section className="bg-white border border-[var(--border)] rounded-lg p-4">
-          <h2 className="text-[14px] font-semibold flex items-center gap-1.5 mb-3">
+          <h2 className="text-[14px] font-semibold flex items-center gap-1.5 mb-1">
             <FileText size={15} className="text-[var(--blue)]" /> {lang === "hi" ? "आर्टिकल जनरेटर" : "Article generator"}
           </h2>
+          <p className="text-[12px] text-[var(--text-3)] mb-3">
+            {lang === "hi"
+              ? "पूरा कंपोज़र खुलेगा — ट्रेंडिंग जैसा, सभी कंट्रोल्स (टोन, वॉइस, प्रकाशन, शब्द-सीमा…) के साथ।"
+              : "Opens the full composer — same as trending, with every control (tone, voice, publication, word count…)."}
+          </p>
           <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">{lang === "hi" ? "टॉपिक" : "Topic"}</label>
           <textarea
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             rows={2}
-            placeholder={lang === "hi" ? "टॉपिक लिखें या किसी आइडिया से चुनें…" : "Type a topic or pick from an idea…"}
+            placeholder={lang === "hi" ? "टॉपिक लिखें या बाईं ओर किसी आइडिया से चुनें…" : "Type a topic, or pick an idea on the left…"}
             className="w-full text-[13px] bg-[var(--surface-2)] border border-[var(--border)] rounded px-3 py-2 outline-none focus:border-[var(--blue)] focus:bg-white resize-y mb-2"
           />
           <button
-            onClick={genArticle}
-            disabled={loadingArticle || !topic.trim()}
+            onClick={() => openComposer(topic)}
+            disabled={!topic.trim()}
             className="bg-[var(--red)] hover:bg-[var(--red-hover)] text-white text-[12px] font-medium px-3 py-1.5 rounded disabled:opacity-50 flex items-center gap-1.5"
           >
-            {loadingArticle && <Loader2 size={12} className="animate-spin" />}
-            {loadingArticle ? (lang === "hi" ? "लिख रहे…" : "Writing…") : lang === "hi" ? "आर्टिकल लिखें" : "Write article"}
+            <PenSquare size={12} />
+            {lang === "hi" ? "आर्टिकल बनाएँ" : "Generate article"}
           </button>
-          {articleErr && <div className="text-[12px] text-[var(--red)] mt-2">{articleErr}</div>}
-          {article && (
-            <div className="mt-3">
-              <div className="flex justify-end mb-1">
-                <button
-                  onClick={() => {
-                    navigator.clipboard?.writeText(article);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                  }}
-                  className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)] flex items-center gap-1"
-                >
-                  {copied ? <Check size={11} /> : <Copy size={11} />}
-                  {copied ? (lang === "hi" ? "कॉपी हुआ" : "Copied") : lang === "hi" ? "कॉपी" : "Copy"}
-                </button>
-              </div>
-              <textarea
-                value={article}
-                onChange={(e) => setArticle(e.target.value)}
-                className="w-full min-h-[400px] text-[14px] leading-[1.7] bg-white border border-[var(--border)] rounded p-3 outline-none resize-y"
-              />
-            </div>
-          )}
         </section>
       </div>
+
+      {/* The full composer — identical to the one opened from a trending story */}
+      {composerOpen && (
+        <Editor
+          trend={null}
+          title={composerTitle}
+          setTitle={setComposerTitle}
+          onClose={() => setComposerOpen(false)}
+        />
+      )}
     </>
   );
 }
