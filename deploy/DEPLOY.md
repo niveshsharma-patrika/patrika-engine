@@ -43,8 +43,10 @@ bash deploy/migrate-data.sh
 ## 3. Configure the environment
 ```bash
 cp .env.production.example .env
-nano .env        # set DATABASE_URL, PGSSL=require, PORT, OPENAI_API_KEY,
-                 # and generate AUTH_SECRET + CRON_SECRET:  openssl rand -hex 32
+nano .env        # set DATABASE_URL, PGSSL=require, PORT, and generate
+                 # AUTH_SECRET + CRON_SECRET + KEY_ENCRYPTION_SECRET: openssl rand -hex 32
+                 # AI provider keys are NOT set here — add them in Admin → API Keys
+                 # after first login (stored encrypted in the DB).
 ```
 
 ## 4. Build + start under PM2
