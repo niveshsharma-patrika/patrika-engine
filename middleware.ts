@@ -76,7 +76,12 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  // Pass the path to server components. The root layout uses it to bounce
+  // removed/disabled users whose cookie is still valid but whose live account
+  // is gone (the edge check here only verifies the JWT signature, not the DB).
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", pathname);
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

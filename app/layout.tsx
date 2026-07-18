@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Roboto, Roboto_Mono } from "next/font/google";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import "./globals.css";
 import { LangProvider } from "@/lib/i18n/context";
 import { Shell } from "@/components/shell";
@@ -29,6 +31,18 @@ export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const session = await getSession();
+
+  // getSession re-checks the DB, so a still-valid cookie whose account was
+  // removed or disabled resolves to null. The edge middleware only verifies the
+  // JWT signature and can't tell — so it lets them through; we bounce them to
+  // /login here. Unauthenticated users never reach a protected layout (middleware
+  // already redirects them), so a null session on any non-login page means a
+  // dead account. (x-pathname is set by the middleware; absent on /login.)
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  if (!session && pathname && pathname !== "/login") {
+    redirect("/login");
+  }
+
   return (
     <html
       lang="en"
