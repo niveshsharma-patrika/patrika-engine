@@ -4,6 +4,7 @@ import {
 } from "@/components/pipeline-switches";
 import { createAdminClient } from "@/lib/supabase/server";
 import { envOverrides } from "@/lib/pipeline-settings";
+import { ProviderKeys } from "@/components/provider-keys";
 
 export const dynamic = "force-dynamic";
 
@@ -61,13 +62,6 @@ const PROVIDER_ENV: Record<string, string> = {
   groq: "GROQ_API_KEY",
 };
 
-const PROVIDER_COLORS: Record<string, string> = {
-  anthropic: "#c96342",
-  openai: "#10a37f",
-  google: "var(--blue)",
-  groq: "var(--purple)",
-};
-
 // Canonical ordering for the pipeline rows in the UI — mirrors the
 // runtime execution order so the stages read top-to-bottom.
 const PIPELINE_ORDER: PipelineRow["key"][] = ["fetch", "enrich", "cluster"];
@@ -88,6 +82,17 @@ export default async function AdminPage() {
     const envKey = envVar ? !!process.env[envVar] : false;
     return { ...p, dbKey, envKey, hasKey: dbKey || envKey };
   });
+
+  const providerRows = providerStatus.map((p) => ({
+    id: p.id,
+    provider_key: p.provider_key,
+    display_name: p.display_name,
+    envVar: PROVIDER_ENV[p.provider_key] ?? "",
+    dbKey: p.dbKey,
+    envKey: p.envKey,
+    hasKey: p.hasKey,
+    modelCount: models.filter((m) => m.provider_id === p.id).length,
+  }));
 
   // Usage totals
   const totals = usage.reduce(
@@ -140,56 +145,14 @@ export default async function AdminPage() {
 
       {/* AI Providers + Keys */}
       <section className="mb-8">
-        <h2 className="text-[15px] font-medium mb-3">API Keys</h2>
-        <div className="bg-white border border-[var(--border)] rounded-md overflow-hidden">
-          <div className="grid grid-cols-[44px_1fr_180px_120px_100px] gap-3.5 px-4 py-2.5 bg-[var(--surface-2)] text-[11px] uppercase tracking-wider text-[var(--text-3)] font-medium">
-            <div></div>
-            <div>Provider</div>
-            <div>Key source</div>
-            <div>Models</div>
-            <div>Status</div>
-          </div>
-          {providerStatus.map((p) => {
-            const provModels = models.filter((m) => m.provider_id === p.id);
-            return (
-              <div
-                key={p.id}
-                className="grid grid-cols-[44px_1fr_180px_120px_100px] gap-3.5 px-4 py-3 items-center border-t border-[var(--border)]"
-              >
-                <div
-                  className="w-9 h-9 grid place-items-center rounded text-[14px] font-mono font-semibold text-white"
-                  style={{ background: PROVIDER_COLORS[p.provider_key] ?? "var(--text)" }}
-                >
-                  {p.provider_key[0].toUpperCase()}
-                </div>
-                <div>
-                  <div className="text-sm font-medium">{p.display_name}</div>
-                  <div className="text-[11px] text-[var(--text-3)] font-mono mt-0.5">{p.provider_key}</div>
-                </div>
-                <div className="font-mono text-[11px] text-[var(--text-2)]">
-                  {p.dbKey
-                    ? "DB (encrypted)"
-                    : p.envKey
-                    ? `env: ${PROVIDER_ENV[p.provider_key]}`
-                    : "not set"}
-                </div>
-                <div className="font-mono text-[12px] text-[var(--text-2)]">{provModels.length} models</div>
-                <div>
-                  <span
-                    className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                      p.hasKey
-                        ? "bg-[var(--green-soft)] text-[var(--green)]"
-                        : "bg-[var(--surface-2)] text-[var(--text-3)]"
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                    {p.hasKey ? "Active" : "No key"}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+        <div className="mb-3">
+          <h2 className="text-[15px] font-medium">API Keys</h2>
+          <p className="text-[12px] text-[var(--text-3)] mt-0.5">
+            Set a provider&apos;s key to store it encrypted in the database — it overrides the
+            environment variable and takes effect immediately. Clear it to fall back to the env var.
+          </p>
         </div>
+        <ProviderKeys providers={providerRows} />
       </section>
 
       {/* Users */}
