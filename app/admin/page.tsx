@@ -87,7 +87,8 @@ export default async function AdminPage() {
     id: p.id,
     provider_key: p.provider_key,
     display_name: p.display_name,
-    envVar: PROVIDER_ENV[p.provider_key] ?? "",
+    // Note: the env-var NAME is intentionally NOT sent to the client — only the
+    // booleans below (dbKey/envKey/hasKey) cross to the admin UI.
     dbKey: p.dbKey,
     envKey: p.envKey,
     hasKey: p.hasKey,

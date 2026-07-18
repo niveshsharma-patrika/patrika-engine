@@ -8,7 +8,6 @@ export type ProviderKeyRow = {
   id: string;
   provider_key: string;
   display_name: string;
-  envVar: string;
   dbKey: boolean;
   envKey: boolean;
   hasKey: boolean;
@@ -81,7 +80,7 @@ export function ProviderKeys({ providers }: { providers: ProviderKeyRow[] }) {
                 <div className="text-[11px] text-[var(--text-3)] font-mono mt-0.5">{p.provider_key}</div>
               </div>
               <div className="font-mono text-[11px] text-[var(--text-2)]">
-                {p.dbKey ? "DB (encrypted)" : p.envKey ? `env: ${p.envVar}` : "not set"}
+                {p.dbKey ? "DB (encrypted)" : p.envKey ? "Environment variable" : "not set"}
               </div>
               <div className="font-mono text-[12px] text-[var(--text-2)]">{p.modelCount} models</div>
               <div>

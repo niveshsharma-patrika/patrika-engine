@@ -69,9 +69,11 @@ export async function getPipelineSettings(
  * Used to disable the toggle in the UI and explain why a flip didn't
  * take effect.
  */
-export function envOverrides(): Partial<Record<PipelineStageKey, string>> {
-  const out: Partial<Record<PipelineStageKey, string>> = {};
-  if (process.env.SKIP_FETCH === "1") out.fetch = "SKIP_FETCH=1";
-  if (process.env.SKIP_CLUSTER === "1") out.cluster = "SKIP_CLUSTER=1";
+export function envOverrides(): Partial<Record<PipelineStageKey, boolean>> {
+  // Return only WHETHER a stage is env-locked — never the env-var name — so no
+  // server-config detail reaches the (client) admin UI.
+  const out: Partial<Record<PipelineStageKey, boolean>> = {};
+  if (process.env.SKIP_FETCH === "1") out.fetch = true;
+  if (process.env.SKIP_CLUSTER === "1") out.cluster = true;
   return out;
 }

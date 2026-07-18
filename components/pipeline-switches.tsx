@@ -12,7 +12,9 @@ export type PipelineRow = {
 
 type Props = {
   rows: PipelineRow[];
-  envOverrides: Partial<Record<PipelineRow["key"], string>>;
+  // Only whether a stage is env-locked — not the env-var name (no server config
+  // detail crosses to the client).
+  envOverrides: Partial<Record<PipelineRow["key"], boolean>>;
 };
 
 // Every stage is free now — clustering is pure text math (no AI). The
@@ -81,8 +83,8 @@ export function PipelineSwitches({ rows, envOverrides }: Props) {
                 </div>
               )}
               {override && (
-                <div className="text-[11px] text-[var(--red)] mt-1 font-mono">
-                  Forced OFF by env: {override}
+                <div className="text-[11px] text-[var(--red)] mt-1">
+                  Forced OFF by a server setting
                 </div>
               )}
             </div>
@@ -112,7 +114,7 @@ export function PipelineSwitches({ rows, envOverrides }: Props) {
                 } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                 title={
                   override
-                    ? `Cannot toggle — ${override} is set in env`
+                    ? "Cannot toggle — locked by a server setting"
                     : effective
                     ? "Click to disable"
                     : "Click to enable"
