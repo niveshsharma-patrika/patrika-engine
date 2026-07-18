@@ -11,7 +11,7 @@ on the Azure box over SSH.
 - **Azure Database for PostgreSQL** (Flexible Server). Create an empty database `patrika_engine`.
 - The VM can reach the database (firewall rule: allow the VM's IP / VNet).
 - `postgresql-client` on the VM: `sudo apt install -y postgresql-client`
-- This repo cloned on the VM, on branch `aws-rds-migration` (until it's merged).
+- This repo cloned on the VM, tracking `main`.
 
 ## 1. Load the schema into the Azure database
 ```bash
@@ -93,9 +93,9 @@ crontab -e
 ## Redeploying after a code change
 ```bash
 # 1. get the new code — confirm the branch + a clean tree first, verify the pull landed
-git branch --show-current            # aws-rds-migration
+git branch --show-current            # main
 git status --porcelain               # must be empty (else `git stash` first)
-git pull --ff-only origin aws-rds-migration
+git pull --ff-only origin main
 git log -1 --oneline                 # confirm the commit you expect is now HEAD
 
 # 2. build FIRST — if this fails, STOP here; the running app is untouched and stays up
