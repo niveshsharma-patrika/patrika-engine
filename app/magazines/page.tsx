@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  ArrowLeft, Lightbulb, Loader2, FileText, PenSquare,
+  ArrowLeft, Lightbulb, Loader2, PenSquare,
   ShieldAlert, Landmark, Building2, Wheat, Scale, HeartHandshake,
   HeartPulse, GraduationCap, Trophy, UtensilsCrossed, BookOpen,
   type LucideIcon,
@@ -36,7 +36,6 @@ export default function MagazinesPage() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loadingIdeas, setLoadingIdeas] = useState(false);
   const [ideasErr, setIdeasErr] = useState<string | null>(null);
-  const [topic, setTopic] = useState("");
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState("");
 
@@ -46,11 +45,10 @@ export default function MagazinesPage() {
     setSelected(key);
     setIdeas([]);
     setIdeasErr(null);
-    setTopic("");
   }
 
   // Open the full article composer (the same one used from trending) seeded
-  // with a topic or a generated idea.
+  // with the chosen idea.
   function openComposer(seed: string) {
     setComposerTitle(seed.trim());
     setComposerOpen(true);
@@ -151,77 +149,64 @@ export default function MagazinesPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-5">
-        {/* Ideas generator (Layer 1) */}
-        <section className="bg-white border border-[var(--border)] rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[14px] font-semibold flex items-center gap-1.5">
-              <Lightbulb size={15} className="text-[var(--amber)]" /> {lang === "hi" ? "आइडिया जनरेटर" : "Ideas generator"}
+      {/* Ideas — generate, then pick one to open the full composer */}
+      <section>
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-[15px] font-semibold flex items-center gap-1.5">
+              <Lightbulb size={16} className="text-[var(--amber)]" /> {lang === "hi" ? "आइडिया जनरेटर" : "Ideas generator"}
             </h2>
-            <button
-              onClick={genIdeas}
-              disabled={loadingIdeas}
-              className="bg-[var(--text)] hover:bg-black text-white text-[12px] font-medium px-3 py-1.5 rounded disabled:opacity-50 flex items-center gap-1.5"
-            >
-              {loadingIdeas && <Loader2 size={12} className="animate-spin" />}
-              {loadingIdeas
-                ? lang === "hi" ? "बना रहे…" : "Generating…"
-                : ideas.length
-                  ? lang === "hi" ? "और आइडिया" : "More ideas"
-                  : lang === "hi" ? "आइडिया बनाएं" : "Generate ideas"}
-            </button>
-          </div>
-          {ideasErr && <div className="text-[12px] text-[var(--red)] mb-2">{ideasErr}</div>}
-          {ideas.length === 0 && !loadingIdeas && (
-            <p className="text-[12.5px] text-[var(--text-3)]">
-              {lang === "hi" ? "इस मैगज़ीन के लिए 12–15 नए टॉपिक-आइडिया बनाएं।" : "Generate 12–15 fresh topic ideas for this magazine."}
+            <p className="text-[12px] text-[var(--text-3)] mt-0.5 max-w-xl">
+              {lang === "hi"
+                ? "आइडिया बनाएं, फिर किसी एक पर 'आर्टिकल बनाएँ' दबाकर पूरा कंपोज़र (सभी कंट्रोल्स के साथ) खोलें।"
+                : "Generate ideas, then hit 'Generate article' on one to open the full composer — same as trending, with all the controls."}
             </p>
-          )}
-          <div className="space-y-2">
-            {ideas.map((idea, i) => (
-              <div key={i} className="border border-[var(--border)] rounded-md p-2.5">
-                <div className="text-[13px] font-medium text-[var(--text)]">{idea.headline}</div>
-                <div className="text-[11px] text-[var(--text-3)] mt-0.5">
-                  {idea.subVertical} · {idea.hook}
-                </div>
-                <button
-                  onClick={() => openComposer(idea.headline)}
-                  className="text-[11px] text-[var(--red)] mt-1.5 hover:underline font-medium"
-                >
-                  {lang === "hi" ? "आर्टिकल बनाएँ →" : "Generate article →"}
-                </button>
-              </div>
-            ))}
           </div>
-        </section>
-
-        {/* Article generator — opens the full composer (same as trending) */}
-        <section className="bg-white border border-[var(--border)] rounded-lg p-4">
-          <h2 className="text-[14px] font-semibold flex items-center gap-1.5 mb-1">
-            <FileText size={15} className="text-[var(--blue)]" /> {lang === "hi" ? "आर्टिकल जनरेटर" : "Article generator"}
-          </h2>
-          <p className="text-[12px] text-[var(--text-3)] mb-3">
-            {lang === "hi"
-              ? "पूरा कंपोज़र खुलेगा — ट्रेंडिंग जैसा, सभी कंट्रोल्स (टोन, वॉइस, प्रकाशन, शब्द-सीमा…) के साथ।"
-              : "Opens the full composer — same as trending, with every control (tone, voice, publication, word count…)."}
-          </p>
-          <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">{lang === "hi" ? "टॉपिक" : "Topic"}</label>
-          <textarea
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            rows={2}
-            placeholder={lang === "hi" ? "टॉपिक लिखें या बाईं ओर किसी आइडिया से चुनें…" : "Type a topic, or pick an idea on the left…"}
-            className="w-full text-[13px] bg-[var(--surface-2)] border border-[var(--border)] rounded px-3 py-2 outline-none focus:border-[var(--blue)] focus:bg-white resize-y mb-2"
-          />
           <button
-            onClick={() => openComposer(topic)}
-            className="bg-[var(--red)] hover:bg-[var(--red-hover)] text-white text-[12px] font-medium px-3 py-1.5 rounded flex items-center gap-1.5"
+            onClick={genIdeas}
+            disabled={loadingIdeas}
+            className="shrink-0 bg-[var(--text)] hover:bg-black text-white text-[13px] font-medium px-4 py-2 rounded disabled:opacity-50 flex items-center gap-1.5"
           >
-            <PenSquare size={12} />
-            {lang === "hi" ? "कंपोज़र खोलें" : "Open composer"}
+            {loadingIdeas && <Loader2 size={13} className="animate-spin" />}
+            {loadingIdeas
+              ? lang === "hi" ? "बना रहे…" : "Generating…"
+              : ideas.length
+                ? lang === "hi" ? "और आइडिया" : "More ideas"
+                : lang === "hi" ? "आइडिया बनाएं" : "Generate ideas"}
           </button>
-        </section>
-      </div>
+        </div>
+
+        {ideasErr && <div className="text-[12px] text-[var(--red)] mb-3">{ideasErr}</div>}
+
+        {ideas.length === 0 && !loadingIdeas && (
+          <div className="border border-dashed border-[var(--border)] rounded-lg p-12 text-center text-[13px] text-[var(--text-3)]">
+            {lang === "hi"
+              ? "इस मैगज़ीन के लिए 12–15 नए टॉपिक-आइडिया बनाएं, फिर किसी एक से आर्टिकल लिखें।"
+              : "Generate 12–15 fresh topic ideas for this magazine, then write an article from one."}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {ideas.map((idea, i) => (
+            <div key={i} className="flex flex-col bg-white border border-[var(--border)] rounded-lg p-4">
+              <div className="text-[14px] font-medium text-[var(--text)] leading-snug">{idea.headline}</div>
+              <div className="text-[11px] text-[var(--text-3)] mt-1">
+                {idea.subVertical} · {idea.hook}
+              </div>
+              {idea.benefit && (
+                <div className="text-[12px] text-[var(--text-2)] mt-2 leading-snug">{idea.benefit}</div>
+              )}
+              <button
+                onClick={() => openComposer(idea.headline)}
+                className="mt-3 self-start bg-[var(--red)] hover:bg-[var(--red-hover)] text-white text-[12px] font-medium px-3 py-1.5 rounded flex items-center gap-1.5"
+              >
+                <PenSquare size={12} />
+                {lang === "hi" ? "आर्टिकल बनाएँ" : "Generate article"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* The full composer — identical to the one opened from a trending story */}
       {composerOpen && (
