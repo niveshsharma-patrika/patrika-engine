@@ -215,11 +215,10 @@ export default function MagazinesPage() {
           />
           <button
             onClick={() => openComposer(topic)}
-            disabled={!topic.trim()}
-            className="bg-[var(--red)] hover:bg-[var(--red-hover)] text-white text-[12px] font-medium px-3 py-1.5 rounded disabled:opacity-50 flex items-center gap-1.5"
+            className="bg-[var(--red)] hover:bg-[var(--red-hover)] text-white text-[12px] font-medium px-3 py-1.5 rounded flex items-center gap-1.5"
           >
             <PenSquare size={12} />
-            {lang === "hi" ? "आर्टिकल बनाएँ" : "Generate article"}
+            {lang === "hi" ? "कंपोज़र खोलें" : "Open composer"}
           </button>
         </section>
       </div>
