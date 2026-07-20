@@ -245,7 +245,7 @@ type LiveTrend = {
   section: string | null;
   suggested_angle: string | null;
   story_type: string | null;
-  signals?: Array<{ author: string | null; content: string }>;
+  signals?: Array<{ author: string | null; content: string; description: string | null }>;
 };
 
 /**
@@ -289,7 +289,7 @@ async function resolveTrend(
     .from("trends")
     .select(
       `id, title, title_hi, desk, section, suggested_angle, story_type,
-       signals ( author, content )`
+       signals ( author, content, description )`
     )
     .eq("id", String(trendId))
     .maybeSingle();
@@ -303,10 +303,14 @@ async function resolveTrend(
     section: row.section,
     suggestedAngle: row.suggested_angle,
     storyType: row.story_type,
-    signals: (row.signals ?? []).slice(0, 6).map((s) => ({
-      author: s.author ?? "Source",
-      text: (s.content ?? "").split(" — ")[0].slice(0, 200),
-    })),
+    // Feed the headline AND the enriched description the pipeline already stored,
+    // for more sources — so the model has real material to write to length
+    // instead of ~6 bare headlines. More/richer signals = fuller, still-grounded drafts.
+    signals: (row.signals ?? []).slice(0, 12).map((s) => {
+      const headline = (s.content ?? "").split(" — ")[0].trim();
+      const text = [headline, s.description?.trim()].filter(Boolean).join(" — ").slice(0, 700);
+      return { author: s.author ?? "Source", text };
+    }),
   };
 }
 
