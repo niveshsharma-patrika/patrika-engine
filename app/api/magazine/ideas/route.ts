@@ -48,7 +48,7 @@ export async function POST(req: Request) {
           .min(6)
           .max(20),
       }),
-      prompt,
+      prompt: `${prompt}\n\nRespond with valid JSON.`,
       temperature: 0.8,
     });
     return Response.json({ ideas: res.object.ideas });

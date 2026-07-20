@@ -81,7 +81,7 @@ ${DEFINITIONS}
 Headlines:
 ${lines}
 
-Return { items: [ { idx, section } ] } covering every headline by its [idx] number.`,
+Return { items: [ { idx, section } ] } covering every headline by its [idx] number. Respond with valid JSON.`,
       });
       for (const it of object.items) {
         const story = chunk[it.idx - 1];

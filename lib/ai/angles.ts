@@ -96,7 +96,7 @@ ${coverageText}`;
       providerOptions: { groq: { structuredOutputs: false } },
       schema: AngleSchema,
       system: resolved.systemPrompt ?? undefined,
-      prompt,
+      prompt: `${prompt}\n\nRespond with valid JSON.`,
       temperature: 0.4,
     });
 

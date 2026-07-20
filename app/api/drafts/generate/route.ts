@@ -517,7 +517,7 @@ export async function POST(req: Request) {
       providerOptions: { groq: { structuredOutputs: false } },
       system: drafting.systemPrompt ?? undefined,
       schema: z.object({ titles: z.array(z.string()).min(2).max(8) }),
-      prompt: headlinePrompt,
+      prompt: `${headlinePrompt}\n\nRespond with valid JSON.`,
       temperature: 0.6,
     });
 
