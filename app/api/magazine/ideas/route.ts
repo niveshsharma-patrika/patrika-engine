@@ -1,4 +1,4 @@
-import { generateObject } from "ai";
+import { generateStructured } from "@/lib/ai/structured";
 import { z } from "zod";
 
 import { getSession } from "@/lib/auth/session";
@@ -30,10 +30,8 @@ export async function POST(req: Request) {
   if (!prompt) return Response.json({ error: "No idea prompt for this magazine." }, { status: 500 });
 
   try {
-    const res = await generateObject({
+    const res = await generateStructured({
       model: model.model,
-      // Groq's Llama models don't support strict json_schema — use JSON mode.
-      providerOptions: { groq: { structuredOutputs: false } },
       system: model.systemPrompt ?? undefined,
       schema: z.object({
         ideas: z
@@ -45,10 +43,10 @@ export async function POST(req: Request) {
               benefit: z.string(),
             })
           )
-          .min(6)
+          .min(3)
           .max(20),
       }),
-      prompt: `${prompt}\n\nRespond with valid JSON.`,
+      prompt,
       temperature: 0.8,
     });
     return Response.json({ ideas: res.object.ideas });

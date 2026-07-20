@@ -1,4 +1,4 @@
-import { generateObject } from "ai";
+import { generateStructured } from "@/lib/ai/structured";
 import { z } from "zod";
 
 import { getModelFor } from "./provider";
@@ -68,10 +68,8 @@ export async function classifyStorySections(
     const chunk = stories.slice(i, i + BATCH);
     const lines = chunk.map((s, j) => `[${j + 1}] ${s.title}`).join("\n");
     try {
-      const { object } = await generateObject({
+      const { object } = await generateStructured({
         model: resolved.model,
-        // Groq's Llama models don't support strict json_schema — use JSON mode.
-        providerOptions: { groq: { structuredOutputs: false } },
         schema: Schema,
         temperature: 0,
         prompt: `You are a news desk editor at an Indian newsroom. Classify each headline into one section.

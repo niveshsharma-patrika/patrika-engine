@@ -1,4 +1,4 @@
-import { generateObject } from "ai";
+import { generateStructured } from "@/lib/ai/structured";
 import { z } from "zod";
 
 import { getModelFor } from "./provider";
@@ -90,13 +90,11 @@ COVERAGE (${input.coverage.length} articles — the ONLY facts you may use):
 ${coverageText}`;
 
   try {
-    const { object, usage } = await generateObject({
+    const { object, usage } = await generateStructured({
       model: resolved.model,
-      // Groq's Llama models don't support strict json_schema — use JSON mode.
-      providerOptions: { groq: { structuredOutputs: false } },
       schema: AngleSchema,
       system: resolved.systemPrompt ?? undefined,
-      prompt: `${prompt}\n\nRespond with valid JSON.`,
+      prompt,
       temperature: 0.4,
     });
 
