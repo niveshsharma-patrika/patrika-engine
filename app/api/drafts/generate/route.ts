@@ -512,6 +512,9 @@ export async function POST(req: Request) {
     // little more temperature here for genuine variety across the options.
     headlineRes = await generateObject({
       model: drafting.model,
+      // Groq's Llama models don't support strict json_schema — fall back to JSON
+      // mode. Other providers ignore this option.
+      providerOptions: { groq: { structuredOutputs: false } },
       system: drafting.systemPrompt ?? undefined,
       schema: z.object({ titles: z.array(z.string()).min(2).max(8) }),
       prompt: headlinePrompt,

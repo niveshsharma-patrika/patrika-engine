@@ -92,6 +92,8 @@ ${coverageText}`;
   try {
     const { object, usage } = await generateObject({
       model: resolved.model,
+      // Groq's Llama models don't support strict json_schema — use JSON mode.
+      providerOptions: { groq: { structuredOutputs: false } },
       schema: AngleSchema,
       system: resolved.systemPrompt ?? undefined,
       prompt,

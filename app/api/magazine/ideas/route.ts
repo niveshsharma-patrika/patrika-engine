@@ -32,6 +32,8 @@ export async function POST(req: Request) {
   try {
     const res = await generateObject({
       model: model.model,
+      // Groq's Llama models don't support strict json_schema — use JSON mode.
+      providerOptions: { groq: { structuredOutputs: false } },
       system: model.systemPrompt ?? undefined,
       schema: z.object({
         ideas: z

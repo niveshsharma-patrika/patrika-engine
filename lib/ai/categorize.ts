@@ -70,6 +70,8 @@ export async function classifyStorySections(
     try {
       const { object } = await generateObject({
         model: resolved.model,
+        // Groq's Llama models don't support strict json_schema — use JSON mode.
+        providerOptions: { groq: { structuredOutputs: false } },
         schema: Schema,
         temperature: 0,
         prompt: `You are a news desk editor at an Indian newsroom. Classify each headline into one section.
