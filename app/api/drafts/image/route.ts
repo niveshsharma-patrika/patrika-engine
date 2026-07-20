@@ -1,6 +1,10 @@
+import { generateImage } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+
 import { getSession } from "@/lib/auth/session";
 import { pool } from "@/lib/db";
-import { getApiKey } from "@/lib/ai/provider";
+import { getImageRouting } from "@/lib/ai/provider";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
@@ -10,16 +14,17 @@ const IMAGE_QUOTA: Record<string, number> = { admin: Infinity, editor: 5, writer
 
 /**
  * POST /api/drafts/image — generate a hero image for an article from its
- * headline, via the OpenAI images API (gpt-image-1). Returns a data URL the
- * Editor shows inline + lets the user download. No storage.
+ * headline. Provider (OpenAI gpt-image-1 / Google Imagen) is chosen in
+ * Admin → Model routing; the key comes from Admin → API Keys. Returns a data URL.
  */
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const openaiKey = await getApiKey("openai");
-  if (!openaiKey) {
+
+  const routing = await getImageRouting();
+  if (!routing) {
     return Response.json(
-      { error: "No OpenAI key configured (set it in Admin → API Keys, or in the env)." },
+      { error: "No image provider key configured — set OpenAI or Google in Admin → API Keys." },
       { status: 503 }
     );
   }
@@ -51,7 +56,6 @@ export async function POST(req: Request) {
     }
   }
 
-  const model = process.env.IMAGE_MODEL ?? "gpt-image-1";
   const prompt =
     `A realistic editorial news PHOTOGRAPH illustrating this story: "${title}". ` +
     `Photojournalistic press photo — natural lighting, real people and real settings, authentic Indian context, shot on a DSLR with shallow depth of field. ` +
@@ -59,35 +63,25 @@ export async function POST(req: Request) {
     `Absolutely NO text, no words, no letters, no numbers, no watermark, no logos.`;
 
   try {
-    const res = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({ model, prompt, n: 1, size: "1536x1024" }),
-    });
-    if (!res.ok) {
-      return Response.json(
-        { error: `Image generation failed: ${(await res.text()).slice(0, 200)}` },
-        { status: 502 }
-      );
-    }
-    const json = (await res.json()) as { data?: Array<{ b64_json?: string; url?: string }> };
-    const item = json.data?.[0];
-    let b64 = item?.b64_json;
-    if (!b64 && item?.url) {
-      const img = await fetch(item.url);
-      if (img.ok) b64 = Buffer.from(await img.arrayBuffer()).toString("base64");
-    }
-    if (!b64) return Response.json({ error: "No image returned." }, { status: 502 });
+    const imageModel =
+      routing.providerKey === "google"
+        ? createGoogleGenerativeAI({ apiKey: routing.apiKey }).image(routing.modelKey)
+        : createOpenAI({ apiKey: routing.apiKey }).image(routing.modelKey);
+
+    // gpt-image-1 takes an exact pixel size; Imagen takes an aspect ratio.
+    const { image } =
+      routing.providerKey === "google"
+        ? await generateImage({ model: imageModel, prompt, aspectRatio: "16:9" })
+        : await generateImage({ model: imageModel, prompt, size: "1536x1024" });
+
     // Log the successful generation for the quota counter (best-effort).
     try {
       await pool.query("INSERT INTO image_generations (user_id) VALUES ($1)", [session.userId]);
     } catch {
       /* ignore */
     }
-    return Response.json({ image: `data:image/png;base64,${b64}` });
+
+    return Response.json({ image: `data:${image.mediaType ?? "image/png"};base64,${image.base64}` });
   } catch (e) {
     return Response.json(
       { error: e instanceof Error ? e.message : "Image generation failed" },

@@ -1,11 +1,10 @@
 import { generateObject, generateText } from "ai";
 
 import { getEffectiveDirectives, type DirectiveMap } from "@/lib/ai/directives";
-import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 
 import { TRENDS } from "@/lib/data/trends";
-import { getModelFor, getApiKey } from "@/lib/ai/provider";
+import { getModelFor } from "@/lib/ai/provider";
 import { createAdminClient } from "@/lib/supabase/server";
 
 /**
@@ -444,19 +443,11 @@ export async function POST(req: Request) {
     );
   }
 
-  // A distinctive outlet house style (NYT, Reuters, Bloomberg…) needs a stronger
-  // model than the per-tick default to actually ADOPT the voice — gpt-4o-mini
-  // stays generic no matter the directives. Use gpt-4.1 for non-Patrika
-  // publications when an OpenAI key is present (Patrika keeps the cheap default).
+  // The drafting model is whatever the admin selected as the content provider
+  // (resolved above via getModelFor). isDistinctivePub still nudges the
+  // temperature up so non-Patrika outlet styles read less generic.
   const selectedPub = parsed.data.params?.publication;
   const isDistinctivePub = !!selectedPub && !/patrika/i.test(selectedPub);
-  const styleOpenaiKey = isDistinctivePub ? await getApiKey("openai") : null;
-  if (isDistinctivePub && styleOpenaiKey) {
-    const styleModel = process.env.STYLE_DRAFT_MODEL ?? "gpt-4.1";
-    drafting.model = createOpenAI({ apiKey: styleOpenaiKey })(styleModel);
-    drafting.modelKey = styleModel;
-    drafting.providerKey = "openai";
-  }
 
   // No-trend path: just stub
   if (!trend) {

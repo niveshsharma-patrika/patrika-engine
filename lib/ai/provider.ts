@@ -101,6 +101,69 @@ async function envFallback(): Promise<ResolvedModel | null> {
   return null;
 }
 
+// Default model per provider when a provider is selected but not a model.
+export const DEFAULT_CONTENT_MODEL: Record<ProviderKey, string> = {
+  openai: "gpt-4o-mini",
+  anthropic: "claude-haiku-4-5",
+  groq: "llama-3.3-70b-versatile",
+  google: "gemini-2.5-flash",
+};
+export const DEFAULT_IMAGE_MODEL: Record<"openai" | "google", string> = {
+  openai: "gpt-image-1",
+  google: "imagen-4.0-generate-001",
+};
+
+/** The admin-selected provider/model for a purpose (ai_routing table). */
+export async function getRouting(
+  purpose: "content" | "image"
+): Promise<{ provider: ProviderKey; model: string } | null> {
+  try {
+    const { rows } = await pool.query<{ provider: string; model: string | null }>(
+      "SELECT provider, model FROM ai_routing WHERE purpose = $1 LIMIT 1",
+      [purpose]
+    );
+    const row = rows[0];
+    if (!row || !(row.provider in AI_PROVIDERS)) return null;
+    const provider = row.provider as ProviderKey;
+    const fallback =
+      purpose === "image"
+        ? DEFAULT_IMAGE_MODEL[provider as "openai" | "google"] ?? DEFAULT_IMAGE_MODEL.openai
+        : DEFAULT_CONTENT_MODEL[provider];
+    return { provider, model: row.model || fallback };
+  } catch {
+    return null; // table missing / transient → callers fall back
+  }
+}
+
+/**
+ * Resolve the image provider/model/key. Only OpenAI + Google can generate
+ * images; anything else (or nothing selected) falls back to OpenAI. Returns
+ * null if the chosen provider has no key.
+ */
+export async function getImageRouting(): Promise<
+  { providerKey: "openai" | "google"; modelKey: string; apiKey: string } | null
+> {
+  const routing = await getRouting("image");
+  // Honor an explicit selection when that provider actually has a key.
+  if (routing && (routing.provider === "openai" || routing.provider === "google")) {
+    const apiKey = await getApiKey(routing.provider);
+    if (apiKey) {
+      return {
+        providerKey: routing.provider,
+        modelKey: routing.model || DEFAULT_IMAGE_MODEL[routing.provider],
+        apiKey,
+      };
+    }
+  }
+  // No selection (or the selected provider has no key) → use whichever image
+  // provider has a key, OpenAI first then Google.
+  for (const p of ["openai", "google"] as const) {
+    const apiKey = await getApiKey(p);
+    if (apiKey) return { providerKey: p, modelKey: DEFAULT_IMAGE_MODEL[p], apiKey };
+  }
+  return null;
+}
+
 /**
  * Resolve which model to use for a given use case, based on admin config.
  * Returns the LanguageModel + metadata, or null if unconfigured / no key.
@@ -130,7 +193,8 @@ export async function getModelFor(
   }
 
   // Admin-configured model for this use case (ai_config → ai_models → ai_providers).
-  // Direct join — the compat shim handles one-level embeds; this one is two-level.
+  // Fetched first so the per-use-case system prompt survives even when the admin
+  // overrides the provider below.
   type ConfigRow = { system_prompt: string | null; model_key: string; provider_key: string };
   const { rows } = await pool
     .query<ConfigRow>(
@@ -143,8 +207,27 @@ export async function getModelFor(
       [useCase]
     )
     .catch(() => ({ rows: [] as ConfigRow[] }));
-
   const row = rows[0];
+  const systemPrompt = row?.system_prompt ?? null;
+
+  // Admin-selected content provider (Admin → Model routing) overrides the
+  // provider/model for every text use case — but keeps the ai_config system prompt.
+  const contentRouting = await getRouting("content");
+  if (contentRouting) {
+    const apiKey = await getApiKey(contentRouting.provider);
+    if (apiKey) {
+      return {
+        model: instantiate(contentRouting.provider, contentRouting.model, apiKey),
+        providerKey: contentRouting.provider,
+        modelKey: contentRouting.model,
+        systemPrompt,
+      };
+    }
+    console.warn(
+      `Content provider "${contentRouting.provider}" is selected but has no key; falling back.`
+    );
+  }
+
   // No admin config row for this use case → fall back to the env default.
   if (!row) return envFallback();
 

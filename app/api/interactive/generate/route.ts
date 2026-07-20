@@ -1,9 +1,8 @@
 import { generateText, type LanguageModel } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { getModelFor, getApiKey } from "@/lib/ai/provider";
+import { getModelFor } from "@/lib/ai/provider";
 
 export const dynamic = "force-dynamic";
 // gpt-4.1 emitting a full ~20KB designed widget (heavier in Hindi) can take
@@ -80,26 +79,18 @@ export async function POST(req: Request) {
     coverage.push(`- ${text}`);
   }
 
-  // Widgets are design-heavy + on-demand (low volume), so use a stronger model
-  // than the per-tick default — gpt-4o by default, configurable via WIDGET_MODEL.
-  // Falls back to the configured drafting model when no OpenAI key is present.
+  // Widgets use the admin-selected content provider (Admin → Model routing).
   let model: LanguageModel;
   let modelLabel: string;
-  const openaiKey = await getApiKey("openai");
-  if (openaiKey) {
-    modelLabel = process.env.WIDGET_MODEL ?? "gpt-4.1";
-    model = createOpenAI({ apiKey: openaiKey })(modelLabel);
-  } else {
-    const resolved = await getModelFor("drafting");
-    if (!resolved) {
-      return Response.json(
-        { error: "No AI model configured (set OPENAI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY)." },
-        { status: 503 }
-      );
-    }
-    model = resolved.model;
-    modelLabel = resolved.modelKey;
+  const resolved = await getModelFor("drafting");
+  if (!resolved) {
+    return Response.json(
+      { error: "No AI content provider configured — set it in Admin." },
+      { status: 503 }
+    );
   }
+  model = resolved.model;
+  modelLabel = resolved.modelKey;
 
   const t = trend as { title: string; section: string | null; desk: string | null };
   const langLine =

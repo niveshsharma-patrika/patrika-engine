@@ -5,6 +5,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/server";
 import { envOverrides } from "@/lib/pipeline-settings";
 import { ProviderKeys } from "@/components/provider-keys";
+import { AiRouting } from "@/components/ai-routing";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +155,17 @@ export default async function AdminPage() {
           </p>
         </div>
         <ProviderKeys providers={providerRows} />
+      </section>
+
+      {/* AI Model routing — which provider handles content vs images */}
+      <section className="mb-8">
+        <div className="mb-3">
+          <h2 className="text-[15px] font-medium">Model routing</h2>
+          <p className="text-[12px] text-[var(--text-3)] mt-0.5">
+            Choose which provider generates content (text) vs images. Keys come from API Keys above.
+          </p>
+        </div>
+        <AiRouting />
       </section>
 
       {/* Users */}
