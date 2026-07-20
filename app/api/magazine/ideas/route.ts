@@ -33,23 +33,27 @@ export async function POST(req: Request) {
     const res = await generateStructured({
       model: model.model,
       system: model.systemPrompt ?? undefined,
+      // Tolerant: weaker models (Groq) sometimes omit a field. Default missing
+      // text to empty and filter out headline-less items below, rather than
+      // hard-failing the whole batch on one imperfect idea.
       schema: z.object({
         ideas: z
           .array(
             z.object({
-              headline: z.string(),
-              subVertical: z.string(),
-              hook: z.string(),
-              benefit: z.string(),
+              headline: z.string().default(""),
+              subVertical: z.string().default(""),
+              hook: z.string().default(""),
+              benefit: z.string().default(""),
             })
           )
-          .min(3)
+          .min(1)
           .max(20),
       }),
       prompt,
       temperature: 0.8,
     });
-    return Response.json({ ideas: res.object.ideas });
+    const ideas = res.object.ideas.filter((i) => i.headline.trim());
+    return Response.json({ ideas });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Generation failed.";
     const rateLimited = /quota|rate.?limit|exhausted|RESOURCE_EXHAUSTED|429/i.test(msg);

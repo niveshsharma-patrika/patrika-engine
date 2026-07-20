@@ -29,18 +29,20 @@ const AngleSchema = z.object({
   angles: z
     .array(
       z.object({
-        title: z.string().describe("A sharp 6-12 word editorial angle / hook"),
+        title: z.string().default("").describe("A sharp 6-12 word editorial angle / hook"),
         summary: z
           .string()
+          .default("")
           .describe("1-2 sentences: the lens and exactly what to focus on / dig into"),
         format: z
           .string()
+          .default("Analysis")
           .describe(
             "Suggested story format, e.g. Explainer, Ground report, Analysis, Profile, Timeline, Q&A, Data story"
           ),
       })
     )
-    .min(2)
+    .min(1)
     .max(3),
 });
 
@@ -98,12 +100,15 @@ ${coverageText}`;
       temperature: 0.4,
     });
 
-    const angles: StoryAngle[] = object.angles.slice(0, 3).map((a, i) => ({
-      id: `a${i + 1}`,
-      title: a.title.trim(),
-      summary: a.summary.trim(),
-      format: a.format.trim(),
-    }));
+    const angles: StoryAngle[] = object.angles
+      .filter((a) => a.title.trim())
+      .slice(0, 3)
+      .map((a, i) => ({
+        id: `a${i + 1}`,
+        title: a.title.trim(),
+        summary: a.summary.trim(),
+        format: a.format.trim() || "Analysis",
+      }));
 
     return {
       angles,
