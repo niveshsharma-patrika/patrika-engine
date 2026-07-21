@@ -919,75 +919,13 @@ export function Editor({ trend, title, setTitle, onClose }: {
               ? lang === "hi" ? "फिर से बनाएँ →" : "Regenerate →"
               : lang === "hi" ? "स्टोरी बनाएँ →" : "Generate story →"}
           </button>
-
-          {hasGenerated && (
-            <>
-              {/* Story stats */}
-              <div className="mt-5 grid grid-cols-3 gap-2">
-                <div className="rounded-lg border border-[var(--border)] bg-white px-2 py-2.5 text-center">
-                  <div className="text-[17px] font-semibold text-[var(--text)] leading-none">{words}</div>
-                  <div className="text-[10px] text-[var(--text-3)] mt-1">{lang === "hi" ? "शब्द" : "words"}</div>
-                </div>
-                <div className="rounded-lg border border-[var(--border)] bg-white px-2 py-2.5 text-center">
-                  <div className="text-[17px] font-semibold text-[var(--text)] leading-none">{wordCount}</div>
-                  <div className="text-[10px] text-[var(--text-3)] mt-1">{lang === "hi" ? "लक्ष्य" : "target"}</div>
-                </div>
-                <div className="rounded-lg border border-[var(--border)] bg-white px-2 py-2.5 text-center">
-                  <div className="text-[17px] font-semibold text-[var(--text)] leading-none">
-                    {words > 0 ? Math.max(1, Math.round(words / 200)) : 0}
-                  </div>
-                  <div className="text-[10px] text-[var(--text-3)] mt-1">{lang === "hi" ? "मिनट" : "min read"}</div>
-                </div>
-              </div>
-
-              {/* Article image — AI-generated from the headline */}
-              <div className="mt-5">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-[13px] font-semibold flex items-center gap-1.5">
-                    <ImageIcon size={14} className="text-[var(--purple)]" />
-                    {lang === "hi" ? "आर्टिकल इमेज" : "Article image"}
-                  </h4>
-                  {articleImage && (
-                    <a
-                      href={articleImage}
-                      download="patrika-article.png"
-                      className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)] flex items-center gap-1"
-                    >
-                      <Download size={12} /> {lang === "hi" ? "डाउनलोड" : "Download"}
-                    </a>
-                  )}
-                </div>
-                {imageError && <div className="text-[12px] text-[var(--red)] mb-2">{imageError}</div>}
-                {articleImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={articleImage} alt="" className="w-full rounded-xl border border-[var(--border)] mb-2" />
-                ) : (
-                  <div className="rounded-xl border border-dashed border-[var(--border)] p-4 text-center text-[11px] text-[var(--text-3)] mb-2 leading-snug">
-                    {lang === "hi"
-                      ? "हेडलाइन से एक आर्टिकल इमेज बनाएँ (उसमें कोई टेक्स्ट नहीं होगा)।"
-                      : "Generate an article image from the headline (no text baked in)."}
-                  </div>
-                )}
-                <button
-                  onClick={genImage}
-                  disabled={loadingImage || !title.trim()}
-                  className="w-full bg-[var(--purple)] text-white text-[12px] font-medium px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-50"
-                >
-                  {loadingImage ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-                  {loadingImage
-                    ? lang === "hi" ? "बना रहे हैं…" : "Generating…"
-                    : articleImage
-                    ? lang === "hi" ? "फिर से बनाएँ" : "Regenerate"
-                    : lang === "hi" ? "इमेज बनाएँ" : "Generate image"}
-                </button>
-              </div>
-            </>
-          )}
         </aside>
 
         {/* MAIN — Write with AI */}
         <main className="overflow-y-auto p-8">
-          <div className="max-w-[760px]">
+          <div className="flex gap-6 items-start flex-wrap">
+            {/* Article column */}
+            <section className="flex-1 min-w-0 max-w-[760px]">
             <h2 className="text-[20px] font-semibold flex items-center gap-2">
               {lang === "hi" ? "AI से लिखें" : "Write with AI"}
               <Sparkles size={17} className="text-[var(--purple)]" />
@@ -1126,6 +1064,72 @@ export function Editor({ trend, title, setTitle, onClose }: {
                   </div>
                 )}
               </div>
+            )}
+            </section>
+
+            {/* Right rail — story stats + article image, shown once a story exists */}
+            {hasGenerated && (
+              <aside className="w-[300px] shrink-0 space-y-5 sticky top-0">
+                {/* Story stats */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl border border-[var(--border)] bg-white px-2 py-3 text-center">
+                    <div className="text-[18px] font-semibold text-[var(--text)] leading-none">{words}</div>
+                    <div className="text-[10px] text-[var(--text-3)] mt-1">{lang === "hi" ? "शब्द" : "words"}</div>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border)] bg-white px-2 py-3 text-center">
+                    <div className="text-[18px] font-semibold text-[var(--text)] leading-none">{wordCount}</div>
+                    <div className="text-[10px] text-[var(--text-3)] mt-1">{lang === "hi" ? "लक्ष्य" : "target"}</div>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border)] bg-white px-2 py-3 text-center">
+                    <div className="text-[18px] font-semibold text-[var(--text)] leading-none">
+                      {words > 0 ? Math.max(1, Math.round(words / 200)) : 0}
+                    </div>
+                    <div className="text-[10px] text-[var(--text-3)] mt-1">{lang === "hi" ? "मिनट" : "min read"}</div>
+                  </div>
+                </div>
+
+                {/* Article image — AI-generated from the headline */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-[13px] font-semibold flex items-center gap-1.5">
+                      <ImageIcon size={14} className="text-[var(--purple)]" />
+                      {lang === "hi" ? "आर्टिकल इमेज" : "Article image"}
+                    </h4>
+                    {articleImage && (
+                      <a
+                        href={articleImage}
+                        download="patrika-article.png"
+                        className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)] flex items-center gap-1"
+                      >
+                        <Download size={12} /> {lang === "hi" ? "डाउनलोड" : "Download"}
+                      </a>
+                    )}
+                  </div>
+                  {imageError && <div className="text-[12px] text-[var(--red)] mb-2">{imageError}</div>}
+                  {articleImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={articleImage} alt="" className="w-full rounded-xl border border-[var(--border)] mb-2" />
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-[var(--border)] p-5 text-center text-[11px] text-[var(--text-3)] mb-2 leading-snug">
+                      {lang === "hi"
+                        ? "हेडलाइन से एक आर्टिकल इमेज बनाएँ (उसमें कोई टेक्स्ट नहीं होगा)।"
+                        : "Generate an article image from the headline (no text baked in)."}
+                    </div>
+                  )}
+                  <button
+                    onClick={genImage}
+                    disabled={loadingImage || !title.trim()}
+                    className="w-full bg-[var(--purple)] text-white text-[12px] font-medium px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {loadingImage ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                    {loadingImage
+                      ? lang === "hi" ? "बना रहे हैं…" : "Generating…"
+                      : articleImage
+                      ? lang === "hi" ? "फिर से बनाएँ" : "Regenerate"
+                      : lang === "hi" ? "इमेज बनाएँ" : "Generate image"}
+                  </button>
+                </div>
+              </aside>
             )}
           </div>
         </main>
