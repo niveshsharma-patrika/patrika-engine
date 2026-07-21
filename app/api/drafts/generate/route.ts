@@ -436,11 +436,15 @@ Rules:
  */
 function stripCitations(text: string): string {
   return text
-    .replace(/\(?\s*\[[^\]]*\]\(https?:\/\/[^)\s]+\)\s*\)?/g, "") // ([label](url))
+    // Markdown links: KEEP the informative link text (facts/dates live there) —
+    // drop only pure domain/citation labels and the URL itself.
+    .replace(/\(?\s*\[([^\]]*)\]\(https?:\/\/[^)\s]+\)\s*\)?/g, (_m, label: string) => {
+      const l = label.trim();
+      return /^[\w-]+(\.[\w-]+)+$/.test(l) ? "" : l; // domain-only → drop; text → keep
+    })
     .replace(/\(\s*https?:\/\/[^)\s]+\s*\)/g, "") // (url)
-    .replace(/【[^】]*】/g, "") // 【turn0news…】 style refs
-    .replace(/\[\d+\]/g, "") // [1] footnote markers
     .replace(/https?:\/\/[^\s)]+/g, "") // bare urls
+    .replace(/【[^】]*】/g, "") // 【…】 citation markers
     .replace(/\[\s*\]|\(\s*\)/g, "") // leftover empty [] ()
     .replace(/[ \t]{2,}/g, " ")
     .replace(/[ \t]+([।.,;:!?])/g, "$1")
@@ -538,7 +542,7 @@ ${langLine}
 • Verify names, dates, numbers, and especially the REASON / CONTEXT before stating them. If a specific fact can't be verified from your search, leave it out rather than guessing.
 • Length: about ${targetWords} words. Newspaper style: open with a dateline in CAPS (e.g. NEW DELHI:), a strong lead with the LATEST development, then a well-structured body.
 • Do NOT name other news outlets in the article body — Patrika writes its own report.
-• Write clean article prose ONLY — do NOT put inline citations, source links, footnote markers, brackets, or URLs in the article text.
+• Write clean prose — no source links or URLs in the text (no "[label](url)" or "(https://…)"), but KEEP every specific fact, date, number, and name you found.
 • Never refuse; always produce the finished article.
 ${framing}`;
 
