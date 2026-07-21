@@ -170,6 +170,9 @@ ${samplesText}
 
 const Body = z.object({
   trendId: z.union([z.number(), z.string()]).nullable(),
+  // The editor's typed headline/topic — used as the subject on the no-trend
+  // ("Write on a topic") path. Ignored when a trend is selected.
+  title: z.string().max(300).optional(),
   mode: z.enum(["factual", "angle"]).default("factual"),
   lang: z.enum(["en", "hi"]).default("en"),
   // A specific AI-generated angle the editor selected. When present (mode
@@ -461,18 +464,62 @@ export async function POST(req: Request) {
     drafting.providerKey = "openai";
   }
 
-  // No-trend path: just stub
+  // Write-on-a-topic (no trend): write on the editor's typed topic, from the
+  // model's own knowledge (there are no source signals here). Respect the word
+  // count, language, and controls, and offer headline options.
   if (!trend) {
-    const fb = await generateText({
+    const topic = (parsed.data.title ?? "").trim();
+    if (!topic) {
+      return Response.json(
+        { error: "Type a headline / topic to write about." },
+        { status: 400 }
+      );
+    }
+    const p = parsed.data.params;
+    const isHi = parsed.data.lang === "hi";
+    const targetWords = p?.wordCount ?? 600;
+    const directives = await getEffectiveDirectives();
+    const framing = paramDirectives(p, directives);
+    const langLine = isHi
+      ? "पूरा लेख हिंदी (देवनागरी लिपि) में लिखें।"
+      : "Write the entire article in English.";
+    const maxOutputTokens = Math.min(12000, Math.ceil(targetWords * (isHi ? 6 : 2)) + 400);
+
+    const bodyPrompt = `You are a senior Patrika news journalist. Write a complete, publish-ready news article on THIS EXACT topic — do not drift to any other subject:
+
+TOPIC: ${topic}
+
+${langLine}
+• Length: about ${targetWords} words — write the FULL piece, do not stop short.
+• Newspaper style: open with a dateline in CAPS (e.g. NEW DELHI:), a strong lead, then a well-structured body with clear sub-sections.
+• There are no source reports attached — write accurately from established knowledge. If a specific fact is uncertain, keep it general rather than fabricating precise numbers or quotes. Do NOT refuse or apologise; ALWAYS produce the finished article.
+• Do NOT name or attribute to other news outlets — Patrika is writing its own report.
+${framing}`;
+
+    let titles: string[] = [topic];
+    try {
+      const h = await generateObject({
+        model: drafting.model,
+        schema: z.object({ titles: z.array(z.string()).min(2).max(8) }),
+        prompt: `Write ${p?.numberOfTitles ?? 4} distinct newspaper headline options (each 8-14 words) for a news article on this topic: "${topic}". ${isHi ? "हिंदी में लिखें।" : "In English."} Return them in the "titles" array.`,
+        temperature: 0.6,
+      });
+      titles = [topic, ...h.object.titles.filter((t) => t.trim() && t.trim() !== topic)];
+    } catch {
+      /* headline options are optional — keep the typed title */
+    }
+
+    const bodyRes = await generateText({
       model: drafting.model,
-      prompt:
-        parsed.data.lang === "hi"
-          ? "एक 400 शब्दों का समाचार लेख लिखें। शुरुआत में डेटलाइन (जैसे MUMBAI:) रखें।"
-          : "Write a 400 word newspaper article on a topic of your choice. Start with a dateline in CAPS.",
+      prompt: bodyPrompt,
+      temperature: 0.3,
+      maxOutputTokens,
     });
+
     return Response.json({
-      title: "",
-      body: fb.text.trim(),
+      titles,
+      title: topic,
+      body: bodyRes.text.trim(),
       mode: parsed.data.mode,
     });
   }

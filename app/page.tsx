@@ -562,6 +562,7 @@ export function Editor({ trend, title, setTitle, onClose }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           trendId: trend?.uid ?? trend?.id ?? null,
+          title,
           mode: selectedAngle ? "angle" : "factual",
           lang: genLang,
           angle: selectedAngle ?? undefined,
