@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -98,62 +98,118 @@ def _as_int(value: Any) -> int:
         return 0
 
 
-def _normalise(raw: dict[str, Any], handle: str) -> dict[str, Any] | None:
+def _iso(ts: str) -> str:
     """
-    Map one Scweet tweet dict onto the shape lib/twitter/crawl.ts expects.
+    Normalise Scweet's timestamp to ISO-8601 UTC.
 
-    Field names are read through candidate lists rather than assuming one
-    schema — Scweet's shape has shifted across versions. Use ?raw=1 on
-    /timeline to inspect the real keys if something comes back empty.
+    Scweet emits X's legacy format ("Tue Jul 21 07:23:42 +0000 2026"). Convert
+    here rather than relying on JS Date parsing it on the Node side.
+    """
+    for fmt in ("%a %b %d %H:%M:%S %z %Y", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(ts, fmt)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc).isoformat()
+        except ValueError:
+            continue
+    return ts  # let the caller decide; it validates before inserting
+
+
+def _dig(obj: Any, *path: str) -> Any:
+    """Walk a nested dict safely: _dig(raw, 'legacy', 'in_reply_to_status_id_str')."""
+    cur = obj
+    for key in path:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(key)
+    return cur
+
+
+def _normalise(row: dict[str, Any], handle: str) -> dict[str, Any] | None:
+    """
+    Map one Scweet 5.x tweet dict onto the shape lib/twitter/crawl.ts expects.
+
+    Verified against live Scweet 5.3 output, which looks like:
+
+        {"tweet_id": "...", "user": {"screen_name": "...", "name": "..."},
+         "timestamp": "Tue Jul 21 07:23:42 +0000 2026", "text": "...",
+         "comments": 74, "likes": 297, "retweets": 86,
+         "media": {"image_links": [...]}, "tweet_url": "https://x.com/...",
+         "raw": { ...full GraphQL payload... }}
+
+    Note `comments` (not `replies`) and `media` being a DICT — both cost us on
+    the first pass. Alternative key names are still tried so a future Scweet
+    release does not silently zero these out. `raw` is used only for fields
+    absent up top; it is never stored.
     """
 
     def pick(*keys: str) -> Any:
         for key in keys:
-            val = raw.get(key)
+            val = row.get(key)
             if val not in (None, "", [], {}):
                 return val
         return None
 
-    tweet_id = _s(pick("tweet_id", "id", "id_str", "rest_id", "tweetId"))
+    tweet_id = _s(pick("tweet_id", "id", "id_str", "rest_id"))
     if not tweet_id:
         return None
 
-    posted_at = _s(pick("created_at", "date", "timestamp", "time", "datetime"))
+    raw = row.get("raw") if isinstance(row.get("raw"), dict) else {}
+    legacy = _dig(raw, "legacy") or {}
+
+    posted_at = _s(pick("timestamp", "created_at", "date", "time"))
+    if not posted_at:
+        posted_at = _s(legacy.get("created_at"))
     if not posted_at:
         return None
+    posted_at = _iso(posted_at)
 
-    text = _s(pick("text", "full_text", "content", "tweet"))
+    # Top-level `text` carries the FULL note-tweet body; legacy.full_text is
+    # the truncated version, so prefer the former.
+    text = _s(pick("text", "full_text", "content")) or _s(legacy.get("full_text"))
 
-    # Author may be flat, or nested under a user object.
-    author = _s(pick("username", "screen_name", "user_name", "handle", "author"))
+    # Author lives under user{screen_name}; keep flat fallbacks too.
+    author = _s(pick("username", "screen_name", "handle"))
     if not author:
-        user = pick("user", "author_user", "core")
+        user = row.get("user")
         if isinstance(user, dict):
-            author = _s(
-                user.get("screen_name")
-                or user.get("username")
-                or user.get("name")
-            )
+            author = _s(user.get("screen_name") or user.get("username"))
+    if not author:
+        author = _s(_dig(raw, "core", "user_results", "result", "core", "screen_name"))
     author = (author or handle).lstrip("@")
 
-    url = _s(pick("url", "tweet_url", "link", "permalink"))
+    url = _s(pick("tweet_url", "url", "link", "permalink"))
     if not url:
         url = f"https://x.com/{author}/status/{tweet_id}"
 
-    is_retweet = bool(pick("is_retweet", "retweeted", "retweet")) or text.startswith("RT @")
-    is_reply = bool(pick("is_reply", "in_reply_to_status_id", "reply")) or text.startswith("@")
+    # Neither flag is exposed at the top level — derive from the GraphQL payload.
+    is_retweet = bool(
+        pick("is_retweet", "retweeted")
+        or legacy.get("retweeted_status_result")
+        or _dig(raw, "retweeted_status_result")
+    ) or text.startswith("RT @")
+    is_reply = bool(
+        pick("is_reply")
+        or legacy.get("in_reply_to_status_id_str")
+        or legacy.get("in_reply_to_screen_name")
+    )
 
-    media_raw = pick("media", "photos", "images", "media_urls") or []
-    if not isinstance(media_raw, list):
-        media_raw = [media_raw]
+    # `media` is a dict of link lists: {"image_links": [...], "video_links": [...]}
     media: list[str] = []
-    for m in media_raw:
-        if isinstance(m, str):
-            media.append(m.strip())
-        elif isinstance(m, dict):
-            u = m.get("url") or m.get("media_url_https") or m.get("media_url")
-            if u:
-                media.append(str(u))
+    media_raw = pick("media", "photos", "images")
+    if isinstance(media_raw, dict):
+        for links in media_raw.values():
+            if isinstance(links, list):
+                media.extend(_s(x) for x in links if isinstance(x, str))
+    elif isinstance(media_raw, list):
+        for m in media_raw:
+            if isinstance(m, str):
+                media.append(m.strip())
+            elif isinstance(m, dict):
+                u = m.get("media_url_https") or m.get("url") or m.get("media_url")
+                if u:
+                    media.append(str(u))
 
     return {
         "id": tweet_id,
@@ -164,12 +220,13 @@ def _normalise(raw: dict[str, Any], handle: str) -> dict[str, Any] | None:
         "is_retweet": is_retweet,
         "is_reply": is_reply,
         "metrics": {
-            "likes": _as_int(pick("likes", "like_count", "favorite_count", "favorite_count_str")),
-            "retweets": _as_int(pick("retweets", "retweet_count")),
-            "replies": _as_int(pick("replies", "reply_count")),
-            "views": _as_int(pick("views", "view_count")),
+            "likes": _as_int(pick("likes", "like_count") or legacy.get("favorite_count")),
+            "retweets": _as_int(pick("retweets", "retweet_count") or legacy.get("retweet_count")),
+            # Scweet calls replies "comments".
+            "replies": _as_int(pick("comments", "replies", "reply_count") or legacy.get("reply_count")),
+            "views": _as_int(pick("views", "view_count") or _dig(raw, "views", "count")),
         },
-        "media": media,
+        "media": [m for m in media if m],
     }
 
 
