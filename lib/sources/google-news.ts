@@ -160,3 +160,77 @@ export async function fetchGoogleNews(
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+export type TopicHit = { source: string; title: string; url: string; publishedAt: string };
+
+/**
+ * On-demand topic search against Google News RSS — used by "Write on a topic"
+ * to ground an article in CURRENT reporting instead of the model's stale memory.
+ * Returns the most recent, de-duplicated hits (last ~10 days). Never throws:
+ * on any failure it returns [] so the caller falls back to a knowledge-only draft.
+ */
+export async function searchGoogleNews(
+  query: string,
+  lang: "en" | "hi",
+  limit = 10
+): Promise<TopicHit[]> {
+  const q = query.trim().slice(0, 250);
+  if (!q) return [];
+  const hl = lang === "hi" ? "hi-IN" : "en-IN";
+  const ceid = lang === "hi" ? "IN:hi" : "IN:en";
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${hl}&gl=IN&ceid=${ceid}`;
+
+  let xml: string;
+  try {
+    const res = await fetch(url, {
+      headers: BROWSER_HEADERS,
+      signal: AbortSignal.timeout(12_000),
+      redirect: "follow",
+    });
+    if (!res.ok) return [];
+    xml = await res.text();
+  } catch {
+    return [];
+  }
+
+  let parsed: GNRss;
+  try {
+    parsed = parser.parse(xml);
+  } catch {
+    return [];
+  }
+
+  const items = parsed.rss?.channel?.item ?? [];
+  const cutoff = Date.now() - 10 * 86_400_000; // last ~10 days
+  const hits: TopicHit[] = [];
+  for (const item of items) {
+    const titleRaw = s(item.title);
+    const link = s(item.link);
+    if (!titleRaw || !link) continue;
+
+    let publisher = "";
+    const src = item.source;
+    if (src && typeof src === "object") publisher = s(src["#text"]);
+    else if (typeof src === "string") publisher = s(src);
+
+    let pub = new Date(s(item.pubDate));
+    if (isNaN(pub.getTime())) pub = new Date();
+    if (pub.getTime() < cutoff) continue;
+
+    const title = publisher
+      ? titleRaw.replace(new RegExp(`\\s*-\\s*${escapeRegex(publisher)}\\s*$`), "").trim() || titleRaw
+      : titleRaw;
+    hits.push({ source: publisher || "News", title, url: link, publishedAt: pub.toISOString() });
+  }
+
+  hits.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+  const seen = new Set<string>();
+  return hits
+    .filter((h) => {
+      const k = h.title.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, limit);
+}

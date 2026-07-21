@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { TRENDS } from "@/lib/data/trends";
 import { getModelFor, getApiKey } from "@/lib/ai/provider";
+import { searchGoogleNews } from "@/lib/sources/google-news";
 import { createAdminClient } from "@/lib/supabase/server";
 
 /**
@@ -464,9 +465,10 @@ export async function POST(req: Request) {
     drafting.providerKey = "openai";
   }
 
-  // Write-on-a-topic (no trend): write on the editor's typed topic, from the
-  // model's own knowledge (there are no source signals here). Respect the word
-  // count, language, and controls, and offer headline options.
+  // Write-on-a-topic (no trend): pull CURRENT reporting on the typed topic via
+  // Google News search and ground the article in it (falls back to the model's
+  // own knowledge if the search returns nothing). Respects word count / language
+  // / controls, and offers headline options.
   if (!trend) {
     const topic = (parsed.data.title ?? "").trim();
     if (!topic) {
@@ -485,15 +487,26 @@ export async function POST(req: Request) {
       : "Write the entire article in English.";
     const maxOutputTokens = Math.min(12000, Math.ceil(targetWords * (isHi ? 6 : 2)) + 400);
 
+    // Ground on current reporting for the topic.
+    const hits = await searchGoogleNews(topic, parsed.data.lang, 10);
+    const sourcesBlock = hits.length
+      ? `LATEST NEWS on this topic — ${hits.length} recent reports. Use these for the CURRENT facts and developments:\n${hits
+          .map((h, i) => `[${i + 1}] ${h.title}`)
+          .join("\n")}\n\n`
+      : "";
+    const sourcesRule = hits.length
+      ? "• Lead with the newest development from the headlines above; use them for what is happening NOW. You MAY add established background and context for depth, but do NOT fabricate specific new facts, numbers, or quotes beyond them."
+      : "• No live reports were found, so write accurately from established knowledge. If a specific recent fact is uncertain, keep it general rather than fabricating precise numbers or quotes.";
+
     const bodyPrompt = `You are a senior Patrika news journalist. Write a complete, publish-ready news article on THIS EXACT topic — do not drift to any other subject:
 
 TOPIC: ${topic}
 
-${langLine}
+${sourcesBlock}${langLine}
 • Length: about ${targetWords} words — write the FULL piece, do not stop short.
 • Newspaper style: open with a dateline in CAPS (e.g. NEW DELHI:), a strong lead, then a well-structured body with clear sub-sections.
-• There are no source reports attached — write accurately from established knowledge. If a specific fact is uncertain, keep it general rather than fabricating precise numbers or quotes. Do NOT refuse or apologise; ALWAYS produce the finished article.
-• Do NOT name or attribute to other news outlets — Patrika is writing its own report.
+${sourcesRule}
+• Do NOT refuse or apologise; ALWAYS produce the finished article. Do NOT name or attribute to other news outlets — Patrika is writing its own report.
 ${framing}`;
 
     let titles: string[] = [topic];
@@ -521,6 +534,7 @@ ${framing}`;
       title: topic,
       body: bodyRes.text.trim(),
       mode: parsed.data.mode,
+      sources: hits.length,
     });
   }
 

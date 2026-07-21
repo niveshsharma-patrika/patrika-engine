@@ -519,6 +519,8 @@ export function Editor({ trend, title, setTitle, onClose }: {
   const [articleImage, setArticleImage] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  // "Write on a topic" grounding note (how many live sources fed the draft).
+  const [genNote, setGenNote] = useState<string | null>(null);
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const data = e.data as Record<string, unknown> | null;
@@ -592,6 +594,19 @@ export function Editor({ trend, title, setTitle, onClose }: {
         setTitleOptions(opts);
         if (opts.length > 0) setTitle(opts[0]);
         if (json.body) setBody(json.body);
+        if (typeof json.sources === "number") {
+          setGenNote(
+            json.sources > 0
+              ? genLang === "hi"
+                ? `${json.sources} ताज़ा स्रोतों से लिखा गया`
+                : `Written from ${json.sources} recent source${json.sources === 1 ? "" : "s"}`
+              : genLang === "hi"
+              ? "कोई ताज़ा स्रोत नहीं मिला — सामान्य जानकारी से लिखा गया"
+              : "No live sources found — written from general knowledge"
+          );
+        } else {
+          setGenNote(null);
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         setBody(`[Generation failed: ${err.error ?? res.status}]`);
@@ -921,8 +936,13 @@ export function Editor({ trend, title, setTitle, onClose }: {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={lang === "hi" ? "शीर्षक…" : "Headline…"}
-              className="w-full text-[24px] font-bold leading-tight outline-none mb-5 placeholder:text-[var(--text-3)] placeholder:font-normal"
+              className="w-full text-[24px] font-bold leading-tight outline-none mb-2 placeholder:text-[var(--text-3)] placeholder:font-normal"
             />
+            {genNote && (
+              <div className="text-[11px] text-[var(--text-3)] mb-4 flex items-center gap-1.5">
+                <Rss size={11} className="text-[var(--green)]" /> {genNote}
+              </div>
+            )}
 
             {titleOptions.length > 0 && (
               <div className="mb-6">
