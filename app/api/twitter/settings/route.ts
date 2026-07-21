@@ -1,0 +1,114 @@
+import { z } from "zod";
+
+import { getSession } from "@/lib/auth/session";
+import { getSecret, hasSecret, setSecret, X_AUTH_TOKEN } from "@/lib/twitter/secrets";
+
+export const dynamic = "force-dynamic";
+
+const SHIM_URL = process.env.TWITTER_SHIM_URL ?? "http://127.0.0.1:8791";
+
+/**
+ * The X auth_token cookie is a live credential for a logged-in X session, so
+ * only admins may read its status or replace it — and the value itself is
+ * NEVER returned to the client, only whether one is set.
+ */
+async function requireAdmin() {
+  const session = await getSession();
+  return session?.role === "admin" ? session : null;
+}
+
+const Body = z.object({ auth_token: z.string().min(10).max(500) });
+
+/** GET — is a cookie set, and is the Python shim alive? */
+export async function GET() {
+  if (!(await requireAdmin())) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const token = await hasSecret(X_AUTH_TOKEN);
+
+  let shim: { up: boolean; scweet: boolean; error: string | null } = {
+    up: false, scweet: false, error: null,
+  };
+  try {
+    const res = await fetch(new URL("/health", SHIM_URL), {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { ok?: boolean; scweet?: boolean };
+      shim = { up: true, scweet: !!json.scweet, error: null };
+    } else {
+      shim.error = `shim returned ${res.status}`;
+    }
+  } catch (err) {
+    shim.error = err instanceof Error ? err.message : "unreachable";
+  }
+
+  return Response.json({ token, shim });
+}
+
+/** PUT — store/replace the cookie (write-only). */
+export async function PUT(req: Request) {
+  if (!(await requireAdmin())) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const json = await req.json().catch(() => null);
+  const parsed = Body.safeParse(json);
+  if (!parsed.success) {
+    return Response.json({ error: "auth_token is required" }, { status: 400 });
+  }
+
+  if (!process.env.KEY_ENCRYPTION_SECRET) {
+    return Response.json(
+      { error: "KEY_ENCRYPTION_SECRET is not set on the server — cannot store the cookie." },
+      { status: 503 }
+    );
+  }
+
+  try {
+    await setSecret(X_AUTH_TOKEN, parsed.data.auth_token.trim());
+    return Response.json({ ok: true });
+  } catch (err) {
+    return Response.json(
+      { error: err instanceof Error ? err.message : "failed to store token" },
+      { status: 500 }
+    );
+  }
+}
+
+/** POST — verify the stored cookie actually works, without waiting for cron. */
+export async function POST() {
+  if (!(await requireAdmin())) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const cookie = await getSecret(X_AUTH_TOKEN);
+  if (!cookie) {
+    return Response.json({ ok: false, error: "No auth token stored yet." }, { status: 400 });
+  }
+
+  try {
+    const url = new URL("/timeline", SHIM_URL);
+    url.searchParams.set("handle", "PMOIndia");
+    url.searchParams.set("limit", "1");
+    const res = await fetch(url, {
+      headers: { "X-Auth-Token": cookie },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      return Response.json(
+        { ok: false, error: `Shim ${res.status}: ${detail.slice(0, 200)}` },
+        { status: 502 }
+      );
+    }
+    const json = (await res.json()) as { count?: number };
+    return Response.json({ ok: true, tweets: json.count ?? 0 });
+  } catch (err) {
+    return Response.json(
+      { ok: false, error: err instanceof Error ? err.message : "request failed" },
+      { status: 502 }
+    );
+  }
+}

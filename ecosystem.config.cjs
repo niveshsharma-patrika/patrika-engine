@@ -22,5 +22,20 @@ module.exports = {
       max_memory_restart: "1500M",
       time: true,
     },
+    {
+      // Twitter/X scraper shim (Python + Scweet). Deliberately its OWN process:
+      // if it crashes, hangs or gets banned, the news engine above is untouched.
+      // Setup once:  cd twitter-crawler && python3 -m venv venv \
+      //              && ./venv/bin/pip install -r requirements.txt
+      name: "patrika-twitter-shim",
+      script: "venv/bin/uvicorn",
+      args: "app:app --host 127.0.0.1 --port 8791",
+      cwd: __dirname + "/twitter-crawler",
+      interpreter: "none",
+      instances: 1,
+      exec_mode: "fork",
+      max_memory_restart: "400M",
+      time: true,
+    },
   ],
 };
