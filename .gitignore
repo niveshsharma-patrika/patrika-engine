@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Twitter crawler (Python sidecar)
+twitter-crawler/venv/
+twitter-crawler/scweet_state.db
+twitter-crawler/__pycache__/

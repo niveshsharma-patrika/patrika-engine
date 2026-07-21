@@ -7,11 +7,15 @@ in TypeScript in the Next app. Keeping this layer thin means the Python runtime
 can be restarted, upgraded or swapped for a different scraper without touching
 newsroom logic.
 
-Stateless by design: the X auth_token is passed per request in the
-X-Auth-Token header, never stored here. It lives encrypted in Postgres and is
-refreshable from the admin UI (cookie expiry is the main failure mode).
+Stateless w.r.t. credentials: the X auth_token is passed per request in the
+X-Auth-Token header, never written to disk here. It lives encrypted in Postgres
+and is refreshable from the admin UI (cookie expiry is the main failure mode).
 
 Binds to 127.0.0.1 only — this must never be reachable from the internet.
+
+Targets Scweet 5.x:
+    from Scweet import Scweet
+    Scweet(auth_token=...).get_profile_tweets(["handle"], limit=N) -> list[dict]
 
 Run:
     uvicorn app:app --host 127.0.0.1 --port 8791
@@ -19,9 +23,11 @@ Run:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+import threading
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Query
@@ -32,22 +38,53 @@ logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Patrika Twitter shim", docs_url=None, redoc_url=None)
 
-# How far back to look when an account has never been crawled before. Keeps the
-# first crawl from pulling years of history and burning the rate limit.
-FIRST_CRAWL_DAYS = int(os.getenv("TWITTER_FIRST_CRAWL_DAYS", "2"))
+# Scweet keeps a small SQLite state file. Pin it next to this module so it does
+# not land in a random CWD depending on how PM2 launched us.
+DB_PATH = str(Path(__file__).resolve().parent / "scweet_state.db")
+
+# Scweet(...) provisions on construction (query-id manifest etc.), so building a
+# client per request would be slow AND extra load on X. Cache one per token.
+_clients: dict[str, Any] = {}
+_clients_lock = threading.Lock()
+
+
+def _client(auth_token: str):
+    """Get or build a cached Scweet client for this token."""
+    from Scweet import Scweet
+
+    key = hashlib.sha256(auth_token.encode()).hexdigest()[:16]
+    with _clients_lock:
+        client = _clients.get(key)
+        if client is None:
+            log.info("building Scweet client %s", key)
+            client = Scweet(auth_token=auth_token, db_path=DB_PATH)
+            _clients[key] = client
+        return client
+
+
+def _drop_client(auth_token: str) -> None:
+    """Forget a client whose token stopped working, so the next call rebuilds."""
+    key = hashlib.sha256(auth_token.encode()).hexdigest()[:16]
+    with _clients_lock:
+        _clients.pop(key, None)
 
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    """Liveness probe — does not touch X, so it cannot burn rate limit."""
-    try:
-        import Scweet  # noqa: F401
+    """
+    Liveness probe. Does not touch X, so it cannot burn rate limit.
 
-        scweet_ok = True
-    except Exception as exc:  # pragma: no cover - import guard
+    Imports the REAL class rather than just the package — an earlier version
+    only did `import Scweet`, which succeeded even when the class was
+    unreachable and reported a false green.
+    """
+    try:
+        from Scweet import Scweet  # noqa: F401
+
+        return {"ok": True, "scweet": True, "clients": len(_clients)}
+    except Exception as exc:
         log.warning("Scweet import failed: %s", exc)
-        scweet_ok = False
-    return {"ok": True, "scweet": scweet_ok}
+        return {"ok": True, "scweet": False, "error": str(exc)[:200]}
 
 
 def _s(value: Any) -> str:
@@ -63,56 +100,76 @@ def _as_int(value: Any) -> int:
 
 def _normalise(raw: dict[str, Any], handle: str) -> dict[str, Any] | None:
     """
-    Map one Scweet result onto the shape lib/sources/twitter.ts expects.
+    Map one Scweet tweet dict onto the shape lib/twitter/crawl.ts expects.
 
-    Scweet's field names have shifted between versions, so every field is read
-    defensively through a list of candidate keys rather than assuming one
-    schema. A row without an id or a timestamp is unusable and returns None.
+    Field names are read through candidate lists rather than assuming one
+    schema — Scweet's shape has shifted across versions. Use ?raw=1 on
+    /timeline to inspect the real keys if something comes back empty.
     """
 
     def pick(*keys: str) -> Any:
         for key in keys:
-            if key in raw and raw[key] not in (None, ""):
-                return raw[key]
+            val = raw.get(key)
+            if val not in (None, "", [], {}):
+                return val
         return None
 
-    tweet_id = _s(pick("tweet_id", "id", "conversation_id", "tweetId"))
+    tweet_id = _s(pick("tweet_id", "id", "id_str", "rest_id", "tweetId"))
     if not tweet_id:
         return None
 
-    posted_at = _s(pick("date", "created_at", "timestamp", "time"))
+    posted_at = _s(pick("created_at", "date", "timestamp", "time", "datetime"))
     if not posted_at:
         return None
 
-    text = _s(pick("text", "content", "tweet", "full_text"))
-    author = _s(pick("username", "user", "screen_name", "handle")) or handle
+    text = _s(pick("text", "full_text", "content", "tweet"))
 
-    url = _s(pick("url", "tweet_url", "link"))
+    # Author may be flat, or nested under a user object.
+    author = _s(pick("username", "screen_name", "user_name", "handle", "author"))
+    if not author:
+        user = pick("user", "author_user", "core")
+        if isinstance(user, dict):
+            author = _s(
+                user.get("screen_name")
+                or user.get("username")
+                or user.get("name")
+            )
+    author = (author or handle).lstrip("@")
+
+    url = _s(pick("url", "tweet_url", "link", "permalink"))
     if not url:
-        url = f"https://x.com/{author.lstrip('@')}/status/{tweet_id}"
+        url = f"https://x.com/{author}/status/{tweet_id}"
 
-    is_retweet = bool(pick("is_retweet", "retweet")) or text.startswith("RT @")
-    is_reply = bool(pick("is_reply", "reply")) or text.startswith("@")
+    is_retweet = bool(pick("is_retweet", "retweeted", "retweet")) or text.startswith("RT @")
+    is_reply = bool(pick("is_reply", "in_reply_to_status_id", "reply")) or text.startswith("@")
 
-    media = pick("media", "photos", "images") or []
-    if not isinstance(media, list):
-        media = [media]
+    media_raw = pick("media", "photos", "images", "media_urls") or []
+    if not isinstance(media_raw, list):
+        media_raw = [media_raw]
+    media: list[str] = []
+    for m in media_raw:
+        if isinstance(m, str):
+            media.append(m.strip())
+        elif isinstance(m, dict):
+            u = m.get("url") or m.get("media_url_https") or m.get("media_url")
+            if u:
+                media.append(str(u))
 
     return {
         "id": tweet_id,
-        "author": author.lstrip("@"),
+        "author": author,
         "text": text,
         "url": url,
         "posted_at": posted_at,
         "is_retweet": is_retweet,
         "is_reply": is_reply,
         "metrics": {
-            "likes": _as_int(pick("likes", "like_count", "favorite_count")),
+            "likes": _as_int(pick("likes", "like_count", "favorite_count", "favorite_count_str")),
             "retweets": _as_int(pick("retweets", "retweet_count")),
             "replies": _as_int(pick("replies", "reply_count")),
             "views": _as_int(pick("views", "view_count")),
         },
-        "media": [_s(m) if isinstance(m, str) else _s(m.get("url")) for m in media if m],
+        "media": media,
     }
 
 
@@ -121,14 +178,18 @@ def timeline(
     handle: str = Query(..., min_length=1, max_length=40),
     limit: int = Query(20, ge=1, le=100),
     since_id: str | None = Query(None),
+    raw: int = Query(0, ge=0, le=1),
     x_auth_token: str | None = Header(None, alias="X-Auth-Token"),
 ) -> JSONResponse:
     """
-    Return recent tweets for one profile, newest first.
+    Return recent tweets for one profile.
 
-    `since_id` is applied by the CALLER as well (the DB has a unique index on
-    (account_id, tweet_id)), so this is only a bandwidth optimisation — we must
-    never rely on it for correctness.
+    `since_id` is a bandwidth optimisation only — the real dedup guarantee is
+    the unique index on (account_id, tweet_id) in Postgres. Note Scweet's
+    get_profile_tweets has no date filter, so `limit` is the only bound.
+
+    ?raw=1 returns Scweet's untouched dicts — use it to inspect the live field
+    names if normalisation ever comes back empty.
     """
     if not x_auth_token:
         raise HTTPException(status_code=401, detail="X-Auth-Token header required")
@@ -138,40 +199,69 @@ def timeline(
         raise HTTPException(status_code=400, detail="handle required")
 
     try:
-        from Scweet.scweet import Scweet
+        from Scweet import Scweet  # noqa: F401
     except Exception as exc:
         log.error("Scweet import failed: %s", exc)
-        raise HTTPException(
-            status_code=503, detail=f"Scweet unavailable: {exc}"
-        ) from exc
+        raise HTTPException(status_code=503, detail=f"Scweet unavailable: {exc}") from exc
 
-    since = (datetime.now(timezone.utc) - timedelta(days=FIRST_CRAWL_DAYS)).strftime(
-        "%Y-%m-%d"
-    )
+    # Map Scweet's typed errors onto useful statuses so the desk sees "cookie
+    # expired" rather than a generic failure — that is the #1 cause of a silent
+    # feed, and it needs a human to paste a fresh cookie.
+    try:
+        from Scweet import AuthError, RateLimitError, AccountPoolExhausted
+    except Exception:  # pragma: no cover - older/newer layouts
+        AuthError = RateLimitError = AccountPoolExhausted = ()  # type: ignore
 
     try:
-        scweet = Scweet(cookies={"auth_token": x_auth_token})
-        raw_results = scweet.user_tweets(handle=handle, limit=limit, since=since)
+        client = _client(x_auth_token)
+        results = client.get_profile_tweets([handle], limit=limit)
     except Exception as exc:
-        # Surface as 502 so the TS caller can record the account error and keep
-        # going with the other accounts rather than failing the whole crawl.
-        log.warning("timeline fetch failed for @%s: %s", handle, exc)
-        raise HTTPException(status_code=502, detail=str(exc)[:300]) from exc
+        name = type(exc).__name__
+        detail = f"{name}: {exc}"[:300]
 
-    if isinstance(raw_results, dict):
-        raw_results = raw_results.get("tweets") or raw_results.get("data") or []
-    if not isinstance(raw_results, list):
-        raw_results = []
+        if AuthError and isinstance(exc, AuthError):
+            _drop_client(x_auth_token)
+            raise HTTPException(
+                status_code=401,
+                detail="X rejected the auth_token — it has expired or been revoked. "
+                       "Paste a fresh cookie in Twitter → X connection.",
+            ) from exc
+        if (RateLimitError and isinstance(exc, RateLimitError)) or (
+            AccountPoolExhausted and isinstance(exc, AccountPoolExhausted)
+        ):
+            raise HTTPException(
+                status_code=429,
+                detail="X rate limit reached. Move accounts to a slower tier.",
+            ) from exc
+
+        log.warning("timeline fetch failed for @%s: %s", handle, detail)
+        raise HTTPException(status_code=502, detail=detail) from exc
+
+    if isinstance(results, dict):
+        results = results.get("tweets") or results.get("data") or []
+    if not isinstance(results, list):
+        results = []
+
+    if raw:
+        return JSONResponse({"handle": handle, "count": len(results), "raw": results[:5]})
 
     tweets: list[dict[str, Any]] = []
-    for row in raw_results:
+    dropped = 0
+    for row in results:
         if not isinstance(row, dict):
+            dropped += 1
             continue
         item = _normalise(row, handle)
         if item is None:
+            dropped += 1
             continue
         if since_id and item["id"] == since_id:
-            break  # reached the last tweet we already have
+            break  # reached the last tweet we already stored
         tweets.append(item)
 
-    return JSONResponse({"handle": handle, "count": len(tweets), "tweets": tweets})
+    if dropped:
+        log.info("@%s: %d row(s) unparsable — check /timeline?raw=1", handle, dropped)
+
+    return JSONResponse(
+        {"handle": handle, "count": len(tweets), "dropped": dropped, "tweets": tweets}
+    )
