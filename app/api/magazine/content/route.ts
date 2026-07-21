@@ -1,7 +1,8 @@
 import { generateText } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
 
 import { getSession } from "@/lib/auth/session";
-import { getModelFor } from "@/lib/ai/provider";
+import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { getEffectiveDirectives } from "@/lib/ai/directives";
 import { MAGAZINE_BY_KEY } from "@/lib/magazines";
 
@@ -24,9 +25,16 @@ export async function POST(req: Request) {
   if (!mag) return Response.json({ error: "Unknown magazine" }, { status: 400 });
   if (!topic) return Response.json({ error: "A topic is required." }, { status: 400 });
 
-  // Uses the admin-selected content provider (Admin → Model routing).
   const model = await getModelFor("drafting");
-  if (!model) return Response.json({ error: "No content provider configured (set it in Admin)." }, { status: 503 });
+  if (!model) return Response.json({ error: "No drafting model configured." }, { status: 503 });
+  // Premium long-form Hindi — upgrade to gpt-4.1 when an OpenAI key is present.
+  const openaiKey = await getApiKey("openai");
+  if (openaiKey) {
+    const mm = process.env.STYLE_DRAFT_MODEL ?? "gpt-4.1";
+    model.model = createOpenAI({ apiKey: openaiKey })(mm);
+    model.modelKey = mm;
+    model.providerKey = "openai";
+  }
 
   const directives = await getEffectiveDirectives();
   const contentPrompt = directives.magazineContent?.[magKey];

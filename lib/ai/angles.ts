@@ -1,4 +1,4 @@
-import { generateStructured } from "@/lib/ai/structured";
+import { generateObject } from "ai";
 import { z } from "zod";
 
 import { getModelFor } from "./provider";
@@ -29,20 +29,18 @@ const AngleSchema = z.object({
   angles: z
     .array(
       z.object({
-        title: z.string().default("").describe("A sharp 6-12 word editorial angle / hook"),
+        title: z.string().describe("A sharp 6-12 word editorial angle / hook"),
         summary: z
           .string()
-          .default("")
           .describe("1-2 sentences: the lens and exactly what to focus on / dig into"),
         format: z
           .string()
-          .default("Analysis")
           .describe(
             "Suggested story format, e.g. Explainer, Ground report, Analysis, Profile, Timeline, Q&A, Data story"
           ),
       })
     )
-    .min(1)
+    .min(2)
     .max(3),
 });
 
@@ -92,7 +90,7 @@ COVERAGE (${input.coverage.length} articles — the ONLY facts you may use):
 ${coverageText}`;
 
   try {
-    const { object, usage } = await generateStructured({
+    const { object, usage } = await generateObject({
       model: resolved.model,
       schema: AngleSchema,
       system: resolved.systemPrompt ?? undefined,
@@ -100,15 +98,12 @@ ${coverageText}`;
       temperature: 0.4,
     });
 
-    const angles: StoryAngle[] = object.angles
-      .filter((a) => a.title.trim())
-      .slice(0, 3)
-      .map((a, i) => ({
-        id: `a${i + 1}`,
-        title: a.title.trim(),
-        summary: a.summary.trim(),
-        format: a.format.trim() || "Analysis",
-      }));
+    const angles: StoryAngle[] = object.angles.slice(0, 3).map((a, i) => ({
+      id: `a${i + 1}`,
+      title: a.title.trim(),
+      summary: a.summary.trim(),
+      format: a.format.trim(),
+    }));
 
     return {
       angles,

@@ -25,7 +25,7 @@ psql "postgres://USER:PASS@your-db.postgres.database.azure.com:5432/patrika_engi
 their own files. On a fresh install run them all (each is idempotent, so this is
 safe to re-run). `$DATABASE_URL` is the same connection string as above.
 ```bash
-for m in editions writing-directives roles feedback ai-routing; do
+for m in editions writing-directives roles feedback; do
   psql "$DATABASE_URL" -f "deploy/$m.sql"
 done
 ```

@@ -1,4 +1,4 @@
-import { generateStructured } from "@/lib/ai/structured";
+import { generateObject } from "ai";
 import { z } from "zod";
 
 import { getModelFor } from "./provider";
@@ -68,7 +68,7 @@ export async function classifyStorySections(
     const chunk = stories.slice(i, i + BATCH);
     const lines = chunk.map((s, j) => `[${j + 1}] ${s.title}`).join("\n");
     try {
-      const { object } = await generateStructured({
+      const { object } = await generateObject({
         model: resolved.model,
         schema: Schema,
         temperature: 0,
@@ -79,7 +79,7 @@ ${DEFINITIONS}
 Headlines:
 ${lines}
 
-Return { items: [ { idx, section } ] } covering every headline by its [idx] number. Respond with valid JSON.`,
+Return { items: [ { idx, section } ] } covering every headline by its [idx] number.`,
       });
       for (const it of object.items) {
         const story = chunk[it.idx - 1];

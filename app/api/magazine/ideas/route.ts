@@ -1,4 +1,4 @@
-import { generateStructured } from "@/lib/ai/structured";
+import { generateObject } from "ai";
 import { z } from "zod";
 
 import { getSession } from "@/lib/auth/session";
@@ -30,30 +30,26 @@ export async function POST(req: Request) {
   if (!prompt) return Response.json({ error: "No idea prompt for this magazine." }, { status: 500 });
 
   try {
-    const res = await generateStructured({
+    const res = await generateObject({
       model: model.model,
       system: model.systemPrompt ?? undefined,
-      // Tolerant: weaker models (Groq) sometimes omit a field. Default missing
-      // text to empty and filter out headline-less items below, rather than
-      // hard-failing the whole batch on one imperfect idea.
       schema: z.object({
         ideas: z
           .array(
             z.object({
-              headline: z.string().default(""),
-              subVertical: z.string().default(""),
-              hook: z.string().default(""),
-              benefit: z.string().default(""),
+              headline: z.string(),
+              subVertical: z.string(),
+              hook: z.string(),
+              benefit: z.string(),
             })
           )
-          .min(1)
+          .min(6)
           .max(20),
       }),
       prompt,
       temperature: 0.8,
     });
-    const ideas = res.object.ideas.filter((i) => i.headline.trim());
-    return Response.json({ ideas });
+    return Response.json({ ideas: res.object.ideas });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Generation failed.";
     const rateLimited = /quota|rate.?limit|exhausted|RESOURCE_EXHAUSTED|429/i.test(msg);
