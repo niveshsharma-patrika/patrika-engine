@@ -429,6 +429,25 @@ Rules:
   };
 }
 
+/**
+ * Strip the inline citations / source URLs that web-search models embed
+ * (e.g. "([hindustantimes.com](https://…?utm_source=openai))" or 【…】). The
+ * article body should be clean prose; sources are surfaced separately.
+ */
+function stripCitations(text: string): string {
+  return text
+    .replace(/\(?\s*\[[^\]]*\]\(https?:\/\/[^)\s]+\)\s*\)?/g, "") // ([label](url))
+    .replace(/\(\s*https?:\/\/[^)\s]+\s*\)/g, "") // (url)
+    .replace(/【[^】]*】/g, "") // 【turn0news…】 style refs
+    .replace(/\[\d+\]/g, "") // [1] footnote markers
+    .replace(/https?:\/\/[^\s)]+/g, "") // bare urls
+    .replace(/\[\s*\]|\(\s*\)/g, "") // leftover empty [] ()
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([।.,;:!?])/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export async function POST(req: Request) {
   if (!process.env.DATABASE_URL) {
     return Response.json(
@@ -518,7 +537,9 @@ TOPIC: ${topic}
 ${langLine}
 • Verify names, dates, numbers, and especially the REASON / CONTEXT before stating them. If a specific fact can't be verified from your search, leave it out rather than guessing.
 • Length: about ${targetWords} words. Newspaper style: open with a dateline in CAPS (e.g. NEW DELHI:), a strong lead with the LATEST development, then a well-structured body.
-• Do NOT name other news outlets in the article body — Patrika writes its own report. Never refuse; always produce the finished article.
+• Do NOT name other news outlets in the article body — Patrika writes its own report.
+• Write clean article prose ONLY — do NOT put inline citations, source links, footnote markers, brackets, or URLs in the article text.
+• Never refuse; always produce the finished article.
 ${framing}`;
 
       const bodyRes = await generateText({
@@ -534,10 +555,11 @@ ${framing}`;
         },
       });
 
+      const clean = stripCitations(bodyRes.text);
       return Response.json({
-        titles: await headlinesFrom(bodyRes.text),
+        titles: await headlinesFrom(clean),
         title: topic,
-        body: bodyRes.text.trim(),
+        body: clean,
         mode: parsed.data.mode,
         sources: bodyRes.sources?.length ?? 0,
       });
