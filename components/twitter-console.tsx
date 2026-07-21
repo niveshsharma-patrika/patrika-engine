@@ -43,8 +43,12 @@ type Tweet = {
   posted_at: string;
   status: string;
   status_reason: string | null;
+  draft_error: string | null;
   metrics: Record<string, number>;
   tier: number;
+  draft_id: string | null;
+  draft_title: string | null;
+  promoted_at: string | null;
 };
 
 type TwDraft = {
@@ -127,6 +131,8 @@ export function TwitterConsole({ isAdmin }: { isAdmin: boolean }) {
   const [editBody, setEditBody] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
   const [writing, setWriting] = useState(false);
+  // Row id of the tweet currently being written, so only its button spins.
+  const [busyTweet, setBusyTweet] = useState<string | null>(null);
 
   // Add-account form
   const [handle, setHandle] = useState("");
@@ -254,12 +260,38 @@ export function TwitterConsole({ isAdmin }: { isAdmin: boolean }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed");
       setOpenId(null);
-      setCrawlNote(t("Sent to My Articles.", "मेरे लेख में भेज दिया गया।"));
+      setCrawlNote(t("Moved to drafts — find it in My Articles.", "ड्राफ़्ट में भेज दिया गया — 'मेरे लेख' में देखें।"));
       await loadDrafts();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not send");
     } finally {
       setSavingDraft(false);
+    }
+  }
+
+  /**
+   * Write an article for one specific tweet, on demand. Works on any tweet —
+   * including retweets and short posts — because the editor clicking the
+   * button IS the editorial decision.
+   */
+  async function writeArticleFor(tweetRowId: string) {
+    setBusyTweet(tweetRowId);
+    setError(null);
+    setCrawlNote(null);
+    try {
+      const res = await fetch(`/api/twitter/tweets/${tweetRowId}/draft`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || json.ok === false) throw new Error(json.error ?? `Failed (${res.status})`);
+      setCrawlNote(
+        t(`Article written: ${json.title ?? ""}`, `लेख तैयार: ${json.title ?? ""}`)
+      );
+      await Promise.all([loadTweets(), loadDrafts()]);
+      setTab("articles");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not write the article");
+      await loadTweets();
+    } finally {
+      setBusyTweet(null);
     }
   }
 
@@ -492,7 +524,7 @@ export function TwitterConsole({ isAdmin }: { isAdmin: boolean }) {
                               className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
                               style={{ background: "var(--purple)" }}>
                               {savingDraft ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                              {t("Send to My Articles", "मेरे लेख में भेजें")}
+                              {t("Move to draft", "ड्राफ़्ट में भेजें")}
                             </button>
                           </div>
                         </>
@@ -667,12 +699,51 @@ export function TwitterConsole({ isAdmin }: { isAdmin: boolean }) {
                     {tw.status_reason && (
                       <div className="text-[11px] text-[var(--text-3)] mt-2">{tw.status_reason}</div>
                     )}
-                    {tw.url && (
-                      <a href={tw.url} target="_blank" rel="noopener noreferrer"
-                        className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)] mt-2 inline-block">
-                        {t("View on X", "एक्स पर देखें")} ↗
-                      </a>
+                    {tw.draft_error && (
+                      <div className="text-[11px] text-[#991b1b] mt-2 leading-snug">{tw.draft_error}</div>
                     )}
+
+                    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[var(--border)]">
+                      {tw.url && (
+                        <a href={tw.url} target="_blank" rel="noopener noreferrer"
+                          className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)]">
+                          {t("View on X", "एक्स पर देखें")} ↗
+                        </a>
+                      )}
+                      <div className="ml-auto flex items-center gap-2">
+                        {tw.draft_id ? (
+                          <>
+                            <span className="text-[11px] text-[var(--text-3)]">
+                              {tw.promoted_at
+                                ? t("Moved to drafts", "ड्राफ़्ट में भेजा गया")
+                                : t("Article ready", "लेख तैयार")}
+                            </span>
+                            <button
+                              onClick={() => setTab("articles")}
+                              className="text-[12px] font-medium px-3 py-1.5 rounded-lg border border-[var(--border)]"
+                            >
+                              {t("Open article", "लेख खोलें")}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => writeArticleFor(tw.id)}
+                            disabled={busyTweet !== null}
+                            className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
+                            style={{ background: "var(--purple)" }}
+                          >
+                            {busyTweet === tw.id ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : (
+                              <PenLine size={13} />
+                            )}
+                            {busyTweet === tw.id
+                              ? t("Researching…", "शोध हो रहा है…")
+                              : t("Write article", "लेख लिखें")}
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 );
               })}

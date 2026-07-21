@@ -188,6 +188,90 @@ async function draftOne(
   return { title, body, sources: res.sources?.length ?? 0, model };
 }
 
+/** Persist a generated article + flip the tweet's status. */
+async function saveDraft(
+  t: PendingTweet,
+  result: { title: string; body: string; sources: number; model: string }
+): Promise<string> {
+  const words = result.body.trim().split(/\s+/).filter(Boolean).length;
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO twitter_drafts (tweet_id, title, body, language, word_count, sources_used, model)
+          VALUES ($1,$2,$3,$4,$5,$6,$7)
+     ON CONFLICT (tweet_id) DO UPDATE
+        SET title=EXCLUDED.title, body=EXCLUDED.body,
+            word_count=EXCLUDED.word_count, sources_used=EXCLUDED.sources_used,
+            model=EXCLUDED.model, updated_at=now()
+     RETURNING id`,
+    [t.id, result.title, result.body, t.language, words, result.sources, result.model]
+  );
+  await pool.query(
+    `UPDATE tweets SET status='drafted', draft_error=NULL, drafted_at=now() WHERE id=$1`,
+    [t.id]
+  );
+  return rows[0].id;
+}
+
+async function markFailed(tweetId: string, reason: string): Promise<void> {
+  await pool
+    .query(
+      `UPDATE tweets SET status='failed', draft_error=$2, drafted_at=now() WHERE id=$1`,
+      [tweetId, reason.slice(0, 500)]
+    )
+    .catch(() => {});
+}
+
+/**
+ * Write an article for ONE specific tweet, on an editor's explicit click.
+ *
+ * Deliberately accepts ANY tweet regardless of status — including retweets and
+ * very short posts. When a human asks for an article on a specific post, that
+ * IS the editorial decision; no rule should override it. The automatic path is
+ * the one that skips retweets, not this.
+ *
+ * The daily spend cap still applies, since that is a budget guard rather than
+ * an editorial judgement.
+ */
+export async function draftSingleTweet(
+  tweetId: string
+): Promise<{ ok: boolean; draftId?: string; title?: string; error?: string }> {
+  const settings = await getSettings();
+
+  const apiKey = await getApiKey("openai");
+  if (!apiKey) return { ok: false, error: "No OpenAI key configured (Admin → API Keys)." };
+
+  const used = await todayCount();
+  if (used >= settings.daily_cap) {
+    return { ok: false, error: `Daily cap reached (${used}/${settings.daily_cap}). Raise it in Settings.` };
+  }
+
+  const { rows } = await pool.query<PendingTweet>(
+    `SELECT t.id, t.account_id, t.tweet_id, t.author_handle, t.content, t.url,
+            t.posted_at, a.language, a.display_name, a.category
+       FROM tweets t
+       JOIN twitter_accounts a ON a.id = t.account_id
+      WHERE t.id = $1`,
+    [tweetId]
+  );
+  const tweet = rows[0];
+  if (!tweet) return { ok: false, error: "Tweet not found." };
+
+  try {
+    const result = await draftOne(tweet, settings, apiKey);
+    if (!result) {
+      const reason = "Not enough could be verified about this post to write an article.";
+      await markFailed(tweet.id, reason);
+      return { ok: false, error: reason };
+    }
+    const draftId = await saveDraft(tweet, result);
+    return { ok: true, draftId, title: result.title };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await markFailed(tweet.id, message);
+    console.error(`[twitter] manual draft failed for @${tweet.author_handle}:`, message);
+    return { ok: false, error: message.slice(0, 300) };
+  }
+}
+
 /**
  * Draft articles for tweets awaiting one.
  *
@@ -249,40 +333,22 @@ export async function runTwitterDrafting(
       const result = await draftOne(t, settings, apiKey);
 
       if (!result) {
-        await pool.query(
-          `UPDATE tweets SET status='failed', draft_error=$2, drafted_at=now() WHERE id=$1`,
-          [t.id, "Not enough could be verified about this post to write an article."]
+        await markFailed(
+          t.id,
+          "Not enough could be verified about this post to write an article."
         );
         stats.failed += 1;
         stats.drafts.push({ handle: t.author_handle, title: null, error: "insufficient research" });
         continue;
       }
 
-      const words = result.body.trim().split(/\s+/).filter(Boolean).length;
-      await pool.query(
-        `INSERT INTO twitter_drafts (tweet_id, title, body, language, word_count, sources_used, model)
-              VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT (tweet_id) DO UPDATE
-            SET title=EXCLUDED.title, body=EXCLUDED.body,
-                word_count=EXCLUDED.word_count, sources_used=EXCLUDED.sources_used,
-                model=EXCLUDED.model, updated_at=now()`,
-        [t.id, result.title, result.body, t.language, words, result.sources, result.model]
-      );
-      await pool.query(
-        `UPDATE tweets SET status='drafted', draft_error=NULL, drafted_at=now() WHERE id=$1`,
-        [t.id]
-      );
+      await saveDraft(t, result);
 
       stats.drafted += 1;
       stats.drafts.push({ handle: t.author_handle, title: result.title, error: null });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await pool
-        .query(
-          `UPDATE tweets SET status='failed', draft_error=$2, drafted_at=now() WHERE id=$1`,
-          [t.id, message.slice(0, 500)]
-        )
-        .catch(() => {});
+      await markFailed(t.id, message);
       stats.failed += 1;
       stats.drafts.push({ handle: t.author_handle, title: null, error: message.slice(0, 200) });
       console.error(`[twitter] drafting failed for @${t.author_handle}:`, message);
