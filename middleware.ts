@@ -62,7 +62,12 @@ export async function middleware(request: NextRequest) {
       (pathname.startsWith("/sources/") && !pathname.startsWith("/sources/last-run"));
     const blocked =
       session.role === "editor"
-        ? pathname.startsWith("/admin") || pathname.startsWith("/directives") || sourcesBlocked
+        ? pathname.startsWith("/admin") ||
+          pathname.startsWith("/directives") ||
+          // Stats + Style module are admin-only (hidden from editors and writers).
+          pathname.startsWith("/stats") ||
+          pathname.startsWith("/style") ||
+          sourcesBlocked
         : pathname.startsWith("/admin") ||
           pathname.startsWith("/directives") ||
           pathname.startsWith("/stats") ||
