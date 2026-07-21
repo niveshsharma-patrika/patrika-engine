@@ -7,6 +7,10 @@ import { z } from "zod";
 import { TRENDS } from "@/lib/data/trends";
 import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { searchGoogleNews } from "@/lib/sources/google-news";
+
+// Web-search-grounded drafting (write-on-a-topic) does live research, so give
+// it generous room before the proxy/serverless cut-off.
+export const maxDuration = 180;
 import { createAdminClient } from "@/lib/supabase/server";
 
 /**
@@ -465,10 +469,9 @@ export async function POST(req: Request) {
     drafting.providerKey = "openai";
   }
 
-  // Write-on-a-topic (no trend): pull CURRENT reporting on the typed topic via
-  // Google News search and ground the article in it (falls back to the model's
-  // own knowledge if the search returns nothing). Respects word count / language
-  // / controls, and offers headline options.
+  // Write-on-a-topic (no trend): use OpenAI web search to research CURRENT,
+  // verified facts and write from them (not the model's stale memory). Falls
+  // back to a keyless Google News headline grounding if there's no OpenAI key.
   if (!trend) {
     const topic = (parsed.data.title ?? "").trim();
     if (!topic) {
@@ -487,7 +490,63 @@ export async function POST(req: Request) {
       : "Write the entire article in English.";
     const maxOutputTokens = Math.min(12000, Math.ceil(targetWords * (isHi ? 6 : 2)) + 400);
 
-    // Ground on current reporting for the topic.
+    // Headline options generated from the finished article (no search needed).
+    const headlinesFrom = async (article: string): Promise<string[]> => {
+      try {
+        const h = await generateObject({
+          model: drafting.model,
+          schema: z.object({ titles: z.array(z.string()).min(2).max(8) }),
+          prompt: `Write ${p?.numberOfTitles ?? 4} distinct newspaper headline options (each 8-14 words) ${isHi ? "in Hindi" : "in English"} for this article:\n\n${article.slice(0, 2500)}\n\nReturn them in the "titles" array.`,
+          temperature: 0.6,
+        });
+        return [topic, ...h.object.titles.filter((t) => t.trim() && t.trim() !== topic)];
+      } catch {
+        return [topic];
+      }
+    };
+
+    const openaiKey = await getApiKey("openai");
+    if (openaiKey) {
+     try {
+      // Primary: the model researches live sources with web search and grounds
+      // the article in what it actually finds — not outdated training memory.
+      const openai = createOpenAI({ apiKey: openaiKey });
+      const bodyPrompt = `You are a senior Patrika news journalist. FIRST research the CURRENT, up-to-date facts on this topic using web search, then write a complete, publish-ready news article. Write ONLY from what you actually find — do NOT rely on prior memory, which may be outdated.
+
+TOPIC: ${topic}
+
+${langLine}
+• Verify names, dates, numbers, and especially the REASON / CONTEXT before stating them. If a specific fact can't be verified from your search, leave it out rather than guessing.
+• Length: about ${targetWords} words. Newspaper style: open with a dateline in CAPS (e.g. NEW DELHI:), a strong lead with the LATEST development, then a well-structured body.
+• Do NOT name other news outlets in the article body — Patrika writes its own report. Never refuse; always produce the finished article.
+${framing}`;
+
+      const bodyRes = await generateText({
+        model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
+        prompt: bodyPrompt,
+        temperature: 0.3,
+        maxOutputTokens,
+        tools: {
+          web_search: openai.tools.webSearch({
+            searchContextSize: "high",
+            userLocation: { type: "approximate", country: "IN" },
+          }),
+        },
+      });
+
+      return Response.json({
+        titles: await headlinesFrom(bodyRes.text),
+        title: topic,
+        body: bodyRes.text.trim(),
+        mode: parsed.data.mode,
+        sources: bodyRes.sources?.length ?? 0,
+      });
+     } catch (e) {
+       console.error("Web-search draft failed; falling back to headline search:", e);
+     }
+    }
+
+    // Fallback (no OpenAI key, or web search failed): ground on Google News headlines.
     const hits = await searchGoogleNews(topic, parsed.data.lang, 10);
     const sourcesBlock = hits.length
       ? `LATEST NEWS on this topic — ${hits.length} recent reports. Use these for the CURRENT facts and developments:\n${hits
@@ -495,44 +554,28 @@ export async function POST(req: Request) {
           .join("\n")}\n\n`
       : "";
     const sourcesRule = hits.length
-      ? "• Lead with the newest development from the headlines above; use them for what is happening NOW. You MAY add established background and context for depth, but do NOT fabricate specific new facts, numbers, or quotes beyond them."
-      : "• No live reports were found, so write accurately from established knowledge. If a specific recent fact is uncertain, keep it general rather than fabricating precise numbers or quotes.";
-
-    const bodyPrompt = `You are a senior Patrika news journalist. Write a complete, publish-ready news article on THIS EXACT topic — do not drift to any other subject:
+      ? "• Lead with the newest development from the headlines above; use them for what is happening NOW. Do NOT fabricate specific facts, numbers, or reasons beyond them."
+      : "• No live reports were found; write accurately from established knowledge and keep uncertain specifics general rather than fabricating them.";
+    const fbPrompt = `You are a senior Patrika news journalist. Write a complete, publish-ready news article on THIS EXACT topic:
 
 TOPIC: ${topic}
 
 ${sourcesBlock}${langLine}
-• Length: about ${targetWords} words — write the FULL piece, do not stop short.
-• Newspaper style: open with a dateline in CAPS (e.g. NEW DELHI:), a strong lead, then a well-structured body with clear sub-sections.
+• Length: about ${targetWords} words — write the FULL piece.
+• Newspaper style: dateline in CAPS, strong lead, structured body.
 ${sourcesRule}
-• Do NOT refuse or apologise; ALWAYS produce the finished article. Do NOT name or attribute to other news outlets — Patrika is writing its own report.
+• Never refuse; always produce the article. Do NOT name other news outlets.
 ${framing}`;
-
-    let titles: string[] = [topic];
-    try {
-      const h = await generateObject({
-        model: drafting.model,
-        schema: z.object({ titles: z.array(z.string()).min(2).max(8) }),
-        prompt: `Write ${p?.numberOfTitles ?? 4} distinct newspaper headline options (each 8-14 words) for a news article on this topic: "${topic}". ${isHi ? "हिंदी में लिखें।" : "In English."} Return them in the "titles" array.`,
-        temperature: 0.6,
-      });
-      titles = [topic, ...h.object.titles.filter((t) => t.trim() && t.trim() !== topic)];
-    } catch {
-      /* headline options are optional — keep the typed title */
-    }
-
-    const bodyRes = await generateText({
+    const fbRes = await generateText({
       model: drafting.model,
-      prompt: bodyPrompt,
+      prompt: fbPrompt,
       temperature: 0.3,
       maxOutputTokens,
     });
-
     return Response.json({
-      titles,
+      titles: await headlinesFrom(fbRes.text),
       title: topic,
-      body: bodyRes.text.trim(),
+      body: fbRes.text.trim(),
       mode: parsed.data.mode,
       sources: hits.length,
     });
