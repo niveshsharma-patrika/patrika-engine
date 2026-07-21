@@ -108,48 +108,76 @@ export async function POST(req: Request) {
       : "All visible text in the widget must be in ENGLISH.";
   const imageBlock = images.length
     ? images.map((im, i) => `[IMG${i + 1}] ${im.url}\n        caption: ${im.caption}`).join("\n")
-    : "(no real photos available for this story — design a rich graphic with CSS gradients + inline SVG instead; do NOT use any <img> tags)";
+    : "(no real photos available for this story — illustrate with inline SVG/canvas instead; do NOT use any <img> tags)";
 
-  const prompt = `You are an award-winning editorial designer and senior front-end engineer at a world-class digital newsroom (think NYT / The Guardian / Bloomberg graphics desk). Build ONE self-contained, embeddable, visually STUNNING interactive HTML graphic for the story below. It must look premium and highly designed — never a plain bordered box.
+  const prompt = `You are an expert front-end engineer and news designer at Patrika (patrika.com). Build ONE self-contained, interactive HTML widget to embed inside a news article. Its purpose is to make readers DO something the static article can only describe.
 
-Choose the format that best fits THIS story and maximises engagement + relevance (use your judgement): a hero photo lead with captions, an interactive timeline scrubber, a before/after or comparison slider, a live-feeling scoreboard, animated stat counters, a step-through explainer, a map-style layout, a poll/quiz — or a tasteful combination.
+Work through steps 1–2 SILENTLY in your head. Do not print your reasoning — the only thing you output is the HOOK line, the TYPE line, and the HTML.
 
-REAL PHOTOS — these are the ACTUAL images from this story; design around them as the centrepiece:
+STEP 1 — READ THE SOURCE. From the FACTS below, extract: the real hook, every concrete data point (numbers, dates, names, places, sequences), and what is fact vs belief/allegation/estimate.
+
+STEP 2 — FIND THE HOOK (this decides quality). Answer in one sentence: "What can a reader DO here that a static graphic cannot show them?" Putting the article in tabs is NOT a hook. Match the story shape to an interaction:
+- ends with "you don't need X" → let them pick their case and prove it to them personally
+- data varies by region → interactive choropleth map
+- things happen at places in sequence → route map / journey
+- a process races a deadline → a moving clock
+- two states of one thing (normal vs exception) → a flip that recolours the whole card
+- one quantity dwarfs the rest → a proportional visual where the smallness is the point
+- a life / history → a timeline they move through
+- a structure with named parts → a tappable diagram of the real thing
+Take the visual language FROM the subject (a fuel story looks like a pump; a temple like sandstone; a funeral is sombre) — never a generic template, never a stock dashboard look, never reuse a previous widget's look.
+
+STEP 3 — BUILD.
+SIZE IS THE BINDING CONSTRAINT (this is where widgets fail most often):
+- It MUST fit ONE mobile screen with NO internal scroll. NEVER use overflow-y:auto to fix height.
+- At 360×640 the card must be ≤ 640px tall IN ITS TALLEST STATE. A widget has many states — mentally click through EVERY tab/mode/step/accordion and take the MAX. The default state is almost never the tallest; this is the #1 bug.
+- Also work at 393×852 and 430×932. Healthy range 520–640px. Card max-width 460px.
+- Zero horizontal overflow at all three widths (scrollWidth − clientWidth must be 0). No truncated tab/chip/button/name labels.
+- When over budget, trim in THIS order: spacing → longest text string → media size → collapse redundant elements → cut a feature → font size LAST. This desk asks for BIGGER type, so shrinking it is the wrong reflex.
+
+TECHNICAL RULES:
+- ONE self-contained snippet: inline <style> + markup + vanilla <script>. No build step, no frameworks, no CDNs.
+- Runs in a sandboxed iframe (scripts allowed, same-origin denied): no fetch, no localStorage, no cookies, no top navigation.
+- Use container-type:inline-size on the root and cqw units. EVERY font size must be clamp(MINpx, N cqw, MAXpx). NEVER vw/vh — this lives in an article column, where vh collapses or overflows.
+- Scope EVERY CSS selector under one root class (e.g. .pk-w) so article styles can't leak either way.
+- Give swapping panels a min-height so the card doesn't jump between states.
+- Put ALL content in ONE editable data array at the top of the <script>, marked with a comment so the desk can edit copy without touching logic.
+- Keyboard accessible: tabindex, Enter/Space handlers, aria-* labels.
+- min-width/min-height floors so small dots/icons/hit targets survive 360px.
+- Respect prefers-reduced-motion (no autoplay, no transitions).
+- Desktop keeps natural height, no scroll trap.
+- Wire EVERY control with working vanilla JS so it visibly responds — no dead sliders or buttons.
+- Illustrate with inline SVG/canvas and draw icons FROM the subject. Any SVG must encode REAL information from the facts (a real proportion, comparison, timeline, progress) — never a decorative circle or a "100%" placeholder.
+
+TYPOGRAPHY — ${langLine}
+- Light theme. Use Noto Sans Devanagari for everything; add Noto Serif Devanagari for headings ONLY if the tone is heritage/serious. One superfamily so nothing clashes. Load it with:
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&display=swap">
+  and ALWAYS declare a fallback stack after it so the widget degrades cleanly if fonts are blocked.
+- NEVER set Devanagari in a Latin-only font (mono faces, Fraunces, etc.) → it breaks into tofu/broken clusters. Mono is fine for digits/Latin only.
+- NEVER use wide letter-spacing on Devanagari (≤ .04em) — it pulls conjuncts apart.
+- Avoid condensed display faces (poor Hindi legibility).
+- Devanagari line-height 1.4–1.55 for Noto. Leave headroom so matras are never clipped — inside overflow:hidden use 1.6+.
+- Generous font sizes; when unsure, bigger.
+- Text contrast ≥ 4.5:1 — the faint footer/caption line is the usual failure.
+
+STEP 4 — EDITORIAL RULES (Indian publication standards, mandatory):
+- NEVER invent data. No made-up prices, percentages, scores or dates. If it isn't in the FACTS and isn't simple arithmetic from them, leave it out. A control that needs a range with no factual basis must be clearly framed as exploring a scenario and labelled illustrative — never stated as fact.
+- Preserve hedging language EXACTLY ("कथित" / alleged / estimated / "मान्यता है"). Never quietly upgrade an allegation into a fact. Present beliefs as beliefs.
+- Maps of India MUST show the official boundary — full Jammu & Kashmir / Ladakh including PoK and Aksai Chin, plus Arunachal Pradesh. Most open datasets draw the de-facto line and are unpublishable: the northern extent must reach ~37°N and Ladakh must extend east to ~80°E. If you cannot draw a compliant boundary from the facts you have, choose a NON-MAP interaction instead.
+- Health content: no invented risk models; the logic must never be backwards (a specific symptom must not score below a non-specific one); keep disclaimers and "screening, not diagnosis" framing.
+- Religion / politics / communal topics: neutral, factual, attributed, never sensationalised.
+- Real people and tragedy: dignified and restrained — no playful animation, no invented outcomes.
+- Add a short source/caveat line wherever data needs it (estimates, ranges, shifting dates, schematic diagrams) and say plainly what is schematic.
+- If there is scoring/matching logic, mentally simulate EVERY input combination before emitting, to confirm it isn't backwards.
+
+PHOTOS (optional — only if one genuinely earns its height against the 640px budget):
 ${imageBlock}
-Rules for images:
-- Use ONLY the exact URLs above in <img> or CSS background-image. NEVER invent, guess, modify, or shorten an image URL.
-- Lead with the most relevant photo (e.g. the key person or object — for a SpaceX story that means the rocket / Elon Musk shot). Use the others as inline shots, a gallery, or section backgrounds with a subtle dark gradient overlay so any text on top stays readable.
-- Add a tasteful caption/credit near photos.
-- EVERY <img> MUST include onerror="this.onerror=null;this.style.display='none'" and sit on top of a CSS gradient fallback, so a blocked or expired image never breaks the layout.
+- Use ONLY the exact URLs above in <img> or CSS background-image. NEVER invent, guess, modify or shorten an image URL.
+- At most ONE photo. The interaction, not the photo, is the point — if the photo would push the card past budget, drop it.
+- EVERY <img> MUST include onerror="this.onerror=null;this.style.display='none'" and sit on a CSS gradient fallback so a blocked image never breaks the layout. Never write CSS that hides photos by default.
+- Check provenance: if a caption suggests the image is AI-generated or प्रतीकात्मक/symbolic, do NOT present it as a real photo of the event — label it, or leave it out.
 
-DESIGN BAR (make it genuinely premium):
-- Bold visual hierarchy, a refined type scale, generous spacing, and a cohesive colour palette matching the story's mood.
-- Rich CSS: gradients, layered shadows, rounded corners, photo overlays, accent colours, smooth entrance + hover transitions/animations.
-- Crisp inline SVG for any data, icons, diagrams, charts, trajectories, etc.
-- Fully responsive: beautiful at ~600px wide and on mobile. System font stack only.
-
-REQUIRED COMPONENTS — include every one the story can support (this is the FLOOR, not the ceiling):
-1. A full-bleed HERO built on the lead photo, with a dark gradient overlay and a bold headline + the single most striking real fact/number laid over it.
-2. A genuinely INTERACTIVE element wired with vanilla JS — a timeline scrubber, tabs, a comparison slider, a toggle, an animated count-up to a key number, or a short poll/quiz. It must visibly respond to the user.
-3. A PHOTO STRIP or gallery that uses the OTHER provided images, each with a caption (hover-zoom or a clickable lightbox is a plus).
-4. At least one crisp INLINE SVG graphic relevant to the story — a chart, progress ring, icon set, trajectory, map marker, gauge, etc.
-5. Smooth entrance animations and hover states (@keyframes + transitions).
-
-Make it a substantial, multi-section interactive FEATURE — rich, layered and polished, NEVER a single plain card. Aim for roughly 8–15KB of HTML (excluding image URLs); do not stop short with a minimal version.
-
-AVOID THESE MISTAKES (they have happened before):
-- Do NOT write any CSS that hides photos (e.g. NEVER \`img[onerror]{display:none}\` or similar). Photos must be VISIBLE by default; the per-image onerror only hides an individual broken one.
-- Use fixed px sizes, NOT vh/vw units — the widget renders inside an auto-sized frame, so vh collapses or overflows.
-- Every number, label, date or stat shown as real MUST come from the FACTS. Do NOT invent a slider range, price, or percentage. If a control needs a range with no factual basis, make it clearly hypothetical ("explore a scenario") and label it so.
-- Any inline SVG must encode REAL information from the facts (a real proportion, comparison, timeline or progress) — never a meaningless decorative circle or "100%" placeholder.
-- Wire EVERY interactive control with working vanilla JS so it visibly responds; no dead sliders or buttons.
-
-HARD RULES:
-- Output ONE self-contained snippet: an inline <style> block + a vanilla <script>. NO frameworks, NO external CSS/JS/CDNs, NO web fonts. The ONLY permitted external resources are the REAL image URLs listed above.
-- Must run inside a sandboxed iframe (scripts allowed, same-origin denied): no fetch, no localStorage, no top navigation, no cookies.
-- NO HALLUCINATION: every fact, number, name or quote presented as real MUST come from the FACTS below. Never fabricate statistics. Values used purely for interactivity may be exploratory but must be clearly labelled illustrative, not stated as fact.
-- ${langLine}
-- Keep it performant, but prioritise a rich, finished result over brevity (see the size target above).
+AVOID: wrapping the article in tabs and calling it interactive; reusing a previous widget's look; overflow-y:auto to fix height; shrinking fonts to fit; designing only for the default state; decorative fonts that hurt Hindi legibility; inventing a statistic to fill a panel; explaining your own editorial process to readers in the footer.
 
 STORY: ${t.title}
 SECTION: ${t.desk ?? t.section ?? "General"}
@@ -157,7 +185,8 @@ FACTS (the only real data you may present as true):
 ${coverage.join("\n") || "(few facts captured — keep claims minimal and clearly illustrative)"}
 
 OUTPUT FORMAT — respond with EXACTLY this and nothing else:
-First line: TYPE: <a 2–4 word label for the widget you built>
+Line 1: HOOK: <the one sentence from step 2 — what the reader can DO>
+Line 2: TYPE: <a 2–4 word label for the widget you built>
 Then a blank line, then the COMPLETE raw HTML snippet (inline <style> + markup + <script>). No markdown, no code fences, no commentary before or after.`;
 
   try {
@@ -171,6 +200,13 @@ Then a blank line, then the COMPLETE raw HTML snippet (inline <style> + markup +
     // strip any markdown fences and trim to the first real HTML tag.
     let raw = text.trim();
     let widgetType = "Interactive feature";
+    let hook = "";
+    // The model leads with "HOOK: …" (what the reader can DO) then "TYPE: …".
+    const hookMatch = raw.match(/^HOOK:\s*(.+)$/im);
+    if (hookMatch) {
+      hook = hookMatch[1].trim().slice(0, 240);
+      raw = raw.slice(raw.indexOf(hookMatch[0]) + hookMatch[0].length);
+    }
     const typeMatch = raw.match(/^TYPE:\s*(.+)$/im);
     if (typeMatch) {
       widgetType = typeMatch[1].trim().slice(0, 40);
@@ -186,6 +222,7 @@ Then a blank line, then the COMPLETE raw HTML snippet (inline <style> + markup +
     if (count(/<script\b/gi) > count(/<\/script>/gi)) html += "\n</script>";
     return Response.json({
       widgetType,
+      hook,
       title: t.title,
       html,
       meta: {

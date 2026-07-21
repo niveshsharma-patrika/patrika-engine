@@ -511,6 +511,8 @@ export function Editor({ trend, title, setTitle, onClose }: {
   // Interactive widget
   const [widgetHtml, setWidgetHtml] = useState<string | null>(null);
   const [widgetType, setWidgetType] = useState<string>("");
+  // One-line "what the reader can DO" the generator reports back with the widget.
+  const [widgetHook, setWidgetHook] = useState<string>("");
   const [loadingWidget, setLoadingWidget] = useState(false);
   const [widgetError, setWidgetError] = useState<string | null>(null);
   // Auto-size the widget iframe to its content (widgets post their height).
@@ -701,6 +703,7 @@ export function Editor({ trend, title, setTitle, onClose }: {
       if (res.ok && json.html) {
         setWidgetHtml(json.html);
         setWidgetType(json.widgetType ?? "");
+        setWidgetHook(json.hook ?? "");
       } else {
         setWidgetError(json.error ?? `Failed (${res.status})`);
       }
@@ -1004,72 +1007,11 @@ export function Editor({ trend, title, setTitle, onClose }: {
               )}
             </div>
 
-            {/* Interactive widget — AI picks the most engaging type for the story */}
-            {trend?.uid && (
-              <div className="mt-6">
-                <div className="flex items-center justify-between gap-2 mb-2.5">
-                  <h4 className="text-[14px] font-semibold flex items-center gap-1.5">
-                    <Sparkles size={15} className="text-[var(--purple)]" />
-                    {lang === "hi" ? "इंटरैक्टिव विजेट" : "Interactive widget"}
-                    {widgetType && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[var(--surface-2)] text-[var(--text-3)] font-normal">
-                        {widgetType}
-                      </span>
-                    )}
-                  </h4>
-                  <div className="flex items-center gap-3">
-                    {widgetHtml && (
-                      <button
-                        onClick={() => navigator.clipboard?.writeText(widgetHtml)}
-                        className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)]"
-                      >
-                        {lang === "hi" ? "HTML कॉपी करें" : "Copy HTML"}
-                      </button>
-                    )}
-                    <button
-                      onClick={generateWidget}
-                      disabled={loadingWidget}
-                      className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg text-white disabled:opacity-60"
-                      style={{ background: "var(--purple)" }}
-                    >
-                      {loadingWidget ? (
-                        <Loader2 size={13} className="animate-spin" />
-                      ) : (
-                        <Sparkles size={13} />
-                      )}
-                      {loadingWidget
-                        ? lang === "hi" ? "बना रहे हैं…" : "Building…"
-                        : widgetHtml
-                        ? lang === "hi" ? "फिर से बनाएँ" : "Regenerate"
-                        : lang === "hi" ? "विजेट बनाएँ" : "Generate widget"}
-                    </button>
-                  </div>
-                </div>
-                {widgetError && (
-                  <div className="text-[12px] text-[var(--red)] mb-2 leading-snug">{widgetError}</div>
-                )}
-                {widgetHtml ? (
-                  <iframe
-                    title="Interactive widget"
-                    srcDoc={widgetHtml + WIDGET_HEIGHT_REPORTER}
-                    sandbox="allow-scripts"
-                    style={{ height: widgetHeight }}
-                    className="w-full rounded-xl border border-[var(--border)] bg-white transition-[height] duration-200"
-                  />
-                ) : (
-                  <div className="rounded-xl border border-dashed border-[var(--border-2)] bg-[var(--surface-2)] py-12 text-center text-[13px] text-[var(--text-3)] leading-relaxed px-4">
-                    {lang === "hi"
-                      ? "स्टोरी के लिए एक छोटा इंटरैक्टिव विजेट बनाएँ — AI सबसे उपयुक्त प्रकार चुनेगा (स्लाइडर, टाइमलाइन, चार्ट…)।"
-                      : "Build a small interactive widget for this story — AI picks the best-fit type (slider, timeline, chart…)."}
-                  </div>
-                )}
-              </div>
-            )}
             </section>
 
             {/* Right rail — story stats + article image, shown once a story exists */}
             {hasGenerated && (
-              <aside className="w-[300px] shrink-0 space-y-5 sticky top-0">
+              <aside className="w-[380px] shrink-0 space-y-5">
                 {/* Story stats */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="rounded-xl border border-[var(--border)] bg-white px-2 py-3 text-center">
@@ -1129,6 +1071,67 @@ export function Editor({ trend, title, setTitle, onClose }: {
                       : lang === "hi" ? "इमेज बनाएँ" : "Generate image"}
                   </button>
                 </div>
+
+                {/* Interactive widget — AI picks the most engaging type for the story.
+                    Rail is 380px so the preview sits near the 360px width the
+                    widget spec is measured against. */}
+                {trend?.uid && (
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h4 className="text-[13px] font-semibold flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-[var(--purple)]" />
+                        {lang === "hi" ? "इंटरैक्टिव विजेट" : "Interactive widget"}
+                      </h4>
+                      {widgetHtml && (
+                        <button
+                          onClick={() => navigator.clipboard?.writeText(widgetHtml)}
+                          className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)]"
+                        >
+                          {lang === "hi" ? "HTML कॉपी करें" : "Copy HTML"}
+                        </button>
+                      )}
+                    </div>
+                    {widgetType && (
+                      <span className="inline-block text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[var(--surface-2)] text-[var(--text-3)] mb-2">
+                        {widgetType}
+                      </span>
+                    )}
+                    {widgetHook && (
+                      <div className="text-[11px] text-[var(--text-3)] leading-snug mb-2">{widgetHook}</div>
+                    )}
+                    {widgetError && (
+                      <div className="text-[12px] text-[var(--red)] mb-2 leading-snug">{widgetError}</div>
+                    )}
+                    {widgetHtml ? (
+                      <iframe
+                        title="Interactive widget"
+                        srcDoc={widgetHtml + WIDGET_HEIGHT_REPORTER}
+                        sandbox="allow-scripts"
+                        style={{ height: widgetHeight }}
+                        className="w-full rounded-xl border border-[var(--border)] bg-white transition-[height] duration-200 mb-2"
+                      />
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-[var(--border-2)] bg-[var(--surface-2)] py-8 text-center text-[11px] text-[var(--text-3)] leading-snug px-3 mb-2">
+                        {lang === "hi"
+                          ? "स्टोरी के लिए एक इंटरैक्टिव विजेट बनाएँ — AI सबसे उपयुक्त प्रकार चुनेगा।"
+                          : "Build an interactive widget for this story — AI picks the best-fit type."}
+                      </div>
+                    )}
+                    <button
+                      onClick={generateWidget}
+                      disabled={loadingWidget}
+                      className="w-full flex items-center justify-center gap-1.5 text-[12px] font-medium px-3 py-2 rounded-lg text-white disabled:opacity-60"
+                      style={{ background: "var(--purple)" }}
+                    >
+                      {loadingWidget ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                      {loadingWidget
+                        ? lang === "hi" ? "बना रहे हैं…" : "Building…"
+                        : widgetHtml
+                        ? lang === "hi" ? "फिर से बनाएँ" : "Regenerate"
+                        : lang === "hi" ? "विजेट बनाएँ" : "Generate widget"}
+                    </button>
+                  </div>
+                )}
               </aside>
             )}
           </div>
