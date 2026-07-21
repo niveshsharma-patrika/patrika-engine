@@ -83,11 +83,11 @@ async function loadStyleAssets(
 }
 
 /**
- * The grounding-rules block that goes into EVERY draft prompt to suppress
- * the 2024-knowledge / hallucination problem. Anchors the AI to:
+ * The grounding-rules block that goes into EVERY draft prompt to keep the AI
+ * factual (no 2024-knowledge / hallucination) WITHOUT making it refuse. Anchors:
  *   1. Today's actual date (so it doesn't pretend it's still 2024)
- *   2. The signals provided (no inventions from training data)
- *   3. An explicit escape hatch when info is missing
+ *   2. The signals provided (don't invent SPECIFIC facts from training data)
+ *   3. "Always write the article" — general context is allowed; no bail-outs
  */
 function groundingRules(lang: "en" | "hi"): string {
   const today = new Date().toLocaleDateString("en-IN", {
@@ -100,33 +100,32 @@ function groundingRules(lang: "en" | "hi"): string {
   if (lang === "hi") {
     return `
 ═══════════════════════════════════════════
-सख्त नियम — कोई मनगढ़ंत तथ्य नहीं — ये कभी न तोड़ें
+आधार नियम — तथ्यपरक रहें, लेकिन लेख हमेशा लिखें
 ═══════════════════════════════════════════
-• कोई मनगढ़ंत/काल्पनिक तथ्य नहीं। कुछ भी अपने आप न गढ़ें — हर तथ्य, नाम, संख्या, तारीख और उद्धरण नीचे दी गई "स्रोत रिपोर्ट" से ही आना चाहिए।
-• आज की तारीख: ${today} (भारतीय समय)
-• केवल नीचे दी गई "स्रोत रिपोर्ट" में मौजूद तथ्यों का उपयोग करें।
-• अपनी प्रशिक्षण डेटा (2024 या उससे पहले) से कोई नाम, तारीख, उद्धरण, या संख्या न जोड़ें।
-• यदि कोई जानकारी संकेतों में नहीं है तो [विवरण आवश्यक] लिखें — आविष्कार न करें।
-• यदि संकेत अपर्याप्त हैं, तो जवाब दें: "INSUFFICIENT INFORMATION: <क्या चाहिए>"
-• तथ्यों का श्रेय कहानी के लोगों/संस्थानों को दें ("पुलिस ने कहा", "एयरलाइन ने बताया") — कभी भी उन समाचार आउटलेट्स/एजेंसियों को नहीं जिन्होंने इसे रिपोर्ट किया। "दैनिक भास्कर के अनुसार", "ABP ने बताया" जैसा कुछ न लिखें और न ही किसी प्रकाशन का नाम लें। पत्रिका अपनी रिपोर्ट लिख रही है।
+• लेख केवल नीचे दी गई "स्रोत रिपोर्ट" पर आधारित हो। आज की तारीख: ${today} (भारतीय समय)।
+• कोई विशिष्ट तथ्य न गढ़ें — ऐसे नाम, संख्या, तारीख, उद्धरण या संस्था न जोड़ें जो "स्रोत रिपोर्ट" में नहीं हैं। प्रशिक्षण डेटा से पुराने विवरण न लाएँ।
+• रिपोर्ट किए गए तथ्यों से तर्कसंगत रूप से निकलने वाला सामान्य संदर्भ, पृष्ठभूमि और विश्लेषण लिख सकते हैं — इसी से लेख को पूरी लंबाई तक विकसित करें।
+• यदि कोई विशिष्ट विवरण मौजूद नहीं है तो उसे सामान्य शब्दों में लिखें। "[विवरण आवश्यक]" जैसे प्लेसहोल्डर न डालें; मना न करें, माफ़ी न माँगें, कोई त्रुटि-संदेश न दें। हमेशा पूरा, प्रकाशन-योग्य लेख लिखें।
+• तथ्यों का श्रेय कहानी के लोगों/संस्थानों को दें ("पुलिस ने कहा", "एयरलाइन ने बताया") — कभी भी उन समाचार आउटलेट्स को नहीं जिन्होंने रिपोर्ट किया। किसी प्रकाशन का नाम न लें। पत्रिका अपनी रिपोर्ट लिख रही है।
 ═══════════════════════════════════════════`;
   }
   return `
 ═══════════════════════════════════════════
-HARD RULES — NO HALLUCINATION — never break these
+GROUNDING — stay factual, but ALWAYS write the full article
 ═══════════════════════════════════════════
-• NO HALLUCINATION. Invent NOTHING. Every fact, name, number, date, quote and
-  organisation in your output MUST come from the SOURCE REPORTS below.
-• Today's date: ${today} (IST). Your training data cutoff is irrelevant.
-• Use ONLY facts present in the SOURCE REPORTS below.
-• Do NOT add names, dates, quotes, numbers, organisations, or context from
-  your training data — even if you "remember" them. They will be wrong or stale.
-• If a fact isn't in the signals, write "[detail needed]" instead of inventing.
-• If signals are insufficient, return literally: "INSUFFICIENT INFORMATION: <what's needed>"
+• Base the article on the SOURCE REPORTS below. Today's date: ${today} (IST);
+  your training-data cutoff is irrelevant.
+• Do NOT fabricate SPECIFIC facts — names, numbers, dates, quotes, or organisations
+  that are not in the SOURCE REPORTS. Don't pull "remembered" specifics from your
+  training data; they'll be stale.
+• You MAY add general context, background, and analysis that reasonably follows
+  from the reported facts — this is how you develop the piece to the full length.
+• If a specific detail is missing, write around it in general terms. Do NOT insert
+  placeholders like "[detail needed]", and do NOT refuse, apologise, or return any
+  meta-message or error. ALWAYS produce the finished, publish-ready article.
 • Attribute facts to the people / institutions IN the story ("the police said",
   "the airline said", "officials told reporters") — NEVER to the news outlets or
-  wire agencies that carried the report. Do NOT write "according to Dainik Bhaskar",
-  "ABP reported", "as per Times of India", or name any publication. Patrika is
+  wire agencies that carried the report. Do NOT name any publication. Patrika is
   writing its OWN report from these facts.
 ═══════════════════════════════════════════`;
 }
