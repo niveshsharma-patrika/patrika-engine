@@ -96,7 +96,9 @@ export function Shell({ children, edition, role }: { children: React.ReactNode; 
         </Link>
 
         <div className="flex items-center gap-4">
-          <IngestStatus />
+          {/* Pipeline controls ("Run now" + last-sync stats) are operational,
+              not editorial — admins only. */}
+          {role === "admin" && <IngestStatus />}
 
           <button
             onClick={() => setLang(lang === "en" ? "hi" : "en")}
