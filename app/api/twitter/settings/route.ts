@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { getSecret, hasSecret, setSecret, X_AUTH_TOKEN } from "@/lib/twitter/secrets";
 
@@ -19,7 +20,18 @@ async function requireAdmin() {
 
 const Body = z.object({ auth_token: z.string().min(10).max(500) });
 
-/** GET — is a cookie set, and is the Python shim alive? */
+// Spend guard. Every tweet triggers a web-search-grounded generation — the
+// expensive call — so these caps are what stop tweet volume quietly running up
+// an AI bill. Admin-only for that reason.
+const CapsBody = z.object({
+  auto_draft: z.boolean().optional(),
+  daily_cap: z.number().int().min(0).max(1000).optional(),
+  per_account_daily_cap: z.number().int().min(0).max(500).optional(),
+  per_run_cap: z.number().int().min(1).max(20).optional(),
+  target_words: z.number().int().min(150).max(2000).optional(),
+});
+
+/** GET — is a cookie set, is the Python shim alive, and what are the caps? */
 export async function GET() {
   if (!(await requireAdmin())) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
@@ -44,7 +56,55 @@ export async function GET() {
     shim.error = err instanceof Error ? err.message : "unreachable";
   }
 
-  return Response.json({ token, shim });
+  let caps: Record<string, unknown> | null = null;
+  try {
+    const { rows } = await pool.query(
+      `SELECT auto_draft, daily_cap, per_account_daily_cap, per_run_cap, target_words
+         FROM twitter_settings WHERE id = true LIMIT 1`
+    );
+    caps = rows[0] ?? null;
+  } catch {
+    // twitter-phase2.sql not run yet
+  }
+
+  return Response.json({ token, shim, caps });
+}
+
+/** PATCH — update the spend caps / auto-draft switch. */
+export async function PATCH(req: Request) {
+  if (!(await requireAdmin())) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const json = await req.json().catch(() => null);
+  const parsed = CapsBody.safeParse(json);
+  if (!parsed.success) {
+    return Response.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const fields = Object.entries(parsed.data).filter(([, v]) => v !== undefined);
+  if (fields.length === 0) {
+    return Response.json({ error: "Nothing to update" }, { status: 400 });
+  }
+
+  // Column names come from the zod schema above, never straight from the body.
+  const setSql = fields.map(([k], i) => `${k} = $${i + 1}`).join(", ");
+  const values = fields.map(([, v]) => v);
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE twitter_settings SET ${setSql}, updated_at = now()
+        WHERE id = true
+    RETURNING auto_draft, daily_cap, per_account_daily_cap, per_run_cap, target_words`,
+      values
+    );
+    return Response.json({ caps: rows[0] ?? null });
+  } catch (err) {
+    return Response.json(
+      { error: err instanceof Error ? err.message : "update failed" },
+      { status: 500 }
+    );
+  }
 }
 
 /** PUT — store/replace the cookie (write-only). */

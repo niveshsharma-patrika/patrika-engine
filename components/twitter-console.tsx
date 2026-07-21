@@ -12,6 +12,8 @@ import {
   KeyRound,
   Pause,
   Play,
+  PenLine,
+  Send,
 } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
@@ -43,6 +45,25 @@ type Tweet = {
   status_reason: string | null;
   metrics: Record<string, number>;
   tier: number;
+};
+
+type TwDraft = {
+  id: string;
+  title: string;
+  body: string;
+  language: string;
+  word_count: number;
+  sources_used: number;
+  created_at: string;
+  promoted_at: string | null;
+  promoted_draft_id: string | null;
+  tweet_id: string;
+  author_handle: string;
+  tweet_text: string;
+  tweet_url: string | null;
+  posted_at: string;
+  display_name: string | null;
+  desk: string | null;
 };
 
 const CATEGORIES = ["figure", "company", "organisation", "government", "media"] as const;
@@ -89,7 +110,7 @@ export function TwitterConsole({ isAdmin }: { isAdmin: boolean }) {
   const { lang } = useLang();
   const t = (en: string, hi: string) => (lang === "hi" ? hi : en);
 
-  const [tab, setTab] = useState<"accounts" | "feed">("accounts");
+  const [tab, setTab] = useState<"articles" | "accounts" | "feed">("articles");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -97,6 +118,15 @@ export function TwitterConsole({ isAdmin }: { isAdmin: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [crawling, setCrawling] = useState(false);
   const [crawlNote, setCrawlNote] = useState<string | null>(null);
+
+  // Generated articles
+  const [drafts, setDrafts] = useState<TwDraft[]>([]);
+  const [today, setToday] = useState<{ used: number; cap: number }>({ used: 0, cap: 0 });
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [writing, setWriting] = useState(false);
 
   // Add-account form
   const [handle, setHandle] = useState("");
@@ -133,10 +163,114 @@ export function TwitterConsole({ isAdmin }: { isAdmin: boolean }) {
     }
   }, []);
 
+  const loadDrafts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/twitter/drafts");
+      const json = await res.json();
+      if (res.ok) {
+        setDrafts(json.drafts ?? []);
+        setToday(json.today ?? { used: 0, cap: 0 });
+      }
+    } catch {
+      /* secondary — don't blank the page */
+    }
+  }, []);
+
   useEffect(() => {
     loadAccounts();
     loadTweets();
-  }, [loadAccounts, loadTweets]);
+    loadDrafts();
+  }, [loadAccounts, loadTweets, loadDrafts]);
+
+  /** Generate articles now instead of waiting for the cron. */
+  async function writeNow() {
+    setWriting(true);
+    setCrawlNote(null);
+    try {
+      const res = await fetch("/api/twitter/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 3 }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.ok === false) throw new Error(json.error ?? `Failed (${res.status})`);
+      setCrawlNote(
+        json.skipped_reason ??
+          t(
+            `${json.drafted} article(s) written, ${json.failed} could not be researched`,
+            `${json.drafted} लेख बने, ${json.failed} पर पर्याप्त जानकारी नहीं मिली`
+          )
+      );
+      await Promise.all([loadDrafts(), loadTweets()]);
+    } catch (e) {
+      setCrawlNote(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setWriting(false);
+    }
+  }
+
+  function openDraft(d: TwDraft) {
+    setOpenId(d.id);
+    setEditTitle(d.title);
+    setEditBody(d.body);
+  }
+
+  async function saveDraft(id: string) {
+    setSavingDraft(true);
+    try {
+      const res = await fetch(`/api/twitter/drafts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle, body: editBody }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Save failed");
+      setDrafts((prev) =>
+        prev.map((d) =>
+          d.id === id
+            ? { ...d, title: editTitle, body: editBody, word_count: json.draft?.word_count ?? d.word_count }
+            : d
+        )
+      );
+      setCrawlNote(t("Saved.", "सहेजा गया।"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
+  /** The one action that puts a story into the newsroom. */
+  async function promoteDraft(id: string) {
+    setSavingDraft(true);
+    try {
+      // Save any unsaved edits first so the promoted copy is what's on screen.
+      await fetch(`/api/twitter/drafts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle, body: editBody }),
+      });
+      const res = await fetch(`/api/twitter/drafts/${id}/promote`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      setOpenId(null);
+      setCrawlNote(t("Sent to My Articles.", "मेरे लेख में भेज दिया गया।"));
+      await loadDrafts();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not send");
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
+  async function discardDraft(id: string) {
+    if (!confirm(t("Discard this article?", "इस लेख को हटाएँ?"))) return;
+    const res = await fetch(`/api/twitter/drafts/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setOpenId(null);
+      setDrafts((prev) => prev.filter((d) => d.id !== id));
+    }
+  }
 
   async function addAccount() {
     if (!handle.trim()) return;
@@ -255,6 +389,7 @@ export function TwitterConsole({ isAdmin }: { isAdmin: boolean }) {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-[var(--border)] mb-5">
         {([
+          ["articles", t("Articles", "लेख"), drafts.length],
           ["accounts", t("Accounts", "अकाउंट्स"), accounts.length],
           ["feed", t("Feed", "फ़ीड"), tweets.length],
         ] as const).map(([key, label, n]) => (
@@ -276,6 +411,111 @@ export function TwitterConsole({ isAdmin }: { isAdmin: boolean }) {
         <div className="flex items-center gap-2 text-[13px] text-[var(--text-3)] py-10">
           <Loader2 size={15} className="animate-spin" /> {t("Loading…", "लोड हो रहा है…")}
         </div>
+      ) : tab === "articles" ? (
+        <>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="text-[12px] text-[var(--text-3)]">
+              {t(
+                `${today.used} of ${today.cap} articles written today`,
+                `आज ${today.cap} में से ${today.used} लेख बने`
+              )}
+            </div>
+            <button
+              onClick={writeNow}
+              disabled={writing}
+              className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-2 rounded-lg border border-[var(--border)] disabled:opacity-60"
+            >
+              {writing ? <Loader2 size={13} className="animate-spin" /> : <PenLine size={13} />}
+              {writing ? t("Writing…", "लिखा जा रहा है…") : t("Write articles now", "अभी लेख बनाएँ")}
+            </button>
+          </div>
+
+          {drafts.length === 0 ? (
+            <Empty
+              text={t(
+                "No articles yet. Capture some tweets, then press 'Write articles now'.",
+                "अभी कोई लेख नहीं। पहले ट्वीट लें, फिर 'अभी लेख बनाएँ' दबाएँ।"
+              )}
+            />
+          ) : (
+            <div className="space-y-2.5">
+              {drafts.map((d) => {
+                const open = openId === d.id;
+                return (
+                  <div key={d.id} className="border border-[var(--border)] rounded-xl bg-white overflow-hidden">
+                    {/* The originating post — always visible, so the desk can
+                        check the article against the claim it came from. */}
+                    <div className="px-4 py-2.5 bg-[var(--surface-2)] border-b border-[var(--border)]">
+                      <div className="flex items-center gap-2 text-[11px] text-[var(--text-3)] mb-1">
+                        <AtSign size={11} />
+                        <span className="font-medium text-[var(--text-2)]">@{d.author_handle}</span>
+                        <span>{timeAgo(d.posted_at, lang)}</span>
+                        {d.tweet_url && (
+                          <a href={d.tweet_url} target="_blank" rel="noopener noreferrer"
+                            className="hover:text-[var(--text)]">↗</a>
+                        )}
+                      </div>
+                      <p className="text-[12px] text-[var(--text-2)] line-clamp-2">{d.tweet_text}</p>
+                    </div>
+
+                    <div className="p-4">
+                      {open ? (
+                        <>
+                          <input
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full text-[18px] font-semibold leading-snug outline-none mb-3 border-b border-transparent focus:border-[var(--border)] pb-1"
+                          />
+                          <textarea
+                            value={editBody}
+                            onChange={(e) => setEditBody(e.target.value)}
+                            className="w-full min-h-[320px] outline-none text-[14px] leading-[1.75] resize-y"
+                          />
+                          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-[var(--border)]">
+                            <span className="text-[11px] text-[var(--text-3)] mr-auto">
+                              {editBody.trim().split(/\s+/).filter(Boolean).length}{" "}
+                              {t("words", "शब्द")} · {d.sources_used} {t("sources", "स्रोत")}
+                            </span>
+                            <button onClick={() => setOpenId(null)}
+                              className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--border)]">
+                              {t("Close", "बंद करें")}
+                            </button>
+                            <button onClick={() => discardDraft(d.id)}
+                              className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--border)] text-[#991b1b]">
+                              {t("Discard", "हटाएँ")}
+                            </button>
+                            <button onClick={() => saveDraft(d.id)} disabled={savingDraft}
+                              className="text-[12px] px-3 py-1.5 rounded-lg border border-[var(--border)] disabled:opacity-50">
+                              {t("Save", "सहेजें")}
+                            </button>
+                            <button onClick={() => promoteDraft(d.id)} disabled={savingDraft}
+                              className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
+                              style={{ background: "var(--purple)" }}>
+                              {savingDraft ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                              {t("Send to My Articles", "मेरे लेख में भेजें")}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <button onClick={() => openDraft(d)} className="w-full text-left">
+                          <h3 className="text-[16px] font-semibold leading-snug mb-1.5">{d.title}</h3>
+                          <p className="text-[13px] text-[var(--text-2)] leading-relaxed line-clamp-3">
+                            {d.body}
+                          </p>
+                          <div className="text-[11px] text-[var(--text-3)] mt-2">
+                            {d.word_count} {t("words", "शब्द")} · {d.sources_used}{" "}
+                            {t("sources researched", "स्रोतों से शोध")} ·{" "}
+                            {t("click to edit", "संपादित करने के लिए क्लिक करें")}
+                          </div>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       ) : tab === "accounts" ? (
         <>
           {/* Add form */}
