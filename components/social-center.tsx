@@ -213,7 +213,15 @@ export function SocialCenter({ isAdmin }: { isAdmin: boolean }) {
       {note && <div className="mb-4 text-[12px] px-3 py-2 rounded-lg bg-[var(--surface-2)] text-[var(--text-2)]">{note}</div>}
       {error && <div className="mb-4 text-[12px] px-3 py-2 rounded-lg bg-[#fee2e2] text-[#991b1b] flex items-start gap-2"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{error}</div>}
 
-      {isAdmin && <TokenPanel t={t} />}
+      {isAdmin && (
+        <div className="mb-5 text-[11.5px] text-[var(--text-3)] flex items-center gap-1.5">
+          <KeyRound size={12} />
+          {t("Platform keys (YouTube, Meta) are managed in ", "प्लेटफ़ॉर्म कीज़ (YouTube, Meta) यहाँ प्रबंधित होती हैं: ")}
+          <a href="/admin" className="text-[var(--purple)] font-medium hover:underline">
+            {t("Admin → Integration keys", "एडमिन → इंटीग्रेशन कीज़")}
+          </a>
+        </div>
+      )}
 
       <div className="flex gap-1 border-b border-[var(--border)] mb-5">
         {([
@@ -465,82 +473,6 @@ function Suggestions({ suggestions, basedOn, suggesting, getSuggestions, t }: an
         </div>
       )}
     </>
-  );
-}
-
-function TokenPanel({ t }: { t: (e: string, h: string) => string }) {
-  const [status, setStatus] = useState<Record<string, boolean> | null>(null);
-  const [yt, setYt] = useState(""); const [meta, setMeta] = useState(""); const [ig, setIg] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try { const r = await fetch("/api/social/settings"); if (r.ok) setStatus(await r.json()); } catch { /* */ }
-  }, []);
-  useEffect(() => { load(); }, [load]);
-
-  async function save() {
-    const body: Record<string, string> = {};
-    if (yt.trim()) body.youtube_api_key = yt.trim();
-    if (meta.trim()) body.meta_access_token = meta.trim();
-    if (ig.trim()) body.meta_ig_user_id = ig.trim();
-    if (Object.keys(body).length === 0) return;
-    setSaving(true); setMsg(null);
-    try {
-      const r = await fetch("/api/social/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? "Failed");
-      setYt(""); setMeta(""); setIg(""); setMsg(t("Saved.", "सहेजा गया।")); load();
-    } catch (e) { setMsg(e instanceof Error ? e.message : "Failed"); }
-    finally { setSaving(false); }
-  }
-
-  const dot = (ok?: boolean) => (
-    <span className="text-[10px]" style={{ color: ok ? "#166534" : "#991b1b" }}>{ok ? "●" : "○"}</span>
-  );
-
-  return (
-    <details className="border border-[var(--border)] rounded-xl bg-white mb-5">
-      <summary className="cursor-pointer px-4 py-3 text-[13px] font-semibold flex items-center gap-2">
-        <KeyRound size={15} className="text-[var(--purple)]" /> {t("Platform keys", "प्लेटफ़ॉर्म कीज़")}
-        {status && (
-          <span className="text-[11px] font-normal text-[var(--text-3)] ml-2">
-            {dot(status.youtube_api_key)} YouTube {dot(status.meta_access_token)} Meta {dot(status.meta_ig_user_id)} IG-id
-          </span>
-        )}
-      </summary>
-      <div className="px-4 pb-4 space-y-3">
-        <p className="text-[11.5px] text-[var(--text-3)] leading-relaxed">
-          {t(
-            "YouTube needs a Data API v3 key. Instagram competitor data needs a Meta token + YOUR IG business account id (business discovery only works for business/creator accounts). X reuses the Twitter cookie. Facebook has no free competitor API.",
-            "YouTube के लिए Data API v3 की ज़रूरत है। Instagram के लिए Meta टोकन + आपका IG बिज़नेस अकाउंट id चाहिए। X ट्विटर कुकी का उपयोग करता है। Facebook का कोई मुफ़्त API नहीं है।"
-          )}
-        </p>
-        <Row label="YouTube API key" val={yt} set={setYt} ok={status?.youtube_api_key} />
-        <Row label="Meta access token" val={meta} set={setMeta} ok={status?.meta_access_token} />
-        <Row label="Your IG business account id" val={ig} set={setIg} ok={status?.meta_ig_user_id} mono />
-        <div className="flex items-center gap-2">
-          <button onClick={save} disabled={saving}
-            className="text-[12px] font-medium px-3 py-1.5 rounded-lg text-white disabled:opacity-50" style={{ background: "var(--purple)" }}>
-            {saving ? <Loader2 size={12} className="animate-spin" /> : t("Save", "सहेजें")}
-          </button>
-          {msg && <span className="text-[11.5px] text-[var(--text-2)]">{msg}</span>}
-        </div>
-      </div>
-    </details>
-  );
-}
-
-function Row({ label, val, set, ok, mono }: { label: string; val: string; set: (v: string) => void; ok?: boolean; mono?: boolean }) {
-  return (
-    <div>
-      <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">
-        {label} {ok && <span className="text-[#166534]">✓</span>}
-      </label>
-      <input type={mono ? "text" : "password"} value={val} onChange={(e) => set(e.target.value)}
-        placeholder={ok ? "•••••• (replace)" : ""}
-        className={`w-full bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)] ${mono ? "font-mono" : ""}`} />
-    </div>
   );
 }
 

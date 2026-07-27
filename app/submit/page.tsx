@@ -1,13 +1,14 @@
-import { redirect } from "next/navigation";
-
 import { getSession } from "@/lib/auth/session";
 import { NewsSubmitForm } from "@/components/news-submit-form";
 
 export const dynamic = "force-dynamic";
 
-/** News submission form — any signed-in user. The Inbox that receives these is admin-only. */
+/**
+ * Public, standalone news-tip form — shareable to reporters/stringers/public
+ * who may have no Kairos login. Renders with no app chrome (see Shell).
+ * Signed-in visitors submit as themselves; everyone else adds a name.
+ */
 export default async function SubmitPage() {
   const session = await getSession();
-  if (!session) redirect("/login");
-  return <NewsSubmitForm />;
+  return <NewsSubmitForm signedIn={!!session} />;
 }

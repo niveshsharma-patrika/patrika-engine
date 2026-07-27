@@ -39,11 +39,24 @@ const Body = z.object({
   location: z.string().trim().max(160).optional(),
   category: z.enum(CATEGORIES).default("other"),
   attachments: z.array(Attachment).max(MAX_ATTACHMENTS).default([]),
+  // Anonymous (logged-out) submitters identify themselves here.
+  name: z.string().trim().max(120).optional(),
+  contact: z.string().trim().max(160).optional(),
+  // Honeypot — real users never see or fill this; bots do. Accepted by the
+  // schema so we can silently drop it in the handler rather than 400 (which
+  // would tell a bot it was detected).
+  website: z.string().max(200).optional(),
 });
 
+/**
+ * POST — submit a news tip.
+ *
+ * Public: works with OR without a session, so /submit can be a shareable,
+ * standalone form. Signed-in submissions record submitter_id; anonymous ones
+ * record the name/contact typed on the form.
+ */
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -52,13 +65,27 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  const { headline, details, location, category, attachments } = parsed.data;
+  const { headline, details, location, category, attachments, name, contact, website } = parsed.data;
+
+  // Honeypot tripped → silently accept (200) so bots don't learn, but store nothing.
+  if (website) return Response.json({ ok: true });
+
+  // Anonymous submitters must give a name so the desk knows who sent it.
+  if (!session && !name) {
+    return Response.json({ error: "Please add your name." }, { status: 400 });
+  }
 
   try {
     await pool.query(
-      `INSERT INTO news_submissions (submitter_id, headline, details, location, category, attachments)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
-      [session.userId, headline, details, location?.trim() || null, category, JSON.stringify(attachments)]
+      `INSERT INTO news_submissions
+         (submitter_id, submitter_name, submitter_contact, headline, details, location, category, attachments)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+      [
+        session?.userId ?? null,
+        session ? null : (name ?? null),
+        session ? null : (contact ?? null),
+        headline, details, location?.trim() || null, category, JSON.stringify(attachments),
+      ]
     );
     return Response.json({ ok: true });
   } catch (e) {
@@ -78,7 +105,9 @@ export async function GET() {
     const { rows } = await pool.query(
       `SELECT n.id, n.headline, n.details, n.location, n.category, n.attachments,
               n.status, n.created_at, n.promoted_draft_id, n.promoted_at,
-              p.full_name AS submitter_name, p.role AS submitter_role
+              COALESCE(p.full_name, n.submitter_name) AS submitter_name,
+              n.submitter_contact,
+              CASE WHEN n.submitter_id IS NULL THEN 'external' ELSE p.role END AS submitter_role
          FROM news_submissions n
          LEFT JOIN profiles p ON p.id = n.submitter_id
         ORDER BY n.created_at DESC

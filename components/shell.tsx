@@ -71,8 +71,9 @@ export function Shell({ children, edition, role }: { children: React.ReactNode; 
     (n) => n.editions.includes(edition) && (!n.roles || n.roles.includes(role))
   );
 
-  // Auth pages (login) render standalone — no masthead / sidebar chrome.
-  if (pathname === "/login") {
+  // Standalone pages render with no masthead / sidebar chrome: the login page,
+  // and the public /submit news-tip form (shareable to people without a login).
+  if (pathname === "/login" || pathname === "/submit") {
     return <>{children}</>;
   }
 

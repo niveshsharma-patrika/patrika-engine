@@ -18,6 +18,7 @@ type Submission = {
   created_at: string;
   promoted_draft_id: string | null;
   submitter_name: string | null;
+  submitter_contact: string | null;
   submitter_role: string | null;
 };
 
@@ -155,6 +156,12 @@ export function NewsInbox() {
                     </span>
                     {s.location && <span className="flex items-center gap-0.5"><MapPin size={11} /> {s.location}</span>}
                     <span>{s.submitter_name ?? "—"}</span>
+                    {s.submitter_role === "external" && (
+                      <span className="px-1 py-0.5 rounded bg-[var(--amber)]/15 text-[var(--amber)] text-[10px]">
+                        {t("external", "बाहरी")}
+                      </span>
+                    )}
+                    {s.submitter_contact && <span>· {s.submitter_contact}</span>}
                     <span>· {fmt(s.created_at, lang)}</span>
                   </div>
                 </div>

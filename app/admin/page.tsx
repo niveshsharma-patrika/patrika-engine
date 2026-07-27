@@ -5,6 +5,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/server";
 import { envOverrides } from "@/lib/pipeline-settings";
 import { ProviderKeys } from "@/components/provider-keys";
+import { IntegrationKeys } from "@/components/integration-keys";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +155,18 @@ export default async function AdminPage() {
           </p>
         </div>
         <ProviderKeys providers={providerRows} />
+      </section>
+
+      {/* Integration keys — social platforms (YouTube, Meta) */}
+      <section className="mb-8">
+        <div className="mb-3">
+          <h2 className="text-[15px] font-medium">Integration keys</h2>
+          <p className="text-[12px] text-[var(--text-3)] mt-0.5">
+            Keys for the Social command center (YouTube, Meta / Instagram). Stored
+            encrypted, same as the API keys above.
+          </p>
+        </div>
+        <IntegrationKeys />
       </section>
 
       {/* Users */}

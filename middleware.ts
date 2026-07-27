@@ -8,7 +8,13 @@ import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/jwt";
  *   • /login + the auth APIs (so you can sign in)
  *   • /api/cron/* (authenticates with CRON_SECRET, not a user session)
  */
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/logout"];
+// /submit is a shareable, standalone news-tip form usable without a login, so
+// it and the news API are public. The news GET/PATCH/promote handlers still
+// enforce admin in-handler, so only anonymous POST is actually open.
+const PUBLIC_PATHS = [
+  "/login", "/api/auth/login", "/api/auth/logout",
+  "/submit", "/api/news",
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

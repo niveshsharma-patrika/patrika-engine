@@ -36,7 +36,7 @@ function readAsDataURL(file: File): Promise<string> {
   });
 }
 
-export function NewsSubmitForm() {
+export function NewsSubmitForm({ signedIn = true }: { signedIn?: boolean }) {
   const { lang } = useLang();
   const t = (en: string, hi: string) => (lang === "hi" ? hi : en);
 
@@ -44,6 +44,9 @@ export function NewsSubmitForm() {
   const [details, setDetails] = useState("");
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState<Cat>("civic");
+  const [name, setName] = useState("");
+  const [contact, setContact] = useState("");
+  const [website, setWebsite] = useState(""); // honeypot — stays empty for humans
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -75,18 +78,26 @@ export function NewsSubmitForm() {
       setError(t("Add a short headline.", "एक छोटी हेडलाइन जोड़ें।"));
       return;
     }
+    if (!signedIn && !name.trim()) {
+      setError(t("Please add your name.", "कृपया अपना नाम जोड़ें।"));
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const res = await fetch("/api/news", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ headline, details, location: location || undefined, category, attachments }),
+        body: JSON.stringify({
+          headline, details, location: location || undefined, category, attachments,
+          name: name || undefined, contact: contact || undefined, website,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed");
       setDone(true);
-      setHeadline(""); setDetails(""); setLocation(""); setCategory("civic"); setAttachments([]);
+      setHeadline(""); setDetails(""); setLocation(""); setCategory("civic");
+      setName(""); setContact(""); setAttachments([]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not submit");
     } finally {
@@ -111,14 +122,47 @@ export function NewsSubmitForm() {
   }
 
   return (
-    <div className="max-w-[620px] mx-auto py-8">
+    <div className="max-w-[620px] mx-auto py-8 px-4">
+      {/* Standalone masthead — this page renders with no app chrome, so it
+          carries its own Patrika header for when the link is shared. */}
+      <div className="flex items-center gap-2.5 mb-6">
+        <span className="text-[19px] leading-none">
+          <span className="font-medium text-[var(--text-2)]">{t("Patrika ", "पत्रिका ")}</span>
+          <span className="font-bold text-[var(--red)]">{t("Kairos", "कैरोस")}</span>
+        </span>
+      </div>
+
       <h1 className="text-[22px] font-semibold flex items-center gap-2 mb-1">
         <Newspaper size={20} className="text-[var(--purple)]" />
         {t("Submit news", "ख़बर भेजें")}
       </h1>
       <p className="text-[13px] text-[var(--text-3)] mb-6">
-        {t("Share a news tip with the desk — add photos if you have them.", "डेस्क को ख़बर भेजें — तस्वीरें हों तो जोड़ें।")}
+        {t("Share a news tip with the Patrika desk — add photos if you have them.", "पत्रिका डेस्क को ख़बर भेजें — तस्वीरें हों तो जोड़ें।")}
       </p>
+
+      {!signedIn && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label className="block text-[12px] font-medium text-[var(--text-2)] mb-1">
+              {t("Your name", "आपका नाम")} <span className="text-[var(--red)]">*</span>
+            </label>
+            <input value={name} onChange={(e) => setName(e.target.value)}
+              placeholder={t("Full name", "पूरा नाम")}
+              className="w-full bg-white border border-[var(--border)] text-[14px] px-3 py-2.5 rounded-lg outline-none focus:border-[var(--purple)]" />
+          </div>
+          <div>
+            <label className="block text-[12px] font-medium text-[var(--text-2)] mb-1">{t("Contact", "संपर्क")}</label>
+            <input value={contact} onChange={(e) => setContact(e.target.value)}
+              placeholder={t("Phone or email (optional)", "फ़ोन या ईमेल (वैकल्पिक)")}
+              className="w-full bg-white border border-[var(--border)] text-[14px] px-3 py-2.5 rounded-lg outline-none focus:border-[var(--purple)]" />
+          </div>
+        </div>
+      )}
+
+      {/* Honeypot: off-screen, not tabbable. Bots fill it; humans never do. */}
+      <input type="text" name="website" tabIndex={-1} autoComplete="off"
+        value={website} onChange={(e) => setWebsite(e.target.value)}
+        aria-hidden="true" className="absolute -left-[9999px] w-px h-px opacity-0" />
 
       <label className="block text-[12px] font-medium text-[var(--text-2)] mb-1">{t("Headline", "हेडलाइन")}</label>
       <input
