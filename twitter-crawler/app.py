@@ -322,3 +322,65 @@ def timeline(
     return JSONResponse(
         {"handle": handle, "count": len(tweets), "dropped": dropped, "tweets": tweets}
     )
+
+
+@app.get("/search")
+def search(
+    q: str = Query(..., min_length=1, max_length=120),
+    limit: int = Query(20, ge=1, le=100),
+    min_likes: int = Query(50, ge=0, le=1_000_000),
+    x_auth_token: str | None = Header(None, alias="X-Auth-Token"),
+) -> JSONResponse:
+    """
+    Search recent HIGH-ENGAGEMENT tweets for a keyword/hashtag — the X trending
+    signal for the Social Trends feature. Uses Scweet's Top search with a
+    min-likes floor so only tweets that actually caught on come back.
+    """
+    if not x_auth_token:
+        raise HTTPException(status_code=401, detail="X-Auth-Token header required")
+
+    query = q.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="q required")
+
+    try:
+        from Scweet import Scweet  # noqa: F401
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Scweet unavailable: {exc}") from exc
+
+    try:
+        from Scweet import AuthError, RateLimitError, AccountPoolExhausted
+    except Exception:  # pragma: no cover
+        AuthError = RateLimitError = AccountPoolExhausted = ()  # type: ignore
+
+    try:
+        client = _client(x_auth_token)
+        results = client.search(
+            query, min_likes=min_likes, limit=limit, display_type="Top"
+        )
+    except Exception as exc:
+        name = type(exc).__name__
+        detail = f"{name}: {exc}"[:300]
+        if AuthError and isinstance(exc, AuthError):
+            _drop_client(x_auth_token)
+            raise HTTPException(status_code=401, detail="X rejected the auth_token.") from exc
+        if (RateLimitError and isinstance(exc, RateLimitError)) or (
+            AccountPoolExhausted and isinstance(exc, AccountPoolExhausted)
+        ):
+            raise HTTPException(status_code=429, detail="X rate limit reached.") from exc
+        log.warning("search failed for %r: %s", query, detail)
+        raise HTTPException(status_code=502, detail=detail) from exc
+
+    if isinstance(results, dict):
+        results = results.get("tweets") or results.get("data") or []
+    if not isinstance(results, list):
+        results = []
+
+    tweets: list[dict[str, Any]] = []
+    for row in results:
+        if isinstance(row, dict):
+            item = _normalise(row, query)
+            if item is not None:
+                tweets.append(item)
+
+    return JSONResponse({"query": query, "count": len(tweets), "tweets": tweets})

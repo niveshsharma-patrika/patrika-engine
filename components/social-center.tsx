@@ -11,6 +11,7 @@ import {
 // YouTube → MonitorPlay, Instagram → Camera, Facebook → Globe, X → AtSign.
 
 import { useLang } from "@/lib/i18n/context";
+import { SocialTrends } from "@/components/social-trends";
 
 type Platform = "youtube" | "x" | "instagram" | "facebook";
 
@@ -81,7 +82,7 @@ export function SocialCenter({ isAdmin }: { isAdmin: boolean }) {
   const { lang } = useLang();
   const t = (en: string, hi: string) => (lang === "hi" ? hi : en);
 
-  const [tab, setTab] = useState<"dashboard" | "accounts" | "suggestions">("dashboard");
+  const [tab, setTab] = useState<"trends" | "dashboard" | "accounts" | "suggestions">("trends");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [byPlatform, setByPlatform] = useState<PlatformStat[]>([]);
@@ -198,16 +199,18 @@ export function SocialCenter({ isAdmin }: { isAdmin: boolean }) {
           <TrendingUp size={20} className="text-[var(--purple)]" />
           {t("Social command center", "सोशल कमांड सेंटर")}
         </h1>
-        <button onClick={() => syncNow()} disabled={syncing}
-          className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-2 rounded-lg text-white disabled:opacity-60"
-          style={{ background: "var(--purple)" }}>
-          {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-          {syncing ? t("Syncing…", "सिंक हो रहा है…") : t("Sync now", "अभी सिंक करें")}
-        </button>
+        {tab !== "trends" && (
+          <button onClick={() => syncNow()} disabled={syncing}
+            className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-2 rounded-lg text-white disabled:opacity-60"
+            style={{ background: "var(--purple)" }}>
+            {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            {syncing ? t("Syncing…", "सिंक हो रहा है…") : t("Sync now", "अभी सिंक करें")}
+          </button>
+        )}
       </div>
       <p className="text-[13px] text-[var(--text-3)] mb-5">
-        {t("Track competitor & agency pages, spot what's going viral, and get post ideas.",
-           "प्रतिस्पर्धी और एजेंसी पेज ट्रैक करें, वायरल पोस्ट पहचानें, और पोस्ट आइडिया पाएँ।")}
+        {t("See what's trending on social and generate ready-to-post creatives. Competitor tracking is in the other tabs.",
+           "सोशल पर जो ट्रेंड कर रहा है देखें और पोस्ट बनाएँ। प्रतिस्पर्धी ट्रैकिंग बाकी टैब में है।")}
       </p>
 
       {note && <div className="mb-4 text-[12px] px-3 py-2 rounded-lg bg-[var(--surface-2)] text-[var(--text-2)]">{note}</div>}
@@ -225,7 +228,8 @@ export function SocialCenter({ isAdmin }: { isAdmin: boolean }) {
 
       <div className="flex gap-1 border-b border-[var(--border)] mb-5">
         {([
-          ["dashboard", t("Dashboard", "डैशबोर्ड")],
+          ["trends", t("Trends", "ट्रेंड")],
+          ["dashboard", t("Competitors", "प्रतिस्पर्धी")],
           ["accounts", t("Accounts", "अकाउंट्स")],
           ["suggestions", t("Suggestions", "सुझाव")],
         ] as const).map(([k, label]) => (
@@ -237,7 +241,7 @@ export function SocialCenter({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       {/* range + platform filter (dashboard + suggestions) */}
-      {tab !== "accounts" && (
+      {(tab === "dashboard" || tab === "suggestions") && (
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <div className="flex gap-1 bg-[var(--surface-2)] rounded-lg p-0.5">
             {[7, 30, 90].map((d) => (
@@ -264,7 +268,9 @@ export function SocialCenter({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
 
-      {loading ? (
+      {tab === "trends" ? (
+        <SocialTrends />
+      ) : loading ? (
         <div className="flex items-center gap-2 text-[13px] text-[var(--text-3)] py-10">
           <Loader2 size={15} className="animate-spin" /> {t("Loading…", "लोड हो रहा है…")}
         </div>
