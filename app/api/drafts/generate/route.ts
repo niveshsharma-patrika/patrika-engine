@@ -7,6 +7,8 @@ import { z } from "zod";
 import { TRENDS } from "@/lib/data/trends";
 import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { searchGoogleNews } from "@/lib/sources/google-news";
+import { pool } from "@/lib/db";
+import { getSession } from "@/lib/auth/session";
 
 // Web-search-grounded drafting (write-on-a-topic) does live research, so give
 // it generous room before the proxy/serverless cut-off.
@@ -476,6 +478,22 @@ export async function POST(req: Request) {
       },
       { status: 503 }
     );
+  }
+
+  // Count this generation for the productivity report — even if the writer
+  // never saves the resulting draft. Fire-and-forget: never blocks or fails
+  // the generation itself.
+  try {
+    const session = await getSession();
+    if (session) {
+      void pool
+        .query(`INSERT INTO generation_events (user_id, kind) VALUES ($1, 'article')`, [
+          session.userId,
+        ])
+        .catch(() => {});
+    }
+  } catch {
+    /* ignore — logging must never break drafting */
   }
 
   // A distinctive outlet house style (NYT, Reuters, Bloomberg…) needs a stronger

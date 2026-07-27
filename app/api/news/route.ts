@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import { verifyChallenge } from "@/lib/captcha";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,9 @@ const Body = z.object({
   // Anonymous (logged-out) submitters identify themselves here.
   name: z.string().trim().max(120).optional(),
   contact: z.string().trim().max(160).optional(),
+  // Captcha (anonymous submissions only) — token from GET /api/news/captcha.
+  captcha_token: z.string().max(200).optional(),
+  captcha_answer: z.string().max(20).optional(),
   // Honeypot — real users never see or fill this; bots do. Accepted by the
   // schema so we can silently drop it in the handler rather than 400 (which
   // would tell a bot it was detected).
@@ -65,14 +69,26 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  const { headline, details, location, category, attachments, name, contact, website } = parsed.data;
+  const {
+    headline, details, location, category, attachments, name, contact,
+    captcha_token, captcha_answer, website,
+  } = parsed.data;
 
   // Honeypot tripped → silently accept (200) so bots don't learn, but store nothing.
   if (website) return Response.json({ ok: true });
 
-  // Anonymous submitters must give a name so the desk knows who sent it.
-  if (!session && !name) {
-    return Response.json({ error: "Please add your name." }, { status: 400 });
+  // Anonymous submitters must give a name AND pass the captcha. Signed-in staff
+  // skip both (their session is the trust signal).
+  if (!session) {
+    if (!name) {
+      return Response.json({ error: "Please add your name." }, { status: 400 });
+    }
+    if (!verifyChallenge(captcha_token, captcha_answer)) {
+      return Response.json(
+        { error: "Captcha incorrect or expired — please try again.", captcha: true },
+        { status: 400 }
+      );
+    }
   }
 
   try {

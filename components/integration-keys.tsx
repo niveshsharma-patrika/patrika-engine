@@ -16,6 +16,7 @@ export function IntegrationKeys() {
   const [yt, setYt] = useState("");
   const [meta, setMeta] = useState("");
   const [ig, setIg] = useState("");
+  const [x, setX] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -32,6 +33,7 @@ export function IntegrationKeys() {
     if (yt.trim()) body.youtube_api_key = yt.trim();
     if (meta.trim()) body.meta_access_token = meta.trim();
     if (ig.trim()) body.meta_ig_user_id = ig.trim();
+    if (x.trim()) body.x_auth_token = x.trim();
     if (Object.keys(body).length === 0) return;
     setSaving(true); setMsg(null);
     try {
@@ -42,7 +44,7 @@ export function IntegrationKeys() {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Failed");
-      setYt(""); setMeta(""); setIg("");
+      setYt(""); setMeta(""); setIg(""); setX("");
       setMsg("Saved.");
       load();
     } catch (e) {
@@ -57,13 +59,15 @@ export function IntegrationKeys() {
       <p className="text-[12px] text-[var(--text-3)] leading-relaxed mb-3">
         YouTube needs a Data API v3 key. Instagram competitor data needs a Meta
         access token <b>plus your own IG business account id</b> (business
-        discovery only reads business/creator accounts). X reuses the Twitter
-        cookie (Twitter → Settings). Facebook has no free competitor API.
+        discovery only reads business/creator accounts). Facebook has no free
+        competitor API. The X cookie is shared by the Twitter feature and the
+        social center — it can also be set (and tested) in Twitter → Settings.
       </p>
       <div className="space-y-3">
         <Row label="YouTube API key" val={yt} set={setYt} ok={status?.youtube_api_key} />
         <Row label="Meta access token" val={meta} set={setMeta} ok={status?.meta_access_token} />
         <Row label="Your IG business account id" val={ig} set={setIg} ok={status?.meta_ig_user_id} mono />
+        <Row label="X (Twitter) auth_token cookie" val={x} set={setX} ok={status?.x_auth_token} />
       </div>
       <div className="flex items-center gap-3 mt-3">
         <button

@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { Loader2, Users, FileText, CheckCircle2, Clock, ChevronDown } from "lucide-react";
+import { Loader2, Users, FileText, CheckCircle2, Clock, ChevronDown, Sparkles } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
 
@@ -11,6 +11,7 @@ type UserRow = {
   role: string;
   desk: string | null;
   total: number;
+  generated: number;
   published: number;
   approved: number;
   in_review: number;
@@ -20,7 +21,7 @@ type UserRow = {
   last_activity: string | null;
 };
 
-type Totals = { stories: number; published: number; in_review: number; words: number };
+type Totals = { stories: number; generated: number; published: number; in_review: number; words: number };
 
 type Story = {
   id: string;
@@ -63,7 +64,7 @@ export function ProductivityReport() {
 
   const [days, setDays] = useState("30");
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [totals, setTotals] = useState<Totals>({ stories: 0, published: 0, in_review: 0, words: 0 });
+  const [totals, setTotals] = useState<Totals>({ stories: 0, generated: 0, published: 0, in_review: 0, words: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,7 +79,7 @@ export function ProductivityReport() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `Failed (${res.status})`);
       setUsers(json.users ?? []);
-      setTotals(json.totals ?? { stories: 0, published: 0, in_review: 0, words: 0 });
+      setTotals(json.totals ?? { stories: 0, generated: 0, published: 0, in_review: 0, words: 0 });
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
@@ -136,11 +137,12 @@ export function ProductivityReport() {
       )}
 
       {/* Team totals */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
-        <Stat icon={<FileText size={15} />} value={totals.stories} label={t("Stories", "ख़बरें")} />
+      <div className="grid grid-cols-5 gap-3 mb-6">
+        <Stat icon={<Sparkles size={15} />} value={totals.generated} label={t("Generated", "जेनरेट")} />
+        <Stat icon={<FileText size={15} />} value={totals.stories} label={t("Saved", "सहेजे")} />
         <Stat icon={<CheckCircle2 size={15} />} value={totals.published} label={t("Published", "प्रकाशित")} />
         <Stat icon={<Clock size={15} />} value={totals.in_review} label={t("In review", "समीक्षा में")} />
-        <Stat icon={<Users size={15} />} value={users.filter((u) => u.total > 0).length} label={t("Active writers", "सक्रिय लेखक")} />
+        <Stat icon={<Users size={15} />} value={users.filter((u) => u.generated > 0 || u.total > 0).length} label={t("Active", "सक्रिय")} />
       </div>
 
       {loading ? (
@@ -153,10 +155,10 @@ export function ProductivityReport() {
             <thead className="bg-[var(--surface-2)] text-[var(--text-3)] text-[11px] uppercase">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">{t("Writer", "लेखक")}</th>
-                <th className="px-2 py-2 text-right font-medium">{t("Total", "कुल")}</th>
+                <th className="px-2 py-2 text-right font-medium">{t("Generated", "जेनरेट")}</th>
+                <th className="px-2 py-2 text-right font-medium">{t("Saved", "सहेजे")}</th>
                 <th className="px-2 py-2 text-right font-medium">{t("Published", "प्रकाशित")}</th>
                 <th className="px-2 py-2 text-right font-medium">{t("In review", "समीक्षा")}</th>
-                <th className="px-2 py-2 text-right font-medium">{t("Draft", "ड्राफ़्ट")}</th>
                 <th className="px-2 py-2 text-right font-medium">{t("Words", "शब्द")}</th>
                 <th className="px-3 py-2 text-right font-medium">{t("Last active", "आख़िरी")}</th>
                 <th className="w-8"></th>
@@ -167,7 +169,7 @@ export function ProductivityReport() {
                 <Fragment key={u.id}>
                   <tr
                     onClick={() => u.total > 0 && toggleUser(u.id)}
-                    className={`border-t border-[var(--border)] ${u.total > 0 ? "cursor-pointer hover:bg-[var(--surface-2)]" : "opacity-60"}`}
+                    className={`border-t border-[var(--border)] ${u.total > 0 ? "cursor-pointer hover:bg-[var(--surface-2)]" : (u.generated > 0 ? "" : "opacity-60")}`}
                   >
                     <td className="px-3 py-2.5">
                       <div className="font-medium">{u.full_name}</div>
@@ -175,10 +177,10 @@ export function ProductivityReport() {
                         {u.role}{u.desk ? ` · ${u.desk}` : ""}
                       </div>
                     </td>
-                    <td className="px-2 py-2.5 text-right font-medium">{u.total}</td>
+                    <td className="px-2 py-2.5 text-right font-semibold text-[var(--purple)]">{u.generated || "—"}</td>
+                    <td className="px-2 py-2.5 text-right font-medium">{u.total || "—"}</td>
                     <td className="px-2 py-2.5 text-right text-[#166534]">{u.published || "—"}</td>
                     <td className="px-2 py-2.5 text-right text-[#92400e]">{u.in_review || "—"}</td>
-                    <td className="px-2 py-2.5 text-right text-[var(--text-3)]">{u.in_progress || "—"}</td>
                     <td className="px-2 py-2.5 text-right text-[var(--text-2)]">{u.words.toLocaleString()}</td>
                     <td className="px-3 py-2.5 text-right text-[11px] text-[var(--text-3)]">{fmtDate(u.last_activity, lang)}</td>
                     <td className="px-2 text-[var(--text-3)]">

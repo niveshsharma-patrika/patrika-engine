@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, X, Send, Loader2, CheckCircle2, Newspaper } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
@@ -53,6 +53,25 @@ export function NewsSubmitForm({ signedIn = true }: { signedIn?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Captcha — only for logged-out (public) submitters.
+  const [captchaQ, setCaptchaQ] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaAnswer, setCaptchaAnswer] = useState("");
+
+  const loadCaptcha = useCallback(async () => {
+    try {
+      const res = await fetch("/api/news/captcha", { cache: "no-store" });
+      if (res.ok) {
+        const j = await res.json();
+        setCaptchaQ(j.question ?? "");
+        setCaptchaToken(j.token ?? "");
+        setCaptchaAnswer("");
+      }
+    } catch { /* form still works; server re-checks anyway */ }
+  }, []);
+
+  useEffect(() => { if (!signedIn) loadCaptcha(); }, [signedIn, loadCaptcha]);
+
   async function addFiles(files: FileList | null) {
     if (!files) return;
     setError(null);
@@ -82,6 +101,10 @@ export function NewsSubmitForm({ signedIn = true }: { signedIn?: boolean }) {
       setError(t("Please add your name.", "कृपया अपना नाम जोड़ें।"));
       return;
     }
+    if (!signedIn && !captchaAnswer.trim()) {
+      setError(t("Please answer the captcha.", "कृपया कैप्चा का उत्तर दें।"));
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -91,10 +114,14 @@ export function NewsSubmitForm({ signedIn = true }: { signedIn?: boolean }) {
         body: JSON.stringify({
           headline, details, location: location || undefined, category, attachments,
           name: name || undefined, contact: contact || undefined, website,
+          captcha_token: captchaToken, captcha_answer: captchaAnswer || undefined,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Failed");
+      if (!res.ok) {
+        if (json.captcha) loadCaptcha(); // stale/wrong — issue a fresh one
+        throw new Error(json.error ?? "Failed");
+      }
       setDone(true);
       setHeadline(""); setDetails(""); setLocation(""); setCategory("civic");
       setName(""); setContact(""); setAttachments([]);
@@ -222,6 +249,28 @@ export function NewsSubmitForm({ signedIn = true }: { signedIn?: boolean }) {
         <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp"
           multiple hidden onChange={(e) => addFiles(e.target.files)} />
       </div>
+
+      {!signedIn && captchaQ && (
+        <div className="mb-4">
+          <label className="block text-[12px] font-medium text-[var(--text-2)] mb-1">
+            {t("Quick check", "त्वरित जाँच")}
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-[15px] font-mono px-3 py-2 rounded-lg bg-[var(--surface-2)] select-none">{captchaQ}</span>
+            <input
+              value={captchaAnswer}
+              onChange={(e) => setCaptchaAnswer(e.target.value)}
+              inputMode="numeric"
+              placeholder={t("Answer", "उत्तर")}
+              className="w-[110px] bg-white border border-[var(--border)] text-[14px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)]"
+            />
+            <button type="button" onClick={loadCaptcha}
+              className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)]">
+              {t("New", "नया")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && <div className="text-[12px] text-[var(--red)] mb-3">{error}</div>}
 

@@ -39,14 +39,21 @@ export async function GET(req: Request) {
               count(*) FILTER (WHERE d.status = 'in_progress')::int      AS in_progress,
               count(*) FILTER (WHERE d.status = 'rejected')::int         AS rejected,
               COALESCE(sum(d.word_count), 0)::int AS words,
-              max(d.updated_at) AS last_activity
+              -- Every generation this user ran, saved or not (subquery so the
+              -- drafts LEFT JOIN doesn't multiply the event count).
+              (SELECT count(*) FROM generation_events g
+                WHERE g.user_id = p.id ${cutoff ? "AND g.created_at >= $1" : ""})::int AS generated,
+              GREATEST(
+                max(d.updated_at),
+                (SELECT max(created_at) FROM generation_events g2 WHERE g2.user_id = p.id)
+              ) AS last_activity
          FROM profiles p
          LEFT JOIN drafts d
            ON d.author_id = p.id
           ${cutoff ? "AND d.created_at >= $1" : ""}
         WHERE p.is_active = true
         GROUP BY p.id, p.full_name, p.role, p.desk
-        ORDER BY total DESC, p.full_name ASC`,
+        ORDER BY generated DESC, total DESC, p.full_name ASC`,
       cutoff ? [cutoff] : []
     );
 
@@ -54,11 +61,12 @@ export async function GET(req: Request) {
     const totals = rows.reduce(
       (a, r) => ({
         stories: a.stories + r.total,
+        generated: a.generated + r.generated,
         published: a.published + r.published,
         in_review: a.in_review + r.in_review,
         words: a.words + r.words,
       }),
-      { stories: 0, published: 0, in_review: 0, words: 0 }
+      { stories: 0, generated: 0, published: 0, in_review: 0, words: 0 }
     );
 
     return Response.json({ users: rows, totals, days });

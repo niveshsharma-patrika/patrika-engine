@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { getSession } from "@/lib/auth/session";
-import { hasSecret, setSecret } from "@/lib/twitter/secrets";
+import { hasSecret, setSecret, X_AUTH_TOKEN } from "@/lib/twitter/secrets";
 import { YT_API_KEY, META_TOKEN, META_IG_USER_ID } from "@/lib/social/types";
 
 export const dynamic = "force-dynamic";
@@ -22,23 +22,26 @@ const KEYS = {
   youtube_api_key: YT_API_KEY,
   meta_access_token: META_TOKEN,
   meta_ig_user_id: META_IG_USER_ID,
+  x_auth_token: X_AUTH_TOKEN,
 } as const;
 
 const Body = z.object({
   youtube_api_key: z.string().min(4).max(500).optional(),
   meta_access_token: z.string().min(4).max(1000).optional(),
   meta_ig_user_id: z.string().min(1).max(100).optional(),
+  x_auth_token: z.string().min(10).max(500).optional(),
 });
 
 export async function GET() {
   if (!(await requireAdmin())) return Response.json({ error: "Forbidden" }, { status: 403 });
-  const [yt, meta, ig] = await Promise.all([
-    hasSecret(YT_API_KEY), hasSecret(META_TOKEN), hasSecret(META_IG_USER_ID),
+  const [yt, meta, ig, x] = await Promise.all([
+    hasSecret(YT_API_KEY), hasSecret(META_TOKEN), hasSecret(META_IG_USER_ID), hasSecret(X_AUTH_TOKEN),
   ]);
   return Response.json({
     youtube_api_key: yt.set,
     meta_access_token: meta.set,
     meta_ig_user_id: ig.set,
+    x_auth_token: x.set,
   });
 }
 
