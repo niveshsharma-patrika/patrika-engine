@@ -77,8 +77,9 @@ export async function middleware(request: NextRequest) {
           pathname.startsWith("/stats") ||
           pathname.startsWith("/style") ||
           pathname.startsWith("/inbox") ||
-          // Twitter monitoring is for editors + admins only.
+          // Twitter monitoring + Social center are for editors + admins only.
           pathname.startsWith("/twitter") ||
+          pathname.startsWith("/social") ||
           sourcesBlocked;
     if (blocked) {
       const url = request.nextUrl.clone();
