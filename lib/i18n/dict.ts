@@ -27,6 +27,7 @@ export const DICT = {
   navFeedback:        { en: "Feedback",       hi: "फ़ीडबैक" },
   navAdmin:           { en: "Admin",          hi: "एडमिन" },
   navUsers:           { en: "Users",          hi: "यूज़र्स" },
+  navProductivity:    { en: "Productivity",   hi: "उत्पादकता" },
 
   // Sidebar sections
   system:             { en: "System",        hi: "सिस्टम" },
