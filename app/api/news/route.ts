@@ -77,18 +77,17 @@ export async function POST(req: Request) {
   // Honeypot tripped → silently accept (200) so bots don't learn, but store nothing.
   if (website) return Response.json({ ok: true });
 
-  // Anonymous submitters must give a name AND pass the captcha. Signed-in staff
-  // skip both (their session is the trust signal).
-  if (!session) {
-    if (!name) {
-      return Response.json({ error: "Please add your name." }, { status: 400 });
-    }
-    if (!verifyChallenge(captcha_token, captcha_answer)) {
-      return Response.json(
-        { error: "Captcha incorrect or expired — please try again.", captcha: true },
-        { status: 400 }
-      );
-    }
+  // Everyone passes the captcha on this form (it's a public, shareable form).
+  if (!verifyChallenge(captcha_token, captcha_answer)) {
+    return Response.json(
+      { error: "Captcha incorrect or expired — please try again.", captcha: true },
+      { status: 400 }
+    );
+  }
+
+  // Anonymous submitters must also give a name so the desk knows who sent it.
+  if (!session && !name) {
+    return Response.json({ error: "Please add your name." }, { status: 400 });
   }
 
   try {

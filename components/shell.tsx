@@ -47,7 +47,7 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: E
   { href: "/magazines",         icon: <BookOpen size={16} />,      key: "navMagazines",   editions: ["digital"] },
   { href: "/twitter",           icon: <AtSign size={16} />,        key: "navTwitter",     editions: ["digital"], roles: ["admin", "editor"] },
   { href: "/social",            icon: <TrendingUp size={16} />,    key: "navSocial",      editions: ["digital"], roles: ["admin", "editor"] },
-  { href: "/submit",            icon: <Newspaper size={16} />,     key: "navSubmit",      editions: ["digital", "print"] },
+  { href: "/submit",            icon: <Newspaper size={16} />,     key: "navSubmit",      editions: ["digital", "print"], roles: ["admin"] },
   { href: "/inbox",             icon: <Inbox size={16} />,         key: "navInbox",       editions: ["digital"], roles: ["admin"] },
   { href: "/feedback",          icon: <MessageSquare size={16} />, key: "navFeedback",    editions: ["digital", "print"] },
   { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin",       editions: ["digital"], roles: ["admin"] },

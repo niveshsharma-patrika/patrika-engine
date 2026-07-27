@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, X, Send, Loader2, CheckCircle2, Newspaper } from "lucide-react";
 
-import { useLang } from "@/lib/i18n/context";
-
 type Cat =
   | "crime" | "politics" | "civic" | "business" | "sports"
   | "entertainment" | "health" | "education" | "other";
@@ -37,8 +35,10 @@ function readAsDataURL(file: File): Promise<string> {
 }
 
 export function NewsSubmitForm({ signedIn = true }: { signedIn?: boolean }) {
-  const { lang } = useLang();
-  const t = (en: string, hi: string) => (lang === "hi" ? hi : en);
+  // This is a public, Hindi-first submission form (shared with reporters/public),
+  // so it always renders in Hindi regardless of the app's language toggle.
+  const lang = "hi" as const;
+  const t = (_en: string, hi: string) => hi;
 
   const [headline, setHeadline] = useState("");
   const [details, setDetails] = useState("");
@@ -53,7 +53,7 @@ export function NewsSubmitForm({ signedIn = true }: { signedIn?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Captcha — only for logged-out (public) submitters.
+  // Captcha — shown to everyone on this form.
   const [captchaQ, setCaptchaQ] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaAnswer, setCaptchaAnswer] = useState("");
@@ -70,7 +70,7 @@ export function NewsSubmitForm({ signedIn = true }: { signedIn?: boolean }) {
     } catch { /* form still works; server re-checks anyway */ }
   }, []);
 
-  useEffect(() => { if (!signedIn) loadCaptcha(); }, [signedIn, loadCaptcha]);
+  useEffect(() => { loadCaptcha(); }, [loadCaptcha]);
 
   async function addFiles(files: FileList | null) {
     if (!files) return;
@@ -101,7 +101,7 @@ export function NewsSubmitForm({ signedIn = true }: { signedIn?: boolean }) {
       setError(t("Please add your name.", "कृपया अपना नाम जोड़ें।"));
       return;
     }
-    if (!signedIn && !captchaAnswer.trim()) {
+    if (!captchaAnswer.trim()) {
       setError(t("Please answer the captcha.", "कृपया कैप्चा का उत्तर दें।"));
       return;
     }
@@ -250,7 +250,7 @@ export function NewsSubmitForm({ signedIn = true }: { signedIn?: boolean }) {
           multiple hidden onChange={(e) => addFiles(e.target.files)} />
       </div>
 
-      {!signedIn && captchaQ && (
+      {captchaQ && (
         <div className="mb-4">
           <label className="block text-[12px] font-medium text-[var(--text-2)] mb-1">
             {t("Quick check", "त्वरित जाँच")}
