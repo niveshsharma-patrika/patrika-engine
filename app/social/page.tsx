@@ -10,5 +10,5 @@ export default async function SocialPage() {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role !== "admin" && session.role !== "editor") redirect("/");
-  return <SocialCenter isAdmin={session.role === "admin"} />;
+  return <SocialCenter />;
 }
