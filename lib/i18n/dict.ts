@@ -24,6 +24,8 @@ export const DICT = {
   navDirectives:      { en: "Writing Directives", hi: "लेखन निर्देश" },
   navMagazines:       { en: "Patrika+ Special Content", hi: "पत्रिका+ विशेष कंटेंट" },
   navTwitter:         { en: "Twitter",        hi: "ट्विटर" },
+  navSubmit:          { en: "Submit news",    hi: "ख़बर भेजें" },
+  navInbox:           { en: "News Inbox",     hi: "न्यूज़ इनबॉक्स" },
   navFeedback:        { en: "Feedback",       hi: "फ़ीडबैक" },
   navAdmin:           { en: "Admin",          hi: "एडमिन" },
   navUsers:           { en: "Users",          hi: "यूज़र्स" },

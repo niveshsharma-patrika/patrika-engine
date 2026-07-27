@@ -41,10 +41,12 @@ export async function middleware(request: NextRequest) {
       pathname === "/all-stories" ||
       pathname === "/generated" ||
       pathname === "/feedback" ||
+      pathname === "/submit" ||
       pathname.startsWith("/today/") ||
       pathname.startsWith("/all-stories/") ||
       pathname.startsWith("/generated/") ||
-      pathname.startsWith("/feedback/");
+      pathname.startsWith("/feedback/") ||
+      pathname.startsWith("/submit/");
     if (!printOk) {
       const url = request.nextUrl.clone();
       url.pathname = "/today";
@@ -67,11 +69,14 @@ export async function middleware(request: NextRequest) {
           // Stats + Style module are admin-only (hidden from editors and writers).
           pathname.startsWith("/stats") ||
           pathname.startsWith("/style") ||
+          // News Inbox is admin-only (everyone can /submit into it).
+          pathname.startsWith("/inbox") ||
           sourcesBlocked
         : pathname.startsWith("/admin") ||
           pathname.startsWith("/directives") ||
           pathname.startsWith("/stats") ||
           pathname.startsWith("/style") ||
+          pathname.startsWith("/inbox") ||
           // Twitter monitoring is for editors + admins only.
           pathname.startsWith("/twitter") ||
           sourcesBlocked;
