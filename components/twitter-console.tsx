@@ -9,7 +9,6 @@ import {
   Trash2,
   AlertTriangle,
   CheckCircle2,
-  KeyRound,
   Pause,
   Play,
   PenLine,
@@ -761,7 +760,6 @@ function AuthTokenPanel({ t }: { t: (en: string, hi: string) => string }) {
     token: { set: boolean; updatedAt: string | null };
     shim: { up: boolean; scweet: boolean; error: string | null };
   } | null>(null);
-  const [token, setToken] = useState("");
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
@@ -775,28 +773,6 @@ function AuthTokenPanel({ t }: { t: (en: string, hi: string) => string }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  async function save() {
-    if (!token.trim()) return;
-    setSaving(true);
-    setNote(null);
-    try {
-      const res = await fetch("/api/twitter/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auth_token: token.trim() }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Failed");
-      setToken("");
-      setNote(t("Saved.", "सहेजा गया।"));
-      load();
-    } catch (e) {
-      setNote(e instanceof Error ? e.message : "Failed");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function test() {
     setSaving(true);
@@ -816,54 +792,33 @@ function AuthTokenPanel({ t }: { t: (en: string, hi: string) => string }) {
 
   const shimDown = status && !status.shim.up;
   const noToken = status && !status.token.set;
+  const bad = shimDown || noToken;
 
+  // Compact status strip. The cookie itself is set in Admin → Social & platform
+  // keys; here we just show connection health and offer a one-click Test.
   return (
-    <div className="border border-[var(--border)] rounded-xl p-4 mb-5 bg-white">
-      <div className="flex items-center gap-2 mb-2">
-        <KeyRound size={15} className="text-[var(--purple)]" />
-        <h3 className="text-[13px] font-semibold">{t("X connection", "एक्स कनेक्शन")}</h3>
-        {status && (
-          <span className="text-[11px] flex items-center gap-1 ml-1"
-            style={{ color: shimDown || noToken ? "#991b1b" : "#166534" }}>
-            {shimDown || noToken ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
-            {shimDown
-              ? t("Crawler offline", "क्रॉलर बंद है")
-              : noToken
-              ? t("No token set", "टोकन सेट नहीं")
-              : t("Connected", "जुड़ा हुआ")}
-          </span>
-        )}
-      </div>
-      <p className="text-[11.5px] text-[var(--text-3)] leading-relaxed mb-2.5">
-        {t(
-          "Paste the auth_token cookie from a logged-in X session. Use a dedicated throwaway account, never Patrika's own. Cookies expire — if the feed goes quiet, paste a fresh one here.",
-          "लॉग-इन एक्स सेशन से auth_token कुकी यहाँ डालें। इसके लिए अलग (throwaway) अकाउंट इस्तेमाल करें, पत्रिका का असली अकाउंट कभी नहीं। कुकी की अवधि समाप्त होती है — फ़ीड रुक जाए तो नई कुकी डालें।"
-        )}
-      </p>
-      <div className="flex flex-wrap gap-2 items-center">
-        <input
-          type="password"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder={status?.token.set ? "••••••••••  (replace)" : "auth_token"}
-          className="flex-1 min-w-[220px] bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)] font-mono"
-        />
-        <button onClick={save} disabled={saving || !token.trim()}
-          className="text-[12px] font-medium px-3 py-2 rounded-lg text-white disabled:opacity-50"
-          style={{ background: "var(--purple)" }}>
-          {t("Save", "सहेजें")}
-        </button>
-        <button onClick={test} disabled={saving || !status?.token.set}
-          className="text-[12px] font-medium px-3 py-2 rounded-lg border border-[var(--border)] disabled:opacity-50">
-          {saving ? <Loader2 size={13} className="animate-spin" /> : t("Test", "जाँचें")}
-        </button>
-      </div>
-      {note && <div className="text-[11.5px] text-[var(--text-2)] mt-2">{note}</div>}
-      {status?.shim.error && (
-        <div className="text-[11px] text-[#991b1b] mt-2">
-          {t("Crawler:", "क्रॉलर:")} {status.shim.error}
-        </div>
+    <div className="flex flex-wrap items-center gap-3 mb-5 text-[12px]">
+      {status && (
+        <span className="flex items-center gap-1.5" style={{ color: bad ? "#991b1b" : "#166534" }}>
+          {bad ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}
+          {shimDown
+            ? t("Crawler offline", "क्रॉलर बंद है")
+            : noToken
+            ? t("No X token set", "X टोकन सेट नहीं")
+            : t("X connected", "X जुड़ा हुआ")}
+        </span>
       )}
+      {noToken && (
+        <a href="/admin" className="text-[var(--purple)] hover:underline">
+          {t("Set the cookie in Admin → Social & platform keys", "एडमिन → सोशल कीज़ में कुकी सेट करें")}
+        </a>
+      )}
+      <button onClick={test} disabled={saving || !status?.token.set}
+        className="text-[12px] px-2.5 py-1 rounded-lg border border-[var(--border)] disabled:opacity-50">
+        {saving ? <Loader2 size={12} className="animate-spin" /> : t("Test connection", "कनेक्शन जाँचें")}
+      </button>
+      {note && <span className="text-[var(--text-2)]">{note}</span>}
+      {status?.shim.error && <span className="text-[#991b1b]">{status.shim.error}</span>}
     </div>
   );
 }

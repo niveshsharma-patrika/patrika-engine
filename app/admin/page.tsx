@@ -17,14 +17,6 @@ type ProviderRow = {
   api_key_encrypted: string | null;
 };
 
-type ProfileRow = {
-  id: string;
-  full_name: string;
-  role: string;
-  desk: string | null;
-  telegram_handle: string | null;
-};
-
 type UsageRow = {
   model_id: string | null;
   use_case: string | null;
@@ -36,13 +28,12 @@ type UsageRow = {
 
 async function loadData() {
   if (!process.env.DATABASE_URL) {
-    return { providers: [], models: [], profiles: [], usage: [], pipeline: [] };
+    return { providers: [], models: [], usage: [], pipeline: [] };
   }
   const supabase = createAdminClient();
-  const [providers, models, profiles, usage, pipeline] = await Promise.all([
+  const [providers, models, usage, pipeline] = await Promise.all([
     supabase.from("ai_providers").select("id, provider_key, display_name, is_active, api_key_encrypted"),
     supabase.from("ai_models").select("id, model_key, display_name, provider_id, input_price_per_million, output_price_per_million"),
-    supabase.from("profiles").select("id, full_name, role, desk, telegram_handle").limit(50),
     supabase.from("ai_usage").select("model_id, use_case, input_tokens, output_tokens, cost_usd, created_at").gte("created_at", new Date(Date.now() - 30 * 86400e3).toISOString()).limit(2000),
     supabase.from("pipeline_settings").select("key, enabled, label, description, updated_at").order("key"),
   ]);
@@ -50,7 +41,6 @@ async function loadData() {
     providers: (providers.data as ProviderRow[] | null) ?? [],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     models: (models.data as any[]) ?? [],
-    profiles: (profiles.data as ProfileRow[] | null) ?? [],
     usage: (usage.data as UsageRow[] | null) ?? [],
     pipeline: (pipeline.data as PipelineRow[] | null) ?? [],
   };
@@ -68,7 +58,7 @@ const PROVIDER_ENV: Record<string, string> = {
 const PIPELINE_ORDER: PipelineRow["key"][] = ["fetch", "enrich", "cluster"];
 
 export default async function AdminPage() {
-  const { providers, models, profiles, usage, pipeline } = await loadData();
+  const { providers, models, usage, pipeline } = await loadData();
   const overrides = envOverrides();
 
   const pipelineRows = [...pipeline].sort(
@@ -145,64 +135,28 @@ export default async function AdminPage() {
         )}
       </section>
 
-      {/* AI Providers + Keys */}
+      {/* AI provider keys */}
       <section className="mb-8">
         <div className="mb-3">
-          <h2 className="text-[15px] font-medium">API Keys</h2>
+          <h2 className="text-[15px] font-medium">AI provider keys</h2>
           <p className="text-[12px] text-[var(--text-3)] mt-0.5">
-            Set a provider&apos;s key to store it encrypted in the database — it overrides the
-            environment variable and takes effect immediately. Clear it to fall back to the env var.
+            OpenAI, Anthropic, Google, Groq. Set a key to store it encrypted in the
+            database — it overrides the environment variable and takes effect immediately.
           </p>
         </div>
         <ProviderKeys providers={providerRows} />
       </section>
 
-      {/* Integration keys — social platforms (YouTube, Meta) */}
+      {/* Integration keys — grouped by platform */}
       <section className="mb-8">
         <div className="mb-3">
-          <h2 className="text-[15px] font-medium">Integration keys</h2>
+          <h2 className="text-[15px] font-medium">Social &amp; platform keys</h2>
           <p className="text-[12px] text-[var(--text-3)] mt-0.5">
-            Keys for the Social command center (YouTube, Meta / Instagram). Stored
-            encrypted, same as the API keys above.
+            Credentials for Social Trends and the Twitter feature, grouped by platform.
+            Stored encrypted, same as the AI keys above.
           </p>
         </div>
         <IntegrationKeys />
-      </section>
-
-      {/* Users */}
-      <section className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[15px] font-medium">Users</h2>
-          <button className="bg-[var(--text)] hover:bg-black text-white text-[13px] font-medium px-3.5 py-1.5 rounded">
-            + Invite user
-          </button>
-        </div>
-        <div className="bg-white border border-[var(--border)] rounded-md overflow-hidden">
-          {profiles.length === 0 ? (
-            <div className="px-4 py-8 text-center text-[var(--text-3)] text-sm">
-              No users yet. Set up Supabase Auth (sign in / sign up) to invite teammates.
-            </div>
-          ) : (
-            profiles.map((u) => (
-              <div
-                key={u.id}
-                className="grid grid-cols-[44px_1fr_140px_140px] gap-3.5 px-4 py-3 items-center border-t first:border-t-0 border-[var(--border)]"
-              >
-                <div className="w-9 h-9 grid place-items-center rounded-full bg-[var(--text)] text-white text-[12px] font-medium">
-                  {u.full_name.split(" ").map((n) => n[0]?.toUpperCase()).slice(0, 2).join("")}
-                </div>
-                <div>
-                  <div className="text-sm font-medium">{u.full_name}</div>
-                  <div className="text-[11px] text-[var(--text-3)] font-mono mt-0.5">{u.id.slice(0, 8)}</div>
-                </div>
-                <div className="font-mono text-[12px] text-[var(--text-2)]">{u.role}</div>
-                <div className="font-mono text-[11px] text-[var(--text-3)]">
-                  {u.telegram_handle ?? "—"}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
       </section>
 
       {/* AI Usage */}
