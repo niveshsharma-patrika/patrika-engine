@@ -182,6 +182,10 @@ const Body = z.object({
   title: z.string().max(300).optional(),
   mode: z.enum(["factual", "angle"]).default("factual"),
   lang: z.enum(["en", "hi"]).default("en"),
+  // Patrika+ magazine key. When set (article generated from a Patrika+ idea),
+  // that section's content prompt is layered onto the drafting as voice/format
+  // guidance — on TOP of the web-search grounding.
+  magazine: z.string().max(60).optional(),
   // A specific AI-generated angle the editor selected. When present (mode
   // "angle"), the draft is written to THIS angle instead of the no-AI angle.
   angle: z
@@ -526,6 +530,16 @@ export async function POST(req: Request) {
     const targetWords = p?.wordCount ?? 600;
     const directives = await getEffectiveDirectives();
     const framing = paramDirectives(p, directives);
+
+    // Patrika+ special-content voice. When the article was generated from a
+    // Patrika+ idea, layer that section's content prompt on top of the grounded
+    // draft — it drives voice/structure/format, facts still come from research.
+    const magKey = parsed.data.magazine?.trim();
+    const magPrompt = magKey ? directives.magazineContent?.[magKey] : undefined;
+    const magazineBlock = magPrompt
+      ? `\n\nPATRIKA+ SPECIAL CONTENT — write this as a Patrika+ "${magKey}" piece. Follow the voice, structure and format below; where it differs from the generic newspaper-style guidance above, THIS wins. Facts still come only from your research:\n${magPrompt}`
+      : "";
+
     const langLine = isHi
       ? "पूरा लेख हिंदी (देवनागरी लिपि) में लिखें।"
       : "Write the entire article in English.";
@@ -562,7 +576,7 @@ ${langLine}
 • Do NOT name other news outlets in the article body — Patrika writes its own report.
 • Write clean prose — no source links or URLs in the text (no "[label](url)" or "(https://…)"), but KEEP every specific fact, date, number, and name you found.
 • Never refuse; always produce the finished article.
-${framing}`;
+${framing}${magazineBlock}`;
 
       const bodyRes = await generateText({
         model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
@@ -609,7 +623,7 @@ ${sourcesBlock}${langLine}
 • Newspaper style: dateline in CAPS, strong lead, structured body.
 ${sourcesRule}
 • Never refuse; always produce the article. Do NOT name other news outlets.
-${framing}`;
+${framing}${magazineBlock}`;
     const fbRes = await generateText({
       model: drafting.model,
       prompt: fbPrompt,

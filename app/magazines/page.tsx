@@ -215,6 +215,7 @@ export default function MagazinesPage() {
           title={composerTitle}
           setTitle={setComposerTitle}
           onClose={() => setComposerOpen(false)}
+          magazineKey={selected ?? undefined}
         />
       )}
     </>
