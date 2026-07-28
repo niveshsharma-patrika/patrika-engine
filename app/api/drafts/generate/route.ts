@@ -586,7 +586,7 @@ TOPIC: ${topic}
 STEP 1 — PICK THE RIGHT FORM (this decides everything):
 • Is this a NEWS development — something that just happened, was announced, or changed, where the reader wants to know WHAT HAPPENED? → write a NEWS ARTICLE: lead with the latest verified development, then context, stakeholders, what's next.
 • OR is it an EXPLAINER / how-to / practical guide / evergreen wellness–finance–lifestyle topic (e.g. "yoga for seniors", "understand your electricity bill", "10-minute fitness routine") where the reader wants to UNDERSTAND something or DO something? → write a PRACTICAL EXPLAINER: open with a relatable hook, then explain what it is and why it matters to the reader, how to do/apply it (concrete steps/options), what to watch out for, and useful tips — grounded in evidence and expert guidance. Do NOT force a news framing: NO dateline, and do NOT turn it into a roundup of "recent government schemes/events" unless the topic is genuinely about those.
-Match the treatment to the topic. Most Patrika+ lifestyle / health / finance topics are EXPLAINERS, not news — do not report them like news.
+Match the treatment to the topic. Most Patrika+ lifestyle / health / finance topics are EXPLAINERS, not news — do not report them like news. Decide the form SILENTLY: NEVER tell the reader which form you chose, and never write a line like "यह कोई नया समाचार नहीं है, बल्कि एक व्यावहारिक गाइड है" or "this is a practical guide with scientific evidence". Just write the article itself.
 
 STEP 2 — RESEARCH for that form:
 • NEWS: latest status, exact figures/dates/names, official specifics, reactions, what's next.
@@ -596,6 +596,8 @@ STEP 2 — RESEARCH for that form:
 
 STEP 3 — WRITE:
 • ${langLine}
+• SIMPLE, EVERYDAY LANGUAGE for the common reader (आम पाठक). Avoid hard, bookish or heavily Sanskritised words and unexplained English/scientific jargon — e.g. do NOT write "परिसंचरण" (say "खून का दौरा/रक्त का बहाव"). If a technical term is truly needed (VO2max, ग्लाइसेमिक, बायोमार्कर, इंसुलिन प्रतिरोध), explain it in plain words in brackets. Keep it conversational and easy to follow.
+• INTERNAL CONSISTENCY: keep numbers, frequencies and dosages consistent and non-contradictory. If different studies used different protocols (e.g. 10 min 3×/week vs 10 min 2×/day), attribute each figure clearly to its own study, and give the reader ONE clear, coherent recommendation — never blend conflicting frequencies into confusing advice.
 • LENGTH: about ${targetWords} words — treat this as a firm target, not a rough hint. If you are running short, ADD more genuine depth (more practical detail, more sections, examples) — never stop early, and never pad with filler.
 • Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…", "Here is…" or any line that describes this as a feature/article.
 • FLOWING PARAGRAPHS are the default — 2–4 sentence paragraphs under SHORT natural subheadings (a question or short phrase; plain text — no #, no **). Weave facts, evidence and expert views INTO the prose, attributed.
@@ -630,7 +632,7 @@ ${framing}${magazineBlock}`;
         try {
           const expandRes = await generateText({
             model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
-            prompt: `The Hindi article below is too SHORT — it is about ${wc(finalBody)} words but must be about ${targetWords} words. Expand it to roughly ${targetWords} words by ADDING real substance, NOT filler or repetition: research further with web search for MORE specific, NAMED studies / institutions / experts / official data (with exact figures, years, sample sizes) and add practical detail, steps, examples and useful sections. Keep everything already correct, and keep the same structure, voice and flowing-prose style. Do NOT add any preface or any note about length/sources. ${langLine}
+            prompt: `The Hindi article below is too SHORT — it is about ${wc(finalBody)} words but must be about ${targetWords} words. Expand it to roughly ${targetWords} words by ADDING real substance, NOT filler or repetition: research further with web search for MORE specific, NAMED studies / institutions / experts / official data (with exact figures, years, sample sizes) and add practical detail, steps, examples and useful sections. Keep everything already correct, and keep the same structure, voice and flowing-prose style. Use SIMPLE everyday language for the common reader (avoid hard/technical words; explain any needed term in plain words). Keep all numbers and frequencies CONSISTENT — do not introduce contradictory figures. Do NOT add any preface, any note about length/sources, or any line saying what kind of article this is. ${langLine}
 
 Return ONLY the full expanded article.
 
@@ -682,7 +684,8 @@ ${finalBody}`,
 TOPIC: ${topic}
 
 ${sourcesBlock}${langLine}
-• FIRST pick the right form: if this is a NEWS development, write a news article (lead with the latest); if it's an EXPLAINER / how-to / evergreen wellness–finance–lifestyle topic, write a PRACTICAL EXPLAINER (what it is, why it matters, how to do it, precautions, tips) — NO dateline, NOT a roundup of recent schemes. Most Patrika+ topics are explainers, not news.
+• FIRST pick the right form (SILENTLY — never state which form you chose, no "यह गाइड है/समाचार नहीं" line): if this is a NEWS development, write a news article (lead with the latest); if it's an EXPLAINER / how-to / evergreen wellness–finance–lifestyle topic, write a PRACTICAL EXPLAINER (what it is, why it matters, how to do it, precautions, tips) — NO dateline, NOT a roundup of recent schemes. Most Patrika+ topics are explainers, not news.
+• SIMPLE, everyday language for the common reader — avoid hard/bookish/technical words (e.g. not "परिसंचरण" → "खून का दौरा"); explain any needed term in plain words. Keep numbers and frequencies consistent, not contradictory.
 • LENGTH: about ${targetWords} words — a firm target; if short, add real depth rather than stopping early.
 • Write a FLOWING FEATURE in paragraphs. Open DIRECTLY with the lede — NEVER with a preface like "यहाँ प्रस्तुत है…" / "Here is…" or any line describing this as a feature. Break into sections under SHORT natural subheadings (plain text — no #, no **) with 2–4 sentence paragraphs under each. Use a bulleted/numbered list ONLY for a genuine step-by-step or ONE short key-points summary — never turn explanation into bullets. Close with a forward-looking conclusion paragraph.
 ${sourcesRule}
