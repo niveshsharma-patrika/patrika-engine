@@ -20,7 +20,14 @@ export type Magazine = {
   subVerticals: string[]; // 5 micro-niches (Hindi)
   structure: string;     // magazine-specific middle of the article structure (Hindi)
   compliance: string;    // magazine-specific compliance note (Hindi)
+  // Optional desk-specific angle filters. When present, the desk shows a filter
+  // picker; the chosen filter's `brief` steers both idea generation and the
+  // article. `brief` is a Hindi instruction usable in either prompt.
+  filters?: Array<{ key: string; label: string; brief: string }>;
 };
+
+// Reusable brief for the "on this day" filter — injected with today's IST date.
+export const THIS_DAY_LABEL = "इतिहास में आज";
 
 export const MAGAZINES: Magazine[] = [
   {
@@ -44,6 +51,16 @@ export const MAGAZINES: Magazine[] = [
     age: "22–60",
     cadence: "सप्ताह में 3 स्टोरी + महीने में 1 डेटा एनालिसिस",
     subVerticals: ["चर्चित सीट की सामाजिक बनावट", "नेता के गृह क्षेत्र की हकीकत", "बदलता राजनीतिक रुख", "पुराने राजनीतिक गढ़", "वादे बनाम जमीन"],
+    filters: [
+      { key: "current", label: "वर्तमान राजनीतिक मुद्दे",
+        brief: "अभी चर्चा में चल रहे किसी ताज़ा राजनीतिक मुद्दे या घटनाक्रम पर केंद्रित रहो — हालिया, समयोचित और सत्यापित तथ्यों से जुड़ा। यह दर्शाओ कि यह अभी क्यों मायने रखता है।" },
+      { key: "this-day", label: THIS_DAY_LABEL,
+        brief: "'इतिहास में आज' शैली — आज की तारीख से जुड़ी किसी उल्लेखनीय राजनीतिक/सत्ता/शासन की घटना की कहानी बताओ, उसका संदर्भ और आज से उसका जुड़ाव।" },
+      { key: "profile", label: "चर्चित नेता प्रोफ़ाइल",
+        brief: "अभी सुर्खियों या चर्चा में मौजूद किसी नेता की प्रोफ़ाइल — उनका राजनीतिक सफर, कद, ताकत-कमजोरियाँ, और वे इस समय चर्चा में क्यों हैं।" },
+      { key: "govt-history", label: "किसी सरकार की ऐतिहासिक कहानी",
+        brief: "किसी सरकार या शासनकाल की ऐतिहासिक कहानी — उसके बड़े फैसले, उपलब्धियाँ, विवाद और विरासत, तथ्यों व संदर्भ के साथ।" },
+    ],
     structure: "तथ्य/डेटा के पॉइंट्स / सभी पक्षों का नजरिया / जमीनी हकीकत",
     compliance: "सभी दलों व पक्षों को बराबर स्पेस दें; तथ्य और राय अलग रखें; कोई व्यक्तिगत/पार्टी राय नहीं।",
   },

@@ -9,6 +9,7 @@ import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { searchGoogleNews } from "@/lib/sources/google-news";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import { MAGAZINE_BY_KEY } from "@/lib/magazines";
 
 // Web-search-grounded drafting (write-on-a-topic) does live research — and now
 // a conditional second "expand" pass — so give it generous room before the
@@ -187,6 +188,8 @@ const Body = z.object({
   // that section's content prompt is layered onto the drafting as voice/format
   // guidance — on TOP of the web-search grounding.
   magazine: z.string().max(60).optional(),
+  // Optional desk angle filter key (e.g. politics: current / this-day / profile).
+  magazineFilter: z.string().max(60).optional(),
   // A specific AI-generated angle the editor selected. When present (mode
   // "angle"), the draft is written to THIS angle instead of the no-AI angle.
   angle: z
@@ -537,7 +540,14 @@ export async function POST(req: Request) {
     // draft — it drives voice/structure/format, facts still come from research.
     const magKey = parsed.data.magazine?.trim();
     const magPrompt = magKey ? directives.magazineContent?.[magKey] : undefined;
-    const magazineBlock = magPrompt
+    // Desk angle filter (e.g. politics: current topic / on this day / profile).
+    const magFilter = magKey
+      ? MAGAZINE_BY_KEY[magKey]?.filters?.find((f) => f.key === parsed.data.magazineFilter?.trim())
+      : undefined;
+    const filterLine = magFilter
+      ? `\n\nएंगल/फ़िल्टर — यह पूरा लेख इसी एंगल से लिखो: "${magFilter.label}" — ${magFilter.brief}`
+      : "";
+    const magazineBlock = (magPrompt
       ? `\n\nPATRIKA+ SPECIAL CONTENT — write in the voice of the Patrika+ "${magKey}" desk. This is almost always a PRACTICAL EXPLAINER / feature / guide for the reader (wellness, lifestyle, finance, how-to) — NOT a breaking-news roundup; write it that way unless the topic is genuinely a news event. Use the brief below ONLY as guidance for voice, tone and WHAT to cover. However the brief is worded, your OUTPUT MUST be ONE continuous, fully-written article body in flowing prose:
 - Do NOT print field labels ("हेडलाइन:", "हुक इंट्रो:", "समस्या:", "CTA:", "टैग:", "WhatsApp…", "इन्फोग्राफिक…", "Suggested Tags", etc.).
 - Do NOT include a separate headline line, a WhatsApp teaser, infographic bullet points, or a tag list in the body — ONLY the article itself. (The headline is generated separately.)
@@ -549,7 +559,7 @@ Where the brief's voice conflicts with the generic newspaper framing above, the 
 
 BRIEF:
 ${magPrompt}`
-      : "";
+      : "") + filterLine;
 
     const langLine = isHi
       ? "पूरा लेख हिंदी (देवनागरी लिपि) में लिखें।"

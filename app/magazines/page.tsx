@@ -33,6 +33,7 @@ const FALLBACK_VISUAL = { from: "#6b7280", to: "#374151", Icon: BookOpen };
 export default function MagazinesPage() {
   const { lang } = useLang();
   const [selected, setSelected] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loadingIdeas, setLoadingIdeas] = useState(false);
   const [ideasErr, setIdeasErr] = useState<string | null>(null);
@@ -43,6 +44,7 @@ export default function MagazinesPage() {
 
   function open(key: string) {
     setSelected(key);
+    setFilter(null);
     setIdeas([]);
     setIdeasErr(null);
   }
@@ -62,7 +64,7 @@ export default function MagazinesPage() {
       const r = await fetch("/api/magazine/ideas", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ magazine: mag.key }),
+        body: JSON.stringify({ magazine: mag.key, filter: filter ?? undefined }),
       });
       const d = await r.json();
       if (!r.ok) setIdeasErr(d.error ?? "Failed");
@@ -149,6 +151,34 @@ export default function MagazinesPage() {
         </div>
       </div>
 
+      {/* Desk angle filters — steer both idea generation and the article. */}
+      {mag.filters && mag.filters.length > 0 && (
+        <div className="mb-5">
+          <div className="text-[11px] text-[var(--text-3)] mb-1.5">
+            {lang === "hi" ? "एंगल चुनें (वैकल्पिक)" : "Choose an angle (optional)"}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {mag.filters.map((f) => {
+              const active = filter === f.key;
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(active ? null : f.key)}
+                  title={f.brief}
+                  className={`text-[12px] px-3 py-1.5 rounded-full border transition-colors ${
+                    active
+                      ? "border-[var(--red)] bg-[var(--red-soft)] text-[var(--text)] font-medium"
+                      : "border-[var(--border)] text-[var(--text-2)] hover:border-[var(--text-3)]"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Ideas — generate, then pick one to open the full composer */}
       <section>
         <div className="flex items-start justify-between gap-4 mb-4">
@@ -216,6 +246,7 @@ export default function MagazinesPage() {
           setTitle={setComposerTitle}
           onClose={() => setComposerOpen(false)}
           magazineKey={selected ?? undefined}
+          magazineFilter={filter ?? undefined}
         />
       )}
     </>

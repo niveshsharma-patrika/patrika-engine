@@ -463,7 +463,7 @@ function EnhGroup({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function Editor({ trend, title, setTitle, onClose, magazineKey }: {
+export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineFilter }: {
   trend: Trend | null;
   title: string;
   setTitle: (v: string) => void;
@@ -471,6 +471,8 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey }: {
   // When opened from a Patrika+ idea, the section key whose content prompt
   // should shape the article's voice/format.
   magazineKey?: string;
+  // The desk angle filter (e.g. politics: current / this-day / profile).
+  magazineFilter?: string;
 }) {
   const { t, lang } = useLang();
   const [body, setBody] = useState("");
@@ -573,6 +575,7 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey }: {
           mode: selectedAngle ? "angle" : "factual",
           lang: genLang,
           magazine: magazineKey ?? undefined,
+          magazineFilter: magazineFilter ?? undefined,
           angle: selectedAngle ?? undefined,
           params: {
             tone,
