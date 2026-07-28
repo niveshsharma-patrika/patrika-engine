@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Loader2, RefreshCw, Sparkles, Flame, MessageCircle, ArrowUp, ExternalLink,
-  Copy, Check, Plus, Trash2, Settings2, AtSign, Globe,
+  Copy, Check, AtSign, Globe,
 } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
@@ -32,11 +32,6 @@ type Pack = {
   youtube_title: string; hashtags: string[]; image_concept: string; caution: string;
 };
 
-type Source = {
-  id: string; platform: Platform; query: string; label: string | null;
-  is_active: boolean; last_crawled_at: string | null; last_error: string | null; item_count?: number;
-};
-
 function ago(iso: string | null, lang: string): string {
   if (!iso) return "";
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -56,33 +51,26 @@ export function SocialTrends() {
   const t = (en: string, hi: string) => (lang === "hi" ? hi : en);
 
   const [trends, setTrends] = useState<Trend[]>([]);
-  const [byPlatform, setByPlatform] = useState<Array<{ platform: string; items: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [crawling, setCrawling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [platform, setPlatform] = useState<Platform | "">("");
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [pack, setPack] = useState<Pack | null>(null);
   const [genBusy, setGenBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const [showSources, setShowSources] = useState(false);
-
   const load = useCallback(async () => {
     try {
-      const q = new URLSearchParams({ days: "3" });
-      if (platform) q.set("platform", platform);
-      const res = await fetch(`/api/social/trends?${q}`);
+      const res = await fetch(`/api/social/trends?days=3`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed");
       setTrends(json.trends ?? []);
-      setByPlatform(json.byPlatform ?? []);
       setError(null);
     } catch (e) { setError(e instanceof Error ? e.message : "Failed to load"); }
     finally { setLoading(false); }
-  }, [platform]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -92,12 +80,10 @@ export function SocialTrends() {
       const res = await fetch("/api/social/trends/crawl", { method: "POST" });
       const json = await res.json();
       if (!res.ok || json.ok === false) throw new Error(json.error ?? "Failed");
-      // Surface the first source error (e.g. missing Reddit credentials) so a
-      // zero-item crawl isn't a silent mystery.
       const firstErr = (json.results ?? []).find((r: { error: string | null }) => r.error)?.error;
       setNote(t(
-        `${json.sources_ok}/${json.sources} sources · ${json.items_upserted} new items${firstErr ? ` — ${firstErr}` : ""}`,
-        `${json.sources} में से ${json.sources_ok} स्रोत · ${json.items_upserted} नए${firstErr ? ` — ${firstErr}` : ""}`
+        `${json.items_upserted} new · ${json.sources_ok}/${json.sources} sources${firstErr ? ` — ${firstErr}` : ""}`,
+        `${json.items_upserted} नए · ${json.sources} में से ${json.sources_ok}${firstErr ? ` — ${firstErr}` : ""}`
       ));
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : "Crawl failed"); }
@@ -128,37 +114,17 @@ export function SocialTrends() {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1">
-            <FilterBtn active={platform === ""} onClick={() => setPlatform("")} label={t("All", "सभी")} />
-            <FilterBtn active={platform === "reddit"} onClick={() => setPlatform("reddit")} label="Reddit" />
-            <FilterBtn active={platform === "x"} onClick={() => setPlatform("x")} label="X" />
-          </div>
-          {byPlatform.length > 0 && (
-            <span className="text-[11px] text-[var(--text-3)]">
-              {byPlatform.map((b) => `${b.items} ${b.platform}`).join(" · ")}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowSources((s) => !s)}
-            className="flex items-center gap-1.5 text-[12px] px-3 py-2 rounded-lg border border-[var(--border)]">
-            <Settings2 size={13} /> {t("Sources", "स्रोत")}
-          </button>
-          <button onClick={crawl} disabled={crawling}
-            className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-2 rounded-lg text-white disabled:opacity-60"
-            style={{ background: "var(--purple)" }}>
-            {crawling ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-            {crawling ? t("Refreshing…", "रिफ़्रेश…") : t("Refresh trends", "ट्रेंड रिफ़्रेश")}
-          </button>
-        </div>
+      <div className="flex items-center justify-end mb-4">
+        <button onClick={crawl} disabled={crawling}
+          className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-2 rounded-lg text-white disabled:opacity-60"
+          style={{ background: "var(--purple)" }}>
+          {crawling ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          {crawling ? t("Refreshing…", "रिफ़्रेश…") : t("Refresh", "रिफ़्रेश")}
+        </button>
       </div>
 
       {note && <div className="mb-4 text-[12px] px-3 py-2 rounded-lg bg-[var(--surface-2)] text-[var(--text-2)]">{note}</div>}
       {error && <div className="mb-4 text-[12px] px-3 py-2 rounded-lg bg-[#fee2e2] text-[#991b1b]">{error}</div>}
-
-      {showSources && <SourcesPanel t={t} lang={lang} onChange={load} />}
 
       {loading ? (
         <div className="flex items-center gap-2 text-[13px] text-[var(--text-3)] py-10">
@@ -166,7 +132,7 @@ export function SocialTrends() {
         </div>
       ) : trends.length === 0 ? (
         <div className="border border-dashed border-[var(--border)] rounded-xl py-14 text-center text-[13px] text-[var(--text-3)]">
-          {t("No trends yet. Press 'Refresh trends' to crawl now.", "अभी कोई ट्रेंड नहीं। 'ट्रेंड रिफ़्रेश' दबाएँ।")}
+          {t("No trends yet. Press Refresh to crawl now.", "अभी कोई ट्रेंड नहीं। रिफ़्रेश दबाएँ।")}
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -251,15 +217,6 @@ export function SocialTrends() {
   );
 }
 
-function FilterBtn({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  return (
-    <button onClick={onClick}
-      className={`text-[12px] px-2.5 py-1.5 rounded-md ${active ? "bg-[var(--text)] text-white font-medium" : "bg-[var(--surface-2)] text-[var(--text-2)]"}`}>
-      {label}
-    </button>
-  );
-}
-
 function CopyBlock({
   label, text, k, copied, onCopy,
 }: { label: string; text: string; k: string; copied: string | null; onCopy: (k: string, t: string) => void }) {
@@ -272,71 +229,6 @@ function CopyBlock({
         </button>
       </div>
       <p className="text-[13px] leading-snug whitespace-pre-wrap">{text}</p>
-    </div>
-  );
-}
-
-function SourcesPanel({ t, lang, onChange }: { t: (e: string, h: string) => string; lang: string; onChange: () => void }) {
-  const [sources, setSources] = useState<Source[]>([]);
-  const [platform, setPlatform] = useState<Platform>("reddit");
-  const [query, setQuery] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/social/trend-sources");
-    if (res.ok) setSources((await res.json()).sources ?? []);
-  }, []);
-  useEffect(() => { load(); }, [load]);
-
-  async function add() {
-    if (!query.trim()) return;
-    setBusy(true);
-    try {
-      const res = await fetch("/api/social/trend-sources", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ platform, query }),
-      });
-      if (res.ok) { setQuery(""); await load(); onChange(); }
-    } finally { setBusy(false); }
-  }
-  async function remove(id: string) {
-    await fetch(`/api/social/trend-sources/${id}`, { method: "DELETE" });
-    load();
-  }
-
-  return (
-    <div className="border border-[var(--border)] rounded-xl bg-white p-4 mb-4">
-      <div className="flex flex-wrap gap-2 items-end mb-3">
-        <select value={platform} onChange={(e) => setPlatform(e.target.value as Platform)}
-          className="bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none">
-          <option value="reddit">Reddit</option>
-          <option value="x">X</option>
-        </select>
-        <input value={query} onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder={platform === "reddit" ? t("subreddit e.g. india", "सबरेडिट जैसे india") : t("keyword or #hashtag", "कीवर्ड या #हैशटैग")}
-          className="flex-1 min-w-[180px] bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)]" />
-        <button onClick={add} disabled={busy || !query.trim()}
-          className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg text-white disabled:opacity-50" style={{ background: "var(--purple)" }}>
-          <Plus size={14} /> {t("Add", "जोड़ें")}
-        </button>
-      </div>
-      {platform === "x" && (
-        <p className="text-[11px] text-[var(--text-3)] mb-2">
-          {t("X sources need the Twitter cookie set (Admin → Integration keys).", "X स्रोतों के लिए ट्विटर कुकी सेट होनी चाहिए (एडमिन → इंटीग्रेशन कीज़)।")}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-1.5">
-        {sources.map((s) => (
-          <span key={s.id} className="inline-flex items-center gap-1.5 text-[12px] px-2 py-1 rounded-lg bg-[var(--surface-2)]">
-            {s.platform === "x" ? <AtSign size={11} /> : <Globe size={11} className="text-[#ff4500]" />}
-            {s.label ?? s.query}
-            <span className="text-[var(--text-3)]">{s.item_count ?? 0}</span>
-            {s.last_error && <span className="text-[#991b1b]" title={s.last_error}>!</span>}
-            <button onClick={() => remove(s.id)} className="text-[var(--text-3)] hover:text-[#991b1b]"><Trash2 size={11} /></button>
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
