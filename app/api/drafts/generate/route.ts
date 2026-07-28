@@ -537,7 +537,7 @@ export async function POST(req: Request) {
     const magKey = parsed.data.magazine?.trim();
     const magPrompt = magKey ? directives.magazineContent?.[magKey] : undefined;
     const magazineBlock = magPrompt
-      ? `\n\nPATRIKA+ SPECIAL CONTENT — write in the voice of the Patrika+ "${magKey}" desk. Use the brief below ONLY as guidance for voice, tone and WHAT to cover. However the brief is worded, your OUTPUT MUST be ONE continuous, fully-written article body in flowing prose:
+      ? `\n\nPATRIKA+ SPECIAL CONTENT — write in the voice of the Patrika+ "${magKey}" desk. This is almost always a PRACTICAL EXPLAINER / feature / guide for the reader (wellness, lifestyle, finance, how-to) — NOT a breaking-news roundup; write it that way unless the topic is genuinely a news event. Use the brief below ONLY as guidance for voice, tone and WHAT to cover. However the brief is worded, your OUTPUT MUST be ONE continuous, fully-written article body in flowing prose:
 - Do NOT print field labels ("हेडलाइन:", "हुक इंट्रो:", "समस्या:", "CTA:", "टैग:", "WhatsApp…", "इन्फोग्राफिक…", "Suggested Tags", etc.).
 - Do NOT include a separate headline line, a WhatsApp teaser, infographic bullet points, or a tag list in the body — ONLY the article itself. (The headline is generated separately.)
 - Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…" or any sentence describing that this is a feature.
@@ -578,30 +578,28 @@ ${magPrompt}`
       // Primary: the model researches live sources with web search and grounds
       // the article in what it actually finds — not outdated training memory.
       const openai = createOpenAI({ apiKey: openaiKey });
-      const bodyPrompt = `You are a senior Patrika feature journalist writing an in-depth, publish-ready article. Research the topic THOROUGHLY with web search across several angles, verify everything, then write a rich, well-structured piece. Write ONLY from what you actually find — never rely on stale memory.
+      const bodyPrompt = `You are a senior Patrika feature journalist. Write an in-depth, publish-ready article on the topic below. FIRST research it thoroughly with web search, verify everything, then write — using ONLY what you actually find, never stale memory.
 
 TOPIC: ${topic}
 
-RESEARCH DEEPLY — run several searches (not one) to gather, from primary/official sources where possible:
-• The core development and its LATEST status — exact figures, percentages, dates, names, places.
-• EVERY concrete specific you can verify: counts, amounts, scheme/project names, official names & titles, enforcement/action numbers, named locations. Hunt for the specifics a first search misses.
-• The mechanism — HOW it works, the technology or process behind it, explained simply.
-• Background & context — what led to this, earlier steps, the bigger picture.
-• Precedents & comparisons — similar efforts in other Indian cities/states and notable global examples.
-• Stakeholders & reactions — officials (with quotes), experts, agencies involved, affected people.
-• Why it matters — concrete benefits, implications, risks, and what happens next.
-If a specific fact can't be verified, leave it out rather than guessing.
+STEP 1 — PICK THE RIGHT FORM (this decides everything):
+• Is this a NEWS development — something that just happened, was announced, or changed, where the reader wants to know WHAT HAPPENED? → write a NEWS ARTICLE: lead with the latest verified development, then context, stakeholders, what's next.
+• OR is it an EXPLAINER / how-to / practical guide / evergreen wellness–finance–lifestyle topic (e.g. "yoga for seniors", "understand your electricity bill", "10-minute fitness routine") where the reader wants to UNDERSTAND something or DO something? → write a PRACTICAL EXPLAINER: open with a relatable hook, then explain what it is and why it matters to the reader, how to do/apply it (concrete steps/options), what to watch out for, and useful tips — grounded in evidence and expert guidance. Do NOT force a news framing: NO dateline, and do NOT turn it into a roundup of "recent government schemes/events" unless the topic is genuinely about those.
+Match the treatment to the topic. Most Patrika+ lifestyle / health / finance topics are EXPLAINERS, not news — do not report them like news.
 
-WRITE a comprehensive, engaging feature:
+STEP 2 — RESEARCH for that form:
+• NEWS: latest status, exact figures/dates/names, official specifics, reactions, what's next.
+• EXPLAINER: the substance a reader actually needs — how it works, the practical steps and options, expert-recommended best practices, real benefits with evidence, precautions and common mistakes, relatable examples. Bring in a real study or expert view where it builds trust, attributed to the real source.
+• Either way: verify names, numbers and claims; if something can't be verified, leave it out. Never fabricate a source, quote, figure or name, and never leave a placeholder like "[सोर्स जोड़ें]".
+
+STEP 3 — WRITE:
 • ${langLine}
-• Depth over brevity: aim for at least ${targetWords} words and expand as the material warrants to cover the context richly. Do not pad, but never drop real substance to hit a number.
-• Write a FLOWING FEATURE in real paragraphs — that is the default. Open DIRECTLY with the article's first line (a strong lede). NEVER begin with a preface such as "यहाँ प्रस्तुत है…", "इस लेख में…", "प्रस्तुत है…", "Here is…" or any sentence that describes this as a feature/article — just start the article itself.
-• Break the piece into a few sections, each under a SHORT natural subheading (a question or a short phrase, plain text — no #, no **). Under each subheading write 2–4 sentence PARAGRAPHS that explain and narrate; weave research, figures and expert views INTO the prose, attributed to the real source.
-• Use a bulleted or numbered list ONLY where the content is genuinely a list — a step-by-step how-to, or ONE short "key points" summary — at most one or two lists in the whole article. NEVER turn explanation, research findings or context into bullets; those must be written as paragraphs. A comparison table is fine when it genuinely compares items.
-• Give the reader the explainers they'd want as their OWN prose sections — e.g. "how does this work?", "what is <the scheme/tech>?", relevant other-city / global examples.
-• End with a forward-looking conclusion paragraph.
-• Newspaper voice, Patrika style. Do NOT name other news outlets. No source links or URLs in the text (no "[label](url)" or "(https://…)"), but KEEP every specific fact, date, number and name you found.
-• End with the conclusion itself — do NOT append any note about word count, sources, or "facts verified".
+• LENGTH: about ${targetWords} words — treat this as a firm target, not a rough hint. If you are running short, ADD more genuine depth (more practical detail, more sections, examples) — never stop early, and never pad with filler.
+• Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…", "Here is…" or any line that describes this as a feature/article.
+• FLOWING PARAGRAPHS are the default — 2–4 sentence paragraphs under SHORT natural subheadings (a question or short phrase; plain text — no #, no **). Weave facts, evidence and expert views INTO the prose, attributed.
+• Use a bulleted/numbered list ONLY for a genuine step-by-step how-to or ONE short "key points" summary (at most one or two lists in the whole piece); a table only for a real comparison. NEVER render explanation, research or context as bullets.
+• End with a natural, forward-looking conclusion — and nothing after it (no note about word count, sources or "facts verified").
+• Patrika voice. Do NOT name other news outlets. No source links or URLs in the text, but keep every specific fact, date, number and name you use.
 • Never refuse; always produce the full finished article.
 ${framing}${magazineBlock}`;
 
@@ -646,7 +644,8 @@ ${framing}${magazineBlock}`;
 TOPIC: ${topic}
 
 ${sourcesBlock}${langLine}
-• Depth: at least ${targetWords} words — a full feature, not a brief.
+• FIRST pick the right form: if this is a NEWS development, write a news article (lead with the latest); if it's an EXPLAINER / how-to / evergreen wellness–finance–lifestyle topic, write a PRACTICAL EXPLAINER (what it is, why it matters, how to do it, precautions, tips) — NO dateline, NOT a roundup of recent schemes. Most Patrika+ topics are explainers, not news.
+• LENGTH: about ${targetWords} words — a firm target; if short, add real depth rather than stopping early.
 • Write a FLOWING FEATURE in paragraphs. Open DIRECTLY with the lede — NEVER with a preface like "यहाँ प्रस्तुत है…" / "Here is…" or any line describing this as a feature. Break into sections under SHORT natural subheadings (plain text — no #, no **) with 2–4 sentence paragraphs under each. Use a bulleted/numbered list ONLY for a genuine step-by-step or ONE short key-points summary — never turn explanation into bullets. Close with a forward-looking conclusion paragraph.
 ${sourcesRule}
 • Do NOT invent specific figures, names or dates beyond what's given/established — keep unverified specifics general rather than fabricating.
