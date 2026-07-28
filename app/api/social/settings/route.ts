@@ -2,7 +2,9 @@ import { z } from "zod";
 
 import { getSession } from "@/lib/auth/session";
 import { hasSecret, setSecret, X_AUTH_TOKEN } from "@/lib/twitter/secrets";
-import { YT_API_KEY, META_TOKEN, META_IG_USER_ID } from "@/lib/social/types";
+import {
+  YT_API_KEY, META_TOKEN, META_IG_USER_ID, REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET,
+} from "@/lib/social/types";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,8 @@ const KEYS = {
   meta_access_token: META_TOKEN,
   meta_ig_user_id: META_IG_USER_ID,
   x_auth_token: X_AUTH_TOKEN,
+  reddit_client_id: REDDIT_CLIENT_ID,
+  reddit_client_secret: REDDIT_CLIENT_SECRET,
 } as const;
 
 const Body = z.object({
@@ -30,18 +34,23 @@ const Body = z.object({
   meta_access_token: z.string().min(4).max(1000).optional(),
   meta_ig_user_id: z.string().min(1).max(100).optional(),
   x_auth_token: z.string().min(10).max(500).optional(),
+  reddit_client_id: z.string().min(4).max(100).optional(),
+  reddit_client_secret: z.string().min(4).max(100).optional(),
 });
 
 export async function GET() {
   if (!(await requireAdmin())) return Response.json({ error: "Forbidden" }, { status: 403 });
-  const [yt, meta, ig, x] = await Promise.all([
-    hasSecret(YT_API_KEY), hasSecret(META_TOKEN), hasSecret(META_IG_USER_ID), hasSecret(X_AUTH_TOKEN),
+  const [yt, meta, ig, x, rid, rsec] = await Promise.all([
+    hasSecret(YT_API_KEY), hasSecret(META_TOKEN), hasSecret(META_IG_USER_ID),
+    hasSecret(X_AUTH_TOKEN), hasSecret(REDDIT_CLIENT_ID), hasSecret(REDDIT_CLIENT_SECRET),
   ]);
   return Response.json({
     youtube_api_key: yt.set,
     meta_access_token: meta.set,
     meta_ig_user_id: ig.set,
     x_auth_token: x.set,
+    reddit_client_id: rid.set,
+    reddit_client_secret: rsec.set,
   });
 }
 

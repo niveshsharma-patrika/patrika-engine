@@ -92,9 +92,12 @@ export function SocialTrends() {
       const res = await fetch("/api/social/trends/crawl", { method: "POST" });
       const json = await res.json();
       if (!res.ok || json.ok === false) throw new Error(json.error ?? "Failed");
+      // Surface the first source error (e.g. missing Reddit credentials) so a
+      // zero-item crawl isn't a silent mystery.
+      const firstErr = (json.results ?? []).find((r: { error: string | null }) => r.error)?.error;
       setNote(t(
-        `${json.sources_ok}/${json.sources} sources · ${json.items_upserted} new items`,
-        `${json.sources} में से ${json.sources_ok} स्रोत · ${json.items_upserted} नए`
+        `${json.sources_ok}/${json.sources} sources · ${json.items_upserted} new items${firstErr ? ` — ${firstErr}` : ""}`,
+        `${json.sources} में से ${json.sources_ok} स्रोत · ${json.items_upserted} नए${firstErr ? ` — ${firstErr}` : ""}`
       ));
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : "Crawl failed"); }

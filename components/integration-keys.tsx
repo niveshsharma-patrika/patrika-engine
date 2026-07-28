@@ -17,6 +17,8 @@ export function IntegrationKeys() {
   const [meta, setMeta] = useState("");
   const [ig, setIg] = useState("");
   const [x, setX] = useState("");
+  const [rid, setRid] = useState("");
+  const [rsec, setRsec] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -34,6 +36,8 @@ export function IntegrationKeys() {
     if (meta.trim()) body.meta_access_token = meta.trim();
     if (ig.trim()) body.meta_ig_user_id = ig.trim();
     if (x.trim()) body.x_auth_token = x.trim();
+    if (rid.trim()) body.reddit_client_id = rid.trim();
+    if (rsec.trim()) body.reddit_client_secret = rsec.trim();
     if (Object.keys(body).length === 0) return;
     setSaving(true); setMsg(null);
     try {
@@ -44,7 +48,7 @@ export function IntegrationKeys() {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Failed");
-      setYt(""); setMeta(""); setIg(""); setX("");
+      setYt(""); setMeta(""); setIg(""); setX(""); setRid(""); setRsec("");
       setMsg("Saved.");
       load();
     } catch (e) {
@@ -57,17 +61,21 @@ export function IntegrationKeys() {
   return (
     <div className="bg-white border border-[var(--border)] rounded-md p-4">
       <p className="text-[12px] text-[var(--text-3)] leading-relaxed mb-3">
-        YouTube needs a Data API v3 key. Instagram competitor data needs a Meta
-        access token <b>plus your own IG business account id</b> (business
-        discovery only reads business/creator accounts). Facebook has no free
-        competitor API. The X cookie is shared by the Twitter feature and the
-        social center — it can also be set (and tested) in Twitter → Settings.
+        <b>Reddit</b> powers Social Trends and is required — Reddit blocks server
+        IPs without OAuth. Create a free <b>&ldquo;script&rdquo; app</b> at{" "}
+        <a href="https://www.reddit.com/prefs/apps" target="_blank" rel="noopener noreferrer"
+          className="text-[var(--purple)] underline">reddit.com/prefs/apps</a>{" "}
+        and paste its client id + secret below. The X cookie is shared by the
+        Twitter feature and Social Trends (also settable in Twitter → Settings).
+        YouTube/Meta keys feed the (now hidden) competitor tracking.
       </p>
       <div className="space-y-3">
+        <Row label="Reddit client id" val={rid} set={setRid} ok={status?.reddit_client_id} mono />
+        <Row label="Reddit client secret" val={rsec} set={setRsec} ok={status?.reddit_client_secret} />
+        <Row label="X (Twitter) auth_token cookie" val={x} set={setX} ok={status?.x_auth_token} />
         <Row label="YouTube API key" val={yt} set={setYt} ok={status?.youtube_api_key} />
         <Row label="Meta access token" val={meta} set={setMeta} ok={status?.meta_access_token} />
         <Row label="Your IG business account id" val={ig} set={setIg} ok={status?.meta_ig_user_id} mono />
-        <Row label="X (Twitter) auth_token cookie" val={x} set={setX} ok={status?.x_auth_token} />
       </div>
       <div className="flex items-center gap-3 mt-3">
         <button

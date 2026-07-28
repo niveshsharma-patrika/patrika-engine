@@ -33,3 +33,6 @@ export const PLATFORM_LABEL: Record<Platform, string> = {
 export const YT_API_KEY = "youtube_api_key";
 export const META_TOKEN = "meta_access_token";
 export const META_IG_USER_ID = "meta_ig_user_id";
+// Reddit blocks unauthenticated datacenter IPs, so trends need an OAuth app.
+export const REDDIT_CLIENT_ID = "reddit_client_id";
+export const REDDIT_CLIENT_SECRET = "reddit_client_secret";
