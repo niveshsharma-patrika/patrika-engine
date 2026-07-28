@@ -543,7 +543,9 @@ export async function POST(req: Request) {
     const langLine = isHi
       ? "पूरा लेख हिंदी (देवनागरी लिपि) में लिखें।"
       : "Write the entire article in English.";
-    const maxOutputTokens = Math.min(12000, Math.ceil(targetWords * (isHi ? 6 : 2)) + 400);
+    // Roomier budget — a rich, structured feature with explainer sections runs
+    // longer than a flat report, so allow the model to expand for depth.
+    const maxOutputTokens = Math.min(15000, Math.ceil(targetWords * (isHi ? 9 : 3)) + 800);
 
     // Headline options generated from the finished article (no search needed).
     const headlinesFrom = async (article: string): Promise<string[]> => {
@@ -566,16 +568,28 @@ export async function POST(req: Request) {
       // Primary: the model researches live sources with web search and grounds
       // the article in what it actually finds — not outdated training memory.
       const openai = createOpenAI({ apiKey: openaiKey });
-      const bodyPrompt = `You are a senior Patrika news journalist. FIRST research the CURRENT, up-to-date facts on this topic using web search, then write a complete, publish-ready news article. Write ONLY from what you actually find — do NOT rely on prior memory, which may be outdated.
+      const bodyPrompt = `You are a senior Patrika feature journalist writing an in-depth, publish-ready article. Research the topic THOROUGHLY with web search across several angles, verify everything, then write a rich, well-structured piece. Write ONLY from what you actually find — never rely on stale memory.
 
 TOPIC: ${topic}
 
-${langLine}
-• Verify names, dates, numbers, and especially the REASON / CONTEXT before stating them. If a specific fact can't be verified from your search, leave it out rather than guessing.
-• Length: about ${targetWords} words. Newspaper style: open with a dateline in CAPS (e.g. NEW DELHI:), a strong lead with the LATEST development, then a well-structured body.
-• Do NOT name other news outlets in the article body — Patrika writes its own report.
-• Write clean prose — no source links or URLs in the text (no "[label](url)" or "(https://…)"), but KEEP every specific fact, date, number, and name you found.
-• Never refuse; always produce the finished article.
+RESEARCH DEEPLY — run several searches (not one) to gather, from primary/official sources where possible:
+• The core development and its LATEST status — exact figures, percentages, dates, names, places.
+• EVERY concrete specific you can verify: counts, amounts, scheme/project names, official names & titles, enforcement/action numbers, named locations. Hunt for the specifics a first search misses.
+• The mechanism — HOW it works, the technology or process behind it, explained simply.
+• Background & context — what led to this, earlier steps, the bigger picture.
+• Precedents & comparisons — similar efforts in other Indian cities/states and notable global examples.
+• Stakeholders & reactions — officials (with quotes), experts, agencies involved, affected people.
+• Why it matters — concrete benefits, implications, risks, and what happens next.
+If a specific fact can't be verified, leave it out rather than guessing.
+
+WRITE a comprehensive, engaging feature:
+• ${langLine}
+• Depth over brevity: aim for at least ${targetWords} words and expand as the material warrants to cover the context richly. Do not pad, but never drop real substance to hit a number.
+• STRUCTURE it for a reader: a strong intro that states the key development and hooks; then several thematic SECTIONS, each led by a SHORT subheading on its own line (plain text — no #, no **); use bullet lines (start with "• ") for any list (agencies, benefits, steps, the biggest-improving spots, the worsening spots, figures); end with a forward-looking conclusion (what's next / why it matters).
+• Give the reader the explainers they'd want as their OWN sections — e.g. "how does this work?", "what is <the scheme/tech>?", relevant other-city / global examples.
+• Newspaper voice, Patrika style. Do NOT name other news outlets. No source links or URLs in the text (no "[label](url)" or "(https://…)"), but KEEP every specific fact, date, number and name you found.
+• End with the conclusion itself — do NOT append any note about word count, sources, or "facts verified".
+• Never refuse; always produce the full finished article.
 ${framing}${magazineBlock}`;
 
       const bodyRes = await generateText({
@@ -614,14 +628,16 @@ ${framing}${magazineBlock}`;
     const sourcesRule = hits.length
       ? "• Lead with the newest development from the headlines above; use them for what is happening NOW. Do NOT fabricate specific facts, numbers, or reasons beyond them."
       : "• No live reports were found; write accurately from established knowledge and keep uncertain specifics general rather than fabricating them.";
-    const fbPrompt = `You are a senior Patrika news journalist. Write a complete, publish-ready news article on THIS EXACT topic:
+    const fbPrompt = `You are a senior Patrika feature journalist. Write a complete, publish-ready, richly structured article on THIS EXACT topic:
 
 TOPIC: ${topic}
 
 ${sourcesBlock}${langLine}
-• Length: about ${targetWords} words — write the FULL piece.
-• Newspaper style: dateline in CAPS, strong lead, structured body.
+• Depth: at least ${targetWords} words — a full feature, not a brief.
+• STRUCTURE: a strong intro, then thematic SECTIONS each with a SHORT subheading on its own line (plain text — no #, no **); use bullet lines ("• ") for any list; add explainer sections the reader wants ("how does this work?", "what is <the scheme>?", other-city / global examples); close with a forward-looking conclusion.
 ${sourcesRule}
+• Do NOT invent specific figures, names or dates beyond what's given/established — keep unverified specifics general rather than fabricating.
+• End with the conclusion itself — no note about word count or sources.
 • Never refuse; always produce the article. Do NOT name other news outlets.
 ${framing}${magazineBlock}`;
     const fbRes = await generateText({
