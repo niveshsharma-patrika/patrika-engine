@@ -537,7 +537,15 @@ export async function POST(req: Request) {
     const magKey = parsed.data.magazine?.trim();
     const magPrompt = magKey ? directives.magazineContent?.[magKey] : undefined;
     const magazineBlock = magPrompt
-      ? `\n\nPATRIKA+ SPECIAL CONTENT — write this as a Patrika+ "${magKey}" piece. Follow the voice, structure and format below; where it differs from the generic newspaper-style guidance above, THIS wins. Facts still come only from your research:\n${magPrompt}`
+      ? `\n\nPATRIKA+ SPECIAL CONTENT — write in the voice of the Patrika+ "${magKey}" desk. Use the brief below ONLY as guidance for voice, tone and WHAT to cover. However the brief is worded, your OUTPUT MUST be ONE continuous, fully-written article body in flowing prose:
+- Do NOT print field labels ("हेडलाइन:", "हुक इंट्रो:", "समस्या:", "CTA:", "टैग:", "WhatsApp…", "इन्फोग्राफिक…", "Suggested Tags", etc.).
+- Do NOT include a separate headline line, a WhatsApp teaser, infographic bullet points, or a tag list in the body — ONLY the article itself. (The headline is generated separately.)
+- NEVER leave a placeholder such as "[सोर्स जोड़ें]" / "[स्रोत/लिंक जोड़ें]" — use a real, verified detail from your research or omit it. Never fabricate a source, quote, name or number.
+- Weave any required elements (expert view, data, reader takeaway, any disclaimer) naturally into the prose and short plain-text subheadings — not as a checklist.
+Where the brief's voice conflicts with the generic newspaper framing above, the brief wins; facts still come only from your research.
+
+BRIEF:
+${magPrompt}`
       : "";
 
     const langLine = isHi
