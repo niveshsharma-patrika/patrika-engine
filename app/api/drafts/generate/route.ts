@@ -559,13 +559,35 @@ ${magPrompt}`
     const maxOutputTokens = Math.min(15000, Math.ceil(targetWords * (isHi ? 9 : 3)) + 800);
 
     // Headline options generated from the finished article (no search needed).
+    // Catchy, click-worthy Hindi-web style — NOT dry academic headlines.
+    const nTitles = p?.numberOfTitles ?? 4;
+    const headlinePromptFor = (article: string): string =>
+      isHi
+        ? `तुम एक लोकप्रिय हिंदी न्यूज़ वेबसाइट (जैसे राजस्थान पत्रिका / अमर उजाला / दैनिक भास्कर) के हेडलाइन राइटर हो। नीचे दिए लेख के लिए ${nTitles} अलग-अलग, आकर्षक और क्लिक करने लायक हिंदी हेडलाइन लिखो — ऐसी जिन पर पाठक सच में क्लिक करें।
+
+शैली:
+• रोज़मर्रा की बोलचाल वाली सरल, चटपटी हिंदी। जहाँ लोग वैसे ही बोलते हैं, वहाँ आम अंग्रेज़ी शब्द देवनागरी में इस्तेमाल करो (जैसे प्रेग्नेंसी, टिप्स, फिट, हेल्थ, डाइट) — भारी/किताबी शब्दों (गर्भावस्था, परामर्श, "का सकारात्मक प्रभाव") की जगह।
+• जिज्ञासा या सवाल वाला हुक, या पाठक को साफ़ फायदा/वादा — अक्सर दो हिस्सों में: हुक + पेऑफ़। उदाहरण शैली: "प्रेग्नेंसी और बच्चा जनने के बाद मानसिक स्वास्थ्य के लिए क्या करें? टिप्स फॉलो कर शीघ्र हो जाएंगे फिट"।
+• सीधे पाठक से बात करो; उपयोगी और तुरंत काम आने वाला महसूस हो।
+• सूखी, शोध-पत्र जैसी, कोलन-स्टाइल "अध्ययन में साबित / का सकारात्मक प्रभाव / नया अध्ययन" वाली हेडलाइन बिल्कुल मत लिखो।
+• लेख के तथ्यों के प्रति सही रहो — आकर्षक हो, पर भ्रामक या झूठा नहीं।
+
+${nTitles} विकल्प "titles" ऐरे में दो।
+
+लेख:
+${article.slice(0, 2500)}`
+        : `You are a headline writer for a popular news website. Write ${nTitles} distinct, catchy, click-worthy English headlines for the article below — the kind readers actually tap. Use a question / curiosity hook OR a clear reader benefit, often in two parts (hook + payoff). Everyday punchy language; speak directly to the reader. Do NOT write dry, academic "study proves / a new study on… / positive effect of…" headlines. Stay accurate to the article — catchy, not misleading. Return them in the "titles" array.
+
+ARTICLE:
+${article.slice(0, 2500)}`;
+
     const headlinesFrom = async (article: string): Promise<string[]> => {
       try {
         const h = await generateObject({
           model: drafting.model,
           schema: z.object({ titles: z.array(z.string()).min(2).max(8) }),
-          prompt: `Write ${p?.numberOfTitles ?? 4} distinct newspaper headline options (each 8-14 words) ${isHi ? "in Hindi" : "in English"} for this article:\n\n${article.slice(0, 2500)}\n\nReturn them in the "titles" array.`,
-          temperature: 0.6,
+          prompt: headlinePromptFor(article),
+          temperature: 0.75,
         });
         return [topic, ...h.object.titles.filter((t) => t.trim() && t.trim() !== topic)];
       } catch {
