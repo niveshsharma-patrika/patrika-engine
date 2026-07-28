@@ -53,10 +53,13 @@ export async function POST(req: Request) {
 
   const model = process.env.IMAGE_MODEL ?? "gpt-image-1";
   const prompt =
-    `A realistic editorial news PHOTOGRAPH illustrating this story: "${title}". ` +
-    `Photojournalistic press photo — natural lighting, real people and real settings, authentic Indian context, shot on a DSLR with shallow depth of field. ` +
-    `NOT an illustration, NOT a cartoon, NOT 3D-rendered, NOT a painting. ` +
-    `Absolutely NO text, no words, no letters, no numbers, no watermark, no logos.`;
+    `Create a vibrant, professional FEATURED IMAGE (news thumbnail / cover) for an Indian Hindi news article, in the polished style of leading Hindi news portals (Rajasthan Patrika / Amar Ujala). Landscape, 3:2.\n\n` +
+    `ARTICLE TITLE: "${title}"\n\n` +
+    `COMPOSITION:\n` +
+    `• LEFT ~45% of the frame: the title as LARGE, BOLD Hindi (Devanagari) text — a SHORT, punchy version of the title above, about 4–8 words on 2–3 stacked lines. Heavy poster-style Devanagari font, multi-colour (deep navy blue + bright red + black), with a subtle white outline/glow so it stands out. Spell the Hindi correctly and clearly.\n` +
+    `• RIGHT ~55%: a bright, photorealistic editorial illustration of the SUBJECT of the title — the relevant real-world objects, documents, devices or props on a clean surface, PLUS one simple graphic element that visually explains the topic (e.g. a chart, a magnifying glass, a clean icon). Blend realistic photography with tidy infographic touches.\n\n` +
+    `STYLE: eye-catching, high-contrast, well-lit studio look, sharp and modern, trustworthy and uncluttered. A small relevant accent icon (e.g. a glowing bulb) is fine. ` +
+    `Do NOT put any other paragraphs of text, gibberish letters, fake logos or watermarks anywhere — ONLY the short title text.`;
 
   try {
     const res = await fetch("https://api.openai.com/v1/images/generations", {

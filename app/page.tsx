@@ -1082,8 +1082,8 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey }: {
                   ) : (
                     <div className="rounded-xl border border-dashed border-[var(--border)] p-5 text-center text-[11px] text-[var(--text-3)] mb-2 leading-snug">
                       {lang === "hi"
-                        ? "हेडलाइन से एक आर्टिकल इमेज बनाएँ (उसमें कोई टेक्स्ट नहीं होगा)।"
-                        : "Generate an article image from the headline (no text baked in)."}
+                        ? "हेडलाइन से एक फ़ीचर्ड इमेज बनाएँ (शीर्षक इमेज पर होगा)।"
+                        : "Generate a featured image from the headline (title shown on the image)."}
                     </div>
                   )}
                   <button
