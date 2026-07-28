@@ -794,6 +794,10 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey }: {
             </div>
           </div>
 
+          {/* Patrika+ composer keeps only language + target words + generate;
+              the trending composer (no magazineKey) shows all controls. */}
+          {!magazineKey && (
+          <>
           {trend?.uid && (
             <EnhGroup title={lang === "hi" ? "स्टोरी एंगल" : "Story Angle"}>
               {angles && angles.length > 0 ? (
@@ -912,6 +916,26 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey }: {
               />
             </div>
           </EnhGroup>
+          </>
+          )}
+
+          {/* Patrika+ composer: just the target word count. */}
+          {magazineKey && (
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">
+                {lang === "hi" ? "लक्ष्य शब्द संख्या" : "Target Word Count"}
+              </label>
+              <input
+                type="number"
+                min={100}
+                max={2000}
+                step={50}
+                value={wordCount}
+                onChange={(e) => setWordCount(Math.max(100, Math.min(2000, Number(e.target.value) || 100)))}
+                className="w-full bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)]"
+              />
+            </div>
+          )}
 
           <button
             onClick={handleGenerate}
