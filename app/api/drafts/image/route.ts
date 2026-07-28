@@ -52,14 +52,17 @@ export async function POST(req: Request) {
   }
 
   const model = process.env.IMAGE_MODEL ?? "gpt-image-1";
-  const prompt =
-    `Create a vibrant, professional FEATURED IMAGE (news thumbnail / cover) for an Indian Hindi news article, in the polished style of leading Hindi news portals (Rajasthan Patrika / Amar Ujala). Landscape, 3:2.\n\n` +
-    `ARTICLE TITLE: "${title}"\n\n` +
-    `COMPOSITION:\n` +
-    `• LEFT ~45% of the frame: the title as LARGE, BOLD Hindi (Devanagari) text — a SHORT, punchy version of the title above, about 4–8 words on 2–3 stacked lines. Heavy poster-style Devanagari font, multi-colour (deep navy blue + bright red + black), with a subtle white outline/glow so it stands out. Spell the Hindi correctly and clearly.\n` +
-    `• RIGHT ~55%: a bright, photorealistic editorial illustration of the SUBJECT of the title — the relevant real-world objects, documents, devices or props on a clean surface, PLUS one simple graphic element that visually explains the topic (e.g. a chart, a magnifying glass, a clean icon). Blend realistic photography with tidy infographic touches.\n\n` +
-    `STYLE: eye-catching, high-contrast, well-lit studio look, sharp and modern, trustworthy and uncluttered. A small relevant accent icon (e.g. a glowing bulb) is fine. ` +
-    `Do NOT put any other paragraphs of text, gibberish letters, fake logos or watermarks anywhere — ONLY the short title text.`;
+  const prompt = [
+    `Create a premium, ultra-realistic Hindi news FEATURE IMAGE / thumbnail, 3:2 landscape, in the clean editorial style of top Indian digital news portals (Patrika, Aaj Tak, TV9, ABP). High-CTR, mobile-friendly and instantly understandable.`,
+    `ARTICLE TOPIC: "${title}"`,
+    `LAYOUT — split composition:`,
+    `• LEFT ~40–45%: the main subject / person / object of the topic, photorealistic, sharp focus, realistic natural lighting.`,
+    `• RIGHT ~55%: relevant supporting visuals — real objects, icons, documents, charts or illustrations that represent the topic.`,
+    `HEADLINE: place a LARGE, BOLD Hindi (Devanagari) headline — a short, punchy version of the topic, 2–3 lines, 8–12 words max, occupying about 35–40% of the frame. Heavy poster-style font, strong contrast: dark blue (#153B7A), deep red (#D32F2F) and black, with a white outline and soft shadow for readability. Highlight any important NUMBER in yellow. Spell the Hindi exactly and clearly — no broken characters.`,
+    `STYLE: photorealistic, bright natural light, slight warm grading, premium magazine look, clean white/cream background with a subtle gradient, soft depth of field, realistic shadows and reflections, DSLR / 8K detail, cinematic lighting, high dynamic range, balanced composition. Use ONLY visuals directly related to the topic (e.g. documents, bills, calculator, currency, healthy food, medical icons, government symbols, technology, charts, magnifying glass, light effects). Strong negative space, no clutter.`,
+    `Accent colours: blue, red, green for health topics, yellow for emphasis, pink only for women's topics.`,
+    `Do NOT add any logos, watermark, branding, borders, stock-photo look, extra paragraphs of text or gibberish letters — ONLY the short Hindi headline.`,
+  ].join("\n");
 
   try {
     const res = await fetch("https://api.openai.com/v1/images/generations", {
