@@ -540,6 +540,8 @@ export async function POST(req: Request) {
       ? `\n\nPATRIKA+ SPECIAL CONTENT — write in the voice of the Patrika+ "${magKey}" desk. Use the brief below ONLY as guidance for voice, tone and WHAT to cover. However the brief is worded, your OUTPUT MUST be ONE continuous, fully-written article body in flowing prose:
 - Do NOT print field labels ("हेडलाइन:", "हुक इंट्रो:", "समस्या:", "CTA:", "टैग:", "WhatsApp…", "इन्फोग्राफिक…", "Suggested Tags", etc.).
 - Do NOT include a separate headline line, a WhatsApp teaser, infographic bullet points, or a tag list in the body — ONLY the article itself. (The headline is generated separately.)
+- Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…" or any sentence describing that this is a feature.
+- Write in FLOWING PARAGRAPHS as the default; use a list only for a genuine step-by-step or one short key-points summary — never render explanation, research or context as bullets.
 - NEVER leave a placeholder such as "[सोर्स जोड़ें]" / "[स्रोत/लिंक जोड़ें]" — use a real, verified detail from your research or omit it. Never fabricate a source, quote, name or number.
 - Weave any required elements (expert view, data, reader takeaway, any disclaimer) naturally into the prose and short plain-text subheadings — not as a checklist.
 Where the brief's voice conflicts with the generic newspaper framing above, the brief wins; facts still come only from your research.
@@ -593,8 +595,11 @@ If a specific fact can't be verified, leave it out rather than guessing.
 WRITE a comprehensive, engaging feature:
 • ${langLine}
 • Depth over brevity: aim for at least ${targetWords} words and expand as the material warrants to cover the context richly. Do not pad, but never drop real substance to hit a number.
-• STRUCTURE it for a reader: a strong intro that states the key development and hooks; then several thematic SECTIONS, each led by a SHORT subheading on its own line (plain text — no #, no **); use bullet lines (start with "• ") for any list (agencies, benefits, steps, the biggest-improving spots, the worsening spots, figures); end with a forward-looking conclusion (what's next / why it matters).
-• Give the reader the explainers they'd want as their OWN sections — e.g. "how does this work?", "what is <the scheme/tech>?", relevant other-city / global examples.
+• Write a FLOWING FEATURE in real paragraphs — that is the default. Open DIRECTLY with the article's first line (a strong lede). NEVER begin with a preface such as "यहाँ प्रस्तुत है…", "इस लेख में…", "प्रस्तुत है…", "Here is…" or any sentence that describes this as a feature/article — just start the article itself.
+• Break the piece into a few sections, each under a SHORT natural subheading (a question or a short phrase, plain text — no #, no **). Under each subheading write 2–4 sentence PARAGRAPHS that explain and narrate; weave research, figures and expert views INTO the prose, attributed to the real source.
+• Use a bulleted or numbered list ONLY where the content is genuinely a list — a step-by-step how-to, or ONE short "key points" summary — at most one or two lists in the whole article. NEVER turn explanation, research findings or context into bullets; those must be written as paragraphs. A comparison table is fine when it genuinely compares items.
+• Give the reader the explainers they'd want as their OWN prose sections — e.g. "how does this work?", "what is <the scheme/tech>?", relevant other-city / global examples.
+• End with a forward-looking conclusion paragraph.
 • Newspaper voice, Patrika style. Do NOT name other news outlets. No source links or URLs in the text (no "[label](url)" or "(https://…)"), but KEEP every specific fact, date, number and name you found.
 • End with the conclusion itself — do NOT append any note about word count, sources, or "facts verified".
 • Never refuse; always produce the full finished article.
@@ -642,7 +647,7 @@ TOPIC: ${topic}
 
 ${sourcesBlock}${langLine}
 • Depth: at least ${targetWords} words — a full feature, not a brief.
-• STRUCTURE: a strong intro, then thematic SECTIONS each with a SHORT subheading on its own line (plain text — no #, no **); use bullet lines ("• ") for any list; add explainer sections the reader wants ("how does this work?", "what is <the scheme>?", other-city / global examples); close with a forward-looking conclusion.
+• Write a FLOWING FEATURE in paragraphs. Open DIRECTLY with the lede — NEVER with a preface like "यहाँ प्रस्तुत है…" / "Here is…" or any line describing this as a feature. Break into sections under SHORT natural subheadings (plain text — no #, no **) with 2–4 sentence paragraphs under each. Use a bulleted/numbered list ONLY for a genuine step-by-step or ONE short key-points summary — never turn explanation into bullets. Close with a forward-looking conclusion paragraph.
 ${sourcesRule}
 • Do NOT invent specific figures, names or dates beyond what's given/established — keep unverified specifics general rather than fabricating.
 • End with the conclusion itself — no note about word count or sources.
