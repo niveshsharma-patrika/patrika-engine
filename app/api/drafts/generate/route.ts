@@ -10,9 +10,10 @@ import { searchGoogleNews } from "@/lib/sources/google-news";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 
-// Web-search-grounded drafting (write-on-a-topic) does live research, so give
-// it generous room before the proxy/serverless cut-off.
-export const maxDuration = 180;
+// Web-search-grounded drafting (write-on-a-topic) does live research — and now
+// a conditional second "expand" pass — so give it generous room before the
+// proxy/serverless cut-off (nginx proxy_read_timeout is 200s).
+export const maxDuration = 200;
 import { createAdminClient } from "@/lib/supabase/server";
 
 /**
@@ -589,7 +590,8 @@ Match the treatment to the topic. Most Patrika+ lifestyle / health / finance top
 
 STEP 2 — RESEARCH for that form:
 • NEWS: latest status, exact figures/dates/names, official specifics, reactions, what's next.
-• EXPLAINER: the substance a reader actually needs — how it works, the practical steps and options, expert-recommended best practices, real benefits with evidence, precautions and common mistakes, relatable examples. Bring in a real study or expert view where it builds trust, attributed to the real source.
+• EXPLAINER: the substance a reader actually needs — how it works, the practical steps and options, expert-recommended best practices, real benefits with evidence, precautions and common mistakes, relatable examples.
+• EVIDENCE MUST BE SPECIFIC AND NAMED — this is important: cite REAL studies, institutions, experts or official data with concrete detail. Name the study / institution / journal / expert and the year, and give the exact finding (sample size, percentage, figure). Do NOT write a vague "एक अध्ययन में पाया गया / a study found / एक और शोध बताता है" without naming it. Include at least 3–4 such concrete, attributed data points or expert views, woven into the prose.
 • Either way: verify names, numbers and claims; if something can't be verified, leave it out. Never fabricate a source, quote, figure or name, and never leave a placeholder like "[सोर्स जोड़ें]".
 
 STEP 3 — WRITE:
@@ -616,13 +618,49 @@ ${framing}${magazineBlock}`;
         },
       });
 
-      const clean = stripCitations(bodyRes.text);
+      let finalBody = stripCitations(bodyRes.text);
+      let sourceCount = bodyRes.sources?.length ?? 0;
+      const wc = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+
+      // Length top-up. Models chronically undershoot Hindi word targets, so if
+      // the draft is materially short, do ONE more web-search pass that expands
+      // it with REAL added substance — more named studies/data + practical
+      // depth — not filler. Only runs when needed, to keep latency down.
+      if (wc(finalBody) < targetWords * 0.8) {
+        try {
+          const expandRes = await generateText({
+            model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
+            prompt: `The Hindi article below is too SHORT — it is about ${wc(finalBody)} words but must be about ${targetWords} words. Expand it to roughly ${targetWords} words by ADDING real substance, NOT filler or repetition: research further with web search for MORE specific, NAMED studies / institutions / experts / official data (with exact figures, years, sample sizes) and add practical detail, steps, examples and useful sections. Keep everything already correct, and keep the same structure, voice and flowing-prose style. Do NOT add any preface or any note about length/sources. ${langLine}
+
+Return ONLY the full expanded article.
+
+ARTICLE:
+${finalBody}`,
+            temperature: 0.3,
+            maxOutputTokens,
+            tools: {
+              web_search: openai.tools.webSearch({
+                searchContextSize: "high",
+                userLocation: { type: "approximate", country: "IN" },
+              }),
+            },
+          });
+          const expanded = stripCitations(expandRes.text);
+          if (wc(expanded) > wc(finalBody)) {
+            finalBody = expanded;
+            sourceCount += expandRes.sources?.length ?? 0;
+          }
+        } catch (e) {
+          console.error("Expand pass failed; using original draft:", e);
+        }
+      }
+
       return Response.json({
-        titles: await headlinesFrom(clean),
+        titles: await headlinesFrom(finalBody),
         title: topic,
-        body: clean,
+        body: finalBody,
         mode: parsed.data.mode,
-        sources: bodyRes.sources?.length ?? 0,
+        sources: sourceCount,
       });
      } catch (e) {
        console.error("Web-search draft failed; falling back to headline search:", e);
