@@ -674,12 +674,25 @@ ${text}`,
       .split(/[\s,.।–—\-:;!?()"'“”]+/)
       .map((t) => t.replace(/[^\p{L}\p{N}\p{M}]/gu, ""))
       .filter((t) => t.length >= 3);
+    // News-oriented desks (and plain topic entry) get a LENIENT gate so the
+    // source list is complete: Google already ranked these results for the
+    // query, and a long specific headline rarely shares 2+ EXACT tokens with a
+    // short article title (plus script mismatches like "MSP" vs "एमएसपी") — so
+    // requiring 2 over-filters real coverage down to almost nothing. Evergreen
+    // desks keep the STRICT gate, so a how-to/explainer isn't grounded on
+    // tangential news that merely shares one keyword (e.g. yoga-day news under a
+    // "yoga for seniors" guide).
+    const NEWS_DESKS = new Set([
+      "politics-power", "crime-files", "city-pulse", "game-on", "rural-panchayat",
+    ]);
+    const newsLike = !magKey || NEWS_DESKS.has(magKey);
     const isRelevant = (title: string): boolean => {
       if (topicTokens.length === 0) return false;
       const t = title.toLowerCase();
       const overlap = new Set(topicTokens.filter((tok) => t.includes(tok))).size;
-      // ≥2 shared meaningful tokens (≥1 when the topic itself is very short).
-      return overlap >= (topicTokens.length <= 2 ? 1 : 2);
+      // News/plain: any shared meaningful token. Evergreen: ≥2 (≥1 if the topic
+      // itself is very short).
+      return overlap >= (newsLike || topicTokens.length <= 2 ? 1 : 2);
     };
 
     let groundingHits: TopicHit[] = [];
