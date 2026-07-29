@@ -23,7 +23,11 @@ export type Magazine = {
   // Optional desk-specific angle filters. When present, the desk shows a filter
   // picker; the chosen filter's `brief` steers both idea generation and the
   // article. `brief` is a Hindi instruction usable in either prompt.
-  filters?: Array<{ key: string; label: string; brief: string }>;
+  //
+  // `newsQueries`: when a filter needs the LATEST real news (e.g. current
+  // political issues), these Google-News search terms fetch fresh, dated
+  // headlines that seed idea generation — a live feed, fresher than open search.
+  filters?: Array<{ key: string; label: string; brief: string; newsQueries?: string[] }>;
 };
 
 // Reusable brief for the "on this day" filter — injected with today's IST date.
@@ -53,7 +57,11 @@ export const MAGAZINES: Magazine[] = [
     subVerticals: ["चर्चित सीट की सामाजिक बनावट", "नेता के गृह क्षेत्र की हकीकत", "बदलता राजनीतिक रुख", "पुराने राजनीतिक गढ़", "वादे बनाम जमीन"],
     filters: [
       { key: "current", label: "वर्तमान राजनीतिक मुद्दे",
-        brief: "अभी चर्चा में चल रहे किसी एक ताज़ा राजनीतिक मुद्दे/घटनाक्रम पर केंद्रित रहो — हालिया और पूरी तरह सत्यापित तथ्यों के साथ। राष्ट्रीय और अलग-अलग राज्यों दोनों के मुद्दे लो — सिर्फ़ राजस्थान नहीं, देशभर की राजनीति। आइडिया बनाते समय हर बार अलग-अलग, विविध मुद्दे दो — एक ही मुद्दे/दल/घटना के इर्द-गिर्द दोहराव नहीं; अलग-अलग राज्य, दल, नीति, चुनाव, विवाद, संसद व शासन के मुद्दे कवर करो। घटनाओं का क्रम, तारीख और स्थान सटीक व सत्यापित रखो — अनिश्चित हो तो सामान्य रखो, गलत विवरण मत गढ़ो।" },
+        brief: "अभी चर्चा में चल रहे किसी एक ताज़ा राजनीतिक मुद्दे/घटनाक्रम पर केंद्रित रहो — हालिया और पूरी तरह सत्यापित तथ्यों के साथ। राष्ट्रीय और अलग-अलग राज्यों दोनों के मुद्दे लो — सिर्फ़ राजस्थान नहीं, देशभर की राजनीति। आइडिया बनाते समय हर बार अलग-अलग, विविध मुद्दे दो — एक ही मुद्दे/दल/घटना के इर्द-गिर्द दोहराव नहीं; अलग-अलग राज्य, दल, नीति, चुनाव, विवाद, संसद व शासन के मुद्दे कवर करो। घटनाओं का क्रम, तारीख और स्थान सटीक व सत्यापित रखो — अनिश्चित हो तो सामान्य रखो, गलत विवरण मत गढ़ो।",
+        newsQueries: [
+          "भारत राजनीति", "संसद सत्र", "भारत चुनाव", "सरकार नीति फैसला",
+          "विपक्ष सरकार", "विधानसभा राजनीति", "मुख्यमंत्री", "भाजपा कांग्रेस",
+        ] },
       { key: "this-day", label: THIS_DAY_LABEL,
         brief: "'इतिहास में आज' शैली — आज की तारीख से जुड़ी किसी उल्लेखनीय भारतीय राजनीतिक/सत्ता/शासन की सच्ची घटना की कहानी (देशभर से)। घटना का वर्ष, तारीख और तथ्य सत्यापित हों — कोई अनुमानित या गलत तारीख नहीं। उसका संदर्भ और आज से जुड़ाव बताओ। हर बार अलग घटना चुनो।" },
       { key: "profile", label: "चर्चित नेता प्रोफ़ाइल",

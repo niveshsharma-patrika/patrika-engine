@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { getEffectiveDirectives } from "@/lib/ai/directives";
 import { MAGAZINE_BY_KEY } from "@/lib/magazines";
+import { searchGoogleNews } from "@/lib/sources/google-news";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 160;
@@ -43,11 +44,50 @@ export async function POST(req: Request) {
     timeZone: "Asia/Kolkata", day: "numeric", month: "long",
   });
 
-  // ── Web-search research step (best-effort) ──────────────────────────
+  // ── Latest-news / research step (best-effort) ──────────────────────
   // Gathers timely, specific context so the ideas aren't generic.
   let currentContext = "";
+  let contextSource: "news" | "search" | "" = "";
+
+  // (A) LIVE Google-News headlines — the freshest source of "what's in the news
+  // now". Used for filters that carry newsQueries (e.g. current political
+  // issues). Real, dated headlines from the last few days across several themes.
+  if (filter?.newsQueries?.length) {
+    try {
+      const batches = await Promise.all(
+        filter.newsQueries.map((q) => searchGoogleNews(q, "hi", 8))
+      );
+      const seen = new Set<string>();
+      const items = batches
+        .flat()
+        .filter((h) => {
+          const k = h.title.toLowerCase().slice(0, 60);
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        })
+        .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+        .slice(0, 28);
+      if (items.length) {
+        currentContext =
+          items
+            .map((h) => {
+              const d = new Date(h.publishedAt).toLocaleDateString("hi-IN", {
+                timeZone: "Asia/Kolkata", day: "numeric", month: "short",
+              });
+              return `• ${h.title} — ${h.source} (${d})`;
+            })
+            .join("\n");
+        contextSource = "news";
+      }
+    } catch (e) {
+      console.error("Google News fetch for ideas failed:", e);
+    }
+  }
+
+  // (B) Otherwise (or if the news fetch was empty): an OpenAI web-search digest.
   const openaiKey = await getApiKey("openai");
-  if (openaiKey) {
+  if (!currentContext && openaiKey) {
     let query: string;
     if (filter?.key === "current") {
       query = `भारत में इस समय चर्चा में चल रहे अलग-अलग, विविध प्रमुख राजनीतिक मुद्दे — राष्ट्रीय और विभिन्न राज्यों से, अलग-अलग दलों, नीतियों, चुनावों, संसद, विवादों और शासन से जुड़े। कम से कम 8–10 भिन्न-भिन्न मुद्दे, हर एक का नाम, सही तारीख/घटनाक्रम और ठोस विवरण।`;
@@ -76,6 +116,7 @@ export async function POST(req: Request) {
         },
       });
       currentContext = (research.text ?? "").trim();
+      if (currentContext) contextSource = "search";
     } catch (e) {
       console.error("Ideas research step failed; continuing without it:", e);
     }
@@ -85,9 +126,11 @@ export async function POST(req: Request) {
   const filterBlock = filter
     ? `\n\nचुना गया एंगल/फ़िल्टर: "${filter.label}"\nसभी आइडिया इसी एंगल के होने चाहिए — ${filter.brief}\nहर आइडिया एक अलग, भिन्न विषय/घटना/व्यक्ति पर हो — आपस में दोहराव या मिलते-जुलते आइडिया बिल्कुल नहीं; तथ्य व तारीखें सही हों।`
     : "";
-  const contextBlock = currentContext
-    ? `\n\nवर्तमान संदर्भ (इन ताज़ा, ठोस तथ्यों पर आधारित समयोचित आइडिया बनाओ — इनमें से जो प्रासंगिक हो उसका उपयोग करो):\n${currentContext}`
-    : "";
+  const contextBlock = !currentContext
+    ? ""
+    : contextSource === "news"
+    ? `\n\nपिछले कुछ दिनों की असली, ताज़ा राजनीतिक हेडलाइनें (Google News से) — इन्हीं में जो अभी चर्चा में है, उसी पर आधारित अलग-अलग, विविध आइडिया बनाओ। इन्हीं ताज़ा मुद्दों से चुनो, पुरानी/स्मृति-आधारित बातें मत डालो:\n${currentContext}`
+    : `\n\nवर्तमान संदर्भ (इन ताज़ा, ठोस तथ्यों पर आधारित समयोचित आइडिया बनाओ — इनमें से जो प्रासंगिक हो उसका उपयोग करो):\n${currentContext}`;
   const prompt = `${basePrompt}${filterBlock}${contextBlock}`;
 
   try {
