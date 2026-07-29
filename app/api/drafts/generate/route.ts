@@ -658,7 +658,8 @@ STEP 2 — RESEARCH for that form:
 • NEWS: latest status, exact figures/dates/names, official specifics, reactions, what's next.
 • EXPLAINER: the substance a reader actually needs — how it works, the practical steps and options, expert-recommended best practices, real benefits with evidence, precautions and common mistakes, relatable examples.
 • EVIDENCE MUST BE SPECIFIC AND NAMED — this is important: cite REAL studies, institutions, experts or official data with concrete detail. Name the study / institution / journal / expert and the year, and give the exact finding (sample size, percentage, figure). Do NOT write a vague "एक अध्ययन में पाया गया / a study found / एक और शोध बताता है" without naming it. Include at least 3–4 such concrete, attributed data points or expert views, woven into the prose.
-• Either way: verify names, numbers and claims; if something can't be verified, leave it out. Never fabricate a source, quote, figure or name, and never leave a placeholder like "[सोर्स जोड़ें]".
+• CHRONOLOGY & SEQUENCE — when the story involves a series of events (a movement, controversy, campaign, protest, timeline), verify the ORDER, DATES and PLACES of each event from the sources and cross-check them. Do NOT guess or assume which happened FIRST/second, the exact date, or the location — a wrong "पहला प्रदर्शन X में हुआ" or a wrong date is a serious error. If the exact date/order/place cannot be confirmed, keep it general rather than asserting a wrong specific.
+• Either way: verify names, numbers, dates and claims; if something can't be verified, leave it out. Never fabricate a source, quote, figure, name or date, and never leave a placeholder like "[सोर्स जोड़ें]".
 
 STEP 3 — WRITE:
 • ${langLine}

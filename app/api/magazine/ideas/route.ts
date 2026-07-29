@@ -50,22 +50,22 @@ export async function POST(req: Request) {
   if (openaiKey) {
     let query: string;
     if (filter?.key === "current") {
-      query = `भारत में इस समय चर्चा में चल रहे प्रमुख राजनीतिक मुद्दे, बहसें और ताज़ा घटनाक्रम — नाम, तारीख और ठोस विवरण के साथ।`;
+      query = `भारत में इस समय चर्चा में चल रहे अलग-अलग, विविध प्रमुख राजनीतिक मुद्दे — राष्ट्रीय और विभिन्न राज्यों से, अलग-अलग दलों, नीतियों, चुनावों, संसद, विवादों और शासन से जुड़े। कम से कम 8–10 भिन्न-भिन्न मुद्दे, हर एक का नाम, सही तारीख/घटनाक्रम और ठोस विवरण।`;
     } else if (filter?.key === "this-day") {
-      query = `आज ${istToday} — "इतिहास में आज" — इस तारीख से जुड़ी भारतीय राजनीति, सत्ता और शासन की उल्लेखनीय ऐतिहासिक घटनाएँ (वर्ष व विवरण के साथ)।`;
+      query = `आज ${istToday} — "इतिहास में आज" — इस तारीख से जुड़ी भारतीय राजनीति, सत्ता और शासन की उल्लेखनीय ऐतिहासिक घटनाएँ (सही वर्ष व सत्यापित विवरण के साथ; कई अलग-अलग घटनाएँ)।`;
     } else if (filter?.key === "profile") {
-      query = `अभी भारत की सुर्खियों और चर्चा में मौजूद नेता कौन हैं और क्यों — हालिया घटनाक्रम, नाम और संदर्भ।`;
+      query = `अभी भारत की सुर्खियों और चर्चा में मौजूद अलग-अलग नेता कौन हैं और क्यों — कई नाम, हालिया घटनाक्रम, सही तारीखें और संदर्भ।`;
     } else if (filter?.key === "govt-history") {
-      query = `भारत की विभिन्न सरकारों/शासनकालों की उल्लेखनीय ऐतिहासिक कहानियाँ — बड़े फैसले, उपलब्धियाँ और विवाद (तथ्यों के साथ)।`;
+      query = `भारत की विभिन्न सरकारों/शासनकालों (केंद्र व राज्य) की उल्लेखनीय ऐतिहासिक कहानियाँ — बड़े फैसले, उपलब्धियाँ और विवाद (सत्यापित तथ्यों व सही कालक्रम के साथ; कई अलग-अलग)।`;
     } else {
-      query = `"${mag.nameHi}" (${mag.reader}) के लिए अभी प्रासंगिक ताज़ा जानकारी, ट्रेंड और घटनाक्रम — ठोस, हालिया और भारत-केंद्रित।`;
+      query = `"${mag.nameHi}" (${mag.reader}) के लिए अभी प्रासंगिक अलग-अलग ताज़ा जानकारी, ट्रेंड और घटनाक्रम — ठोस, हालिया, विविध और भारत-केंद्रित।`;
     }
 
     try {
       const openai = createOpenAI({ apiKey: openaiKey });
       const research = await generateText({
         model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
-        prompt: `Research with web search and return a CONCISE digest (8–12 bullet points, in Hindi) of timely, SPECIFIC, verified facts for this brief. Include names, dates, numbers and concrete specifics — no vague statements, no invented facts.\n\nBRIEF: ${query}`,
+        prompt: `Research with web search and return a CONCISE digest (8–12 bullet points, in Hindi) of timely, verified facts for this brief. Each bullet must be a DISTINCT topic/event — cover VARIETY, never the same topic repeated. Include names, CORRECT dates, the right ORDER/sequence of events, numbers and concrete specifics; cross-check dates. No vague statements, no invented or wrongly-dated facts.\n\nBRIEF: ${query}`,
         temperature: 0.3,
         maxOutputTokens: 1200,
         tools: {
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
 
   // ── Build the final idea prompt ─────────────────────────────────────
   const filterBlock = filter
-    ? `\n\nचुना गया एंगल/फ़िल्टर: "${filter.label}"\nसभी आइडिया इसी एंगल के होने चाहिए — ${filter.brief}`
+    ? `\n\nचुना गया एंगल/फ़िल्टर: "${filter.label}"\nसभी आइडिया इसी एंगल के होने चाहिए — ${filter.brief}\nहर आइडिया एक अलग, भिन्न विषय/घटना/व्यक्ति पर हो — आपस में दोहराव या मिलते-जुलते आइडिया बिल्कुल नहीं; तथ्य व तारीखें सही हों।`
     : "";
   const contextBlock = currentContext
     ? `\n\nवर्तमान संदर्भ (इन ताज़ा, ठोस तथ्यों पर आधारित समयोचित आइडिया बनाओ — इनमें से जो प्रासंगिक हो उसका उपयोग करो):\n${currentContext}`
