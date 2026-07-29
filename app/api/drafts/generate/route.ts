@@ -657,6 +657,7 @@ ${text}`,
     //   • Time-bounded — each source's fetch chain is capped so one hung
     //     publisher can't stall the batch or eat the 200s request budget.
     const genStartMs = Date.now();
+    const elapsed = () => Date.now() - genStartMs;
     const fmtDate = (iso: string): string =>
       new Date(iso).toLocaleDateString(isHi ? "hi-IN" : "en-IN", {
         timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric",
@@ -743,7 +744,7 @@ Match the treatment to the topic. Most Patrika+ lifestyle / health / finance top
 STEP 2 — RESEARCH for that form:
 • NEWS: latest status, exact figures/dates/names, official specifics, reactions, what's next.
 • EXPLAINER: the substance a reader actually needs — how it works, the practical steps and options, expert-recommended best practices, real benefits with evidence, precautions and common mistakes, relatable examples.
-• EVIDENCE MUST BE SPECIFIC AND NAMED — this is important: cite REAL studies, institutions, experts or official data with concrete detail. Name the study / institution / journal / expert and the year, and give the exact finding (sample size, percentage, figure). Do NOT write a vague "एक अध्ययन में पाया गया / a study found / एक और शोध बताता है" without naming it. Include at least 3–4 such concrete, attributed data points or expert views, woven into the prose.
+• EVIDENCE — REAL OR NOTHING. When your research gives you a REAL, verifiable study / institution / expert / official figure, name it precisely (name + year + the exact finding: sample size, percentage, figure) and weave it in. But NEVER invent one to sound authoritative: do NOT fabricate an expert, a person, a quote, a study, an institution or a statistic. A made-up "कृषि विशेषज्ञ डॉ. राजेश वर्मा ने कहा…" or "एक अध्ययन के अनुसार 7%…" with no real source is a SERIOUS error — worse than having no quote at all. If you do not have a real, named source for a point, either state it as plain general guidance with NO fake attribution, or leave it out. Also avoid the vague "एक अध्ययन में पाया गया / a study found" with no name. Accuracy beats specificity: prefer fewer real facts over more invented ones. Do not attach a fake expert name or a made-up number to generic advice.
 • CHRONOLOGY & SEQUENCE — when the story involves a series of events (a movement, controversy, campaign, protest, timeline), verify the ORDER, DATES and PLACES of each event from the sources and cross-check them. Do NOT guess or assume which happened FIRST/second, the exact date, or the location — a wrong "पहला प्रदर्शन X में हुआ" or a wrong date is a serious error. If the exact date/order/place cannot be confirmed, keep it general rather than asserting a wrong specific.
 • Either way: verify names, numbers, dates and claims; if something can't be verified, leave it out. Never fabricate a source, quote, figure, name or date, and never leave a placeholder like "[सोर्स जोड़ें]".
 
@@ -752,6 +753,7 @@ STEP 3 — WRITE:
 • SIMPLE, EVERYDAY LANGUAGE for the common reader (आम पाठक). Avoid hard, bookish or heavily Sanskritised words and unexplained English/scientific jargon — e.g. do NOT write "परिसंचरण" (say "खून का दौरा/रक्त का बहाव"). If a technical term is truly needed (VO2max, ग्लाइसेमिक, बायोमार्कर, इंसुलिन प्रतिरोध), explain it in plain words in brackets. Keep it conversational and easy to follow.
 • CORRECT HINDI: grammatically correct, with accurate spelling and matras/vowel-signs — e.g. "चलो" not "चलों", "जैमर" not "जामर" — and natural, well-formed sentences (सही वाक्य-बनावट).
 • INTERNAL CONSISTENCY: keep numbers, frequencies and dosages consistent and non-contradictory. If different studies used different protocols (e.g. 10 min 3×/week vs 10 min 2×/day), attribute each figure clearly to its own study, and give the reader ONE clear, coherent recommendation — never blend conflicting frequencies into confusing advice.
+• FACTUAL INTEGRITY: every named person, quote, statistic, and proper noun (a scheme / report / law / place name) in the article must be REAL and traceable to your research — never invented, never a placeholder name. Get official names EXACTLY right (e.g. a government scheme's official title); if you are not sure of the exact official name, use the wording your sources actually use and don't guess a title. Do not present a number as precise ("7% राजस्व घाटा", "76,633 करोड़") unless a source gives it — otherwise keep it general.
 • LENGTH: about ${targetWords} words — treat this as a firm target, not a rough hint. If you are running short, ADD more genuine depth (more practical detail, more sections, examples) — never stop early, and never pad with filler.
 • Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…", "Here is…" or any line that describes this as a feature/article.
 • FLOWING PARAGRAPHS are the default — 2–4 sentence paragraphs under SHORT natural subheadings (a question or short phrase; plain text — no #, no **). Weave facts, evidence and expert views INTO the prose, attributed.
@@ -778,44 +780,71 @@ ${framing}${magazineBlock}`;
       let sourceCount = bodyRes.sources?.length ?? 0;
       const wc = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
-      // Length top-up. Models chronically undershoot Hindi word targets, so if
-      // the draft is materially short, do ONE more web-search pass that expands
-      // it with REAL added substance — more named studies/data + practical
-      // depth — not filler. Only runs when needed, to keep latency down.
-      // Expand only if there's still budget: this is a second web-search pass
-      // (30–90s) and, added to grounding + the first pass + polish, could push a
-      // Hindi generation past the 200s request cutoff and lose the whole draft.
-      if (wc(finalBody) < targetWords * 0.8 && Date.now() - genStartMs < 130_000) {
+      // Fact-check + refine pass. The draft can still (a) invent a named expert
+      // or quote, (b) state an un-sourced statistic as precise, (c) get an
+      // official proper noun (a scheme/report name) wrong, or (d) fall short of
+      // the length. This ONE more web-search pass verifies every check-worthy
+      // specific and returns a corrected article — stripping fabricated
+      // people/quotes, fixing wrong numbers/names/dates, and expanding with REAL
+      // substance if short. It's the automated version of the desk's own fact
+      // check. Time-gated: skipped when the request is already close to the 200s
+      // cutoff, so it can't cost us the whole draft (the prompt-level guards
+      // above are the fallback in that rare case).
+      const short = wc(finalBody) < targetWords * 0.8;
+      // Gate at 95s elapsed: this pass can take ~40–65s and must leave room for
+      // the polish + headline passes before the 200s cutoff.
+      if (elapsed() < 95_000) {
         try {
-          const expandRes = await generateText({
+          const expandNote = short
+            ? `\n- LENGTH: the draft is about ${wc(finalBody)} words but should be about ${targetWords} — expand it to roughly ${targetWords} words by ADDING real, VERIFIED substance (more genuine detail, examples, sections), never filler or repetition.`
+            : `\n- Keep the length about the same (~${wc(finalBody)} words); do not pad.`;
+          const verifyRes = await generateText({
             model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
-            prompt: `The Hindi article below is too SHORT — it is about ${wc(finalBody)} words but must be about ${targetWords} words. Expand it to roughly ${targetWords} words by ADDING real substance, NOT filler or repetition: research further with web search for MORE specific, NAMED studies / institutions / experts / official data (with exact figures, years, sample sizes) and add practical detail, steps, examples and useful sections. Keep everything already correct, and keep the same structure, voice and flowing-prose style. Use SIMPLE everyday language for the common reader (avoid hard/technical words; explain any needed term in plain words). Keep all numbers and frequencies CONSISTENT — do not introduce contradictory figures. Do NOT add any preface, any note about length/sources, or any line saying what kind of article this is. ${langLine}
+            prompt: `You are a rigorous fact-checker AND copy-editor for Patrika. Below is a draft article. Using web search, VERIFY every check-worthy specific and return a CORRECTED, publish-ready version.
 
-Return ONLY the full expanded article.
+Verify: every named person and their quotes; every statistic / number / amount / percentage; every proper noun — scheme / yojana / report / law / place / organisation names (get the OFFICIAL name EXACTLY right); every date and the ORDER of events.
+
+Then rewrite so that:
+- Any named expert / person / quote you CANNOT verify as real is REMOVED — turn it into plain, unattributed guidance or drop it. NEVER keep an invented person (e.g. a generic "डॉ. राजेश वर्मा ने कहा…"). Do not replace it with another made-up name.
+- Any statistic / number you cannot corroborate is corrected to the real figure, or made general — no fake-precise numbers (e.g. do not assert "7% राजस्व घाटा" or "76,633 करोड़" if no source supports it).
+- Proper nouns are corrected to their official / correct form (e.g. a government scheme's real official name); if the exact official name is unclear, use the wording sources use rather than guessing.
+- Wrong dates / sequences are fixed; anything you cannot confirm is kept general, not asserted.
+- Everything you CAN verify stays; add any missing key real fact you find while checking.${expandNote}
+- Preserve the voice, structure, flowing-prose style and SIMPLE everyday language. Do NOT introduce any NEW unverified claim. Do NOT add a preface or any note about fact-checking / length / sources. Do NOT name news outlets. ${langLine}
+
+Return ONLY the corrected article — nothing else.
 
 ARTICLE:
 ${finalBody}`,
-            temperature: 0.3,
+            temperature: 0.2,
             maxOutputTokens,
             tools: {
               web_search: openai.tools.webSearch({
-                searchContextSize: "high",
+                // "medium" (vs the body pass's "high") — this pass is
+                // verify-and-correct, not deep research, so trade a little
+                // context for meaningfully lower latency near the 200s budget.
+                searchContextSize: "medium",
                 userLocation: { type: "approximate", country: "IN" },
               }),
             },
           });
-          const expanded = stripCitations(expandRes.text);
-          if (wc(expanded) > wc(finalBody)) {
-            finalBody = expanded;
-            sourceCount += expandRes.sources?.length ?? 0;
+          const refined = stripCitations(verifyRes.text);
+          // Guard against a truncated / blank return wiping a good draft: the
+          // fact-check legitimately shortens (removing fabrications), but a
+          // collapse to a fragment means the pass failed — keep the original.
+          if (wc(refined) >= wc(finalBody) * 0.6) {
+            finalBody = refined;
+            sourceCount += verifyRes.sources?.length ?? 0;
           }
         } catch (e) {
-          console.error("Expand pass failed; using original draft:", e);
+          console.error("Fact-check/refine pass failed; using original draft:", e);
         }
       }
 
       // Final Hindi language clean-up (spelling / matras / sentence flow).
-      finalBody = await polishHindi(finalBody);
+      // Skip if we're already near the cutoff — headlines still need to run and
+      // losing the whole draft to a timeout is far worse than an unpolished one.
+      if (elapsed() < 160_000) finalBody = await polishHindi(finalBody);
 
       return Response.json({
         titles: await headlinesFrom(finalBody),
@@ -854,6 +883,7 @@ ${sourcesBlock}${langLine}
 • Write a FLOWING FEATURE in paragraphs. Open DIRECTLY with the lede — NEVER with a preface like "यहाँ प्रस्तुत है…" / "Here is…" or any line describing this as a feature. Break into sections under SHORT natural subheadings (plain text — no #, no **) with 2–4 sentence paragraphs under each. Use a bulleted/numbered list ONLY for a genuine step-by-step or ONE short key-points summary — never turn explanation into bullets. Close with a forward-looking conclusion paragraph.
 ${sourcesRule}
 • Do NOT invent specific figures, names or dates beyond what's given/established — keep unverified specifics general rather than fabricating.
+• NEVER fabricate a named expert, person, quote, study or statistic to sound authoritative (no made-up "डॉ. राजेश वर्मा ने कहा…", no "एक अध्ययन के अनुसार 7%…"). If you lack a real named source, give plain unattributed guidance or omit it. Get official proper nouns (scheme / report / law names) exactly right, or use the wording you are sure of.
 • End with the conclusion itself — no note about word count or sources.
 • Never refuse; always produce the article. Do NOT name other news outlets.
 ${framing}${magazineBlock}`;
