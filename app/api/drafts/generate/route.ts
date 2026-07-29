@@ -15,7 +15,10 @@ import { MAGAZINE_BY_KEY } from "@/lib/magazines";
 // Web-search-grounded drafting (write-on-a-topic) does live research — and now
 // a conditional second "expand" pass — so give it generous room before the
 // proxy/serverless cut-off (nginx proxy_read_timeout is 200s).
-export const maxDuration = 200;
+// Strictly under nginx's 200s proxy_read_timeout so the runtime aborts a
+// runaway before the proxy 504s (and the whole in-flight draft is lost). The
+// pass-level elapsed() gates below budget the tail to finish by ~185s.
+export const maxDuration = 195;
 import { createAdminClient } from "@/lib/supabase/server";
 
 /**
@@ -768,6 +771,10 @@ ${framing}${magazineBlock}`;
         prompt: bodyPrompt,
         temperature: 0.3,
         maxOutputTokens,
+        // Bound the one otherwise-unbounded pass: if the research call hangs, abort
+        // at 150s and fall through to the (budget-guarded) fallback rather than
+        // letting nginx 504 the whole request at 200s.
+        abortSignal: AbortSignal.timeout(150_000),
         tools: {
           web_search: openai.tools.webSearch({
             searchContextSize: "high",
@@ -791,16 +798,18 @@ ${framing}${magazineBlock}`;
       // cutoff, so it can't cost us the whole draft (the prompt-level guards
       // above are the fallback in that rare case).
       const short = wc(finalBody) < targetWords * 0.8;
-      // Gate at 95s elapsed: this pass can take ~40–65s and must leave room for
-      // the polish + headline passes before the 200s cutoff.
-      if (elapsed() < 95_000) {
+      let verified = false;
+      // Gate at 90s elapsed: this pass can take ~40–65s and must still leave
+      // room for the (cheap) headline pass before the 200s cutoff. The whole
+      // tail is budgeted so the request finishes by ~185s (15s under nginx 200s).
+      if (elapsed() < 90_000) {
         try {
           const expandNote = short
             ? `\n- LENGTH: the draft is about ${wc(finalBody)} words but should be about ${targetWords} — expand it to roughly ${targetWords} words by ADDING real, VERIFIED substance (more genuine detail, examples, sections), never filler or repetition.`
-            : `\n- Keep the length about the same (~${wc(finalBody)} words); do not pad.`;
+            : `\n- Keep the length about the same (~${wc(finalBody)} words); do not pad. If removing fabricated material makes it shorter, that is fine — a shorter, fully-true article is better than a padded one.`;
           const verifyRes = await generateText({
             model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
-            prompt: `You are a rigorous fact-checker AND copy-editor for Patrika. Below is a draft article. Using web search, VERIFY every check-worthy specific and return a CORRECTED, publish-ready version.
+            prompt: `You are a rigorous fact-checker AND copy-editor for Patrika. Below is a draft article. Using web search AND the SOURCE REPORTING provided, VERIFY every check-worthy specific and return a CORRECTED, publish-ready version.
 
 Verify: every named person and their quotes; every statistic / number / amount / percentage; every proper noun — scheme / yojana / report / law / place / organisation names (get the OFFICIAL name EXACTLY right); every date and the ORDER of events.
 
@@ -809,8 +818,8 @@ Then rewrite so that:
 - Any statistic / number you cannot corroborate is corrected to the real figure, or made general — no fake-precise numbers (e.g. do not assert "7% राजस्व घाटा" or "76,633 करोड़" if no source supports it).
 - Proper nouns are corrected to their official / correct form (e.g. a government scheme's real official name); if the exact official name is unclear, use the wording sources use rather than guessing.
 - Wrong dates / sequences are fixed; anything you cannot confirm is kept general, not asserted.
-- Everything you CAN verify stays; add any missing key real fact you find while checking.${expandNote}
-- Preserve the voice, structure, flowing-prose style and SIMPLE everyday language. Do NOT introduce any NEW unverified claim. Do NOT add a preface or any note about fact-checking / length / sources. Do NOT name news outlets. ${langLine}
+- Everything you CAN verify stays — do NOT strip a fact merely because you did not personally re-find it; only remove things that are clearly fabricated or contradicted. Add any missing key real fact you find while checking.${expandNote}
+- Preserve the voice, structure, flowing-prose style and SIMPLE everyday language. Do NOT introduce any NEW unverified claim. Do NOT add a preface or any note about fact-checking / length / sources. Do NOT name news outlets. ${langLine}${sourceGrounding}
 
 Return ONLY the corrected article — nothing else.
 
@@ -818,6 +827,9 @@ ARTICLE:
 ${finalBody}`,
             temperature: 0.2,
             maxOutputTokens,
+            // Bound the pass so a hang can't blow the tail budget — on abort the
+            // catch below keeps the (already good) draft.
+            abortSignal: AbortSignal.timeout(75_000),
             tools: {
               web_search: openai.tools.webSearch({
                 // "medium" (vs the body pass's "high") — this pass is
@@ -829,11 +841,17 @@ ${finalBody}`,
             },
           });
           const refined = stripCitations(verifyRes.text);
-          // Guard against a truncated / blank return wiping a good draft: the
-          // fact-check legitimately shortens (removing fabrications), but a
-          // collapse to a fragment means the pass failed — keep the original.
-          if (wc(refined) >= wc(finalBody) * 0.6) {
+          // Accept the fact-checked version unless it looks structurally BROKEN
+          // (empty, or truncated mid-sentence). Deliberately NOT gated on a ratio
+          // of the ORIGINAL length: a good fact-check legitimately SHORTENS a
+          // heavily-fabricated draft, and gating on the (fabrication-inflated)
+          // original would reject the correct version and republish the fake one
+          // — the exact failure this pass exists to prevent. Floor is tied to the
+          // target, so only a true fragment is rejected.
+          const refinedComplete = /[।.!?…"”'’)\]]\s*$/.test(refined.trim());
+          if (refined && refinedComplete && wc(refined) >= Math.min(150, Math.round(targetWords * 0.4))) {
             finalBody = refined;
+            verified = true;
             sourceCount += verifyRes.sources?.length ?? 0;
           }
         } catch (e) {
@@ -841,13 +859,16 @@ ${finalBody}`,
         }
       }
 
-      // Final Hindi language clean-up (spelling / matras / sentence flow).
-      // Skip if we're already near the cutoff — headlines still need to run and
-      // losing the whole draft to a timeout is far worse than an unpolished one.
-      if (elapsed() < 160_000) finalBody = await polishHindi(finalBody);
+      // Hindi language clean-up (spelling / matras / sentence flow). The verify
+      // pass already copy-edits, so run this dedicated polish ONLY when verify
+      // did not run — never stack both tails against the 200s cutoff — and only
+      // with budget left.
+      if (!verified && elapsed() < 125_000) finalBody = await polishHindi(finalBody);
 
       return Response.json({
-        titles: await headlinesFrom(finalBody),
+        // Headlines are cheap but not free; if we're near the cutoff, fall back
+        // to just the topic so the finished body still returns instead of 504ing.
+        titles: elapsed() < 170_000 ? await headlinesFrom(finalBody) : [topic],
         title: topic,
         body: finalBody,
         mode: parsed.data.mode,
@@ -887,15 +908,27 @@ ${sourcesRule}
 • End with the conclusion itself — no note about word count or sources.
 • Never refuse; always produce the article. Do NOT name other news outlets.
 ${framing}${magazineBlock}`;
+    // If the web-search path already burned most of the budget before throwing,
+    // don't start a fresh full generation that would 504 anyway — fail cleanly
+    // so the user can retry, rather than losing everything to a proxy timeout.
+    if (elapsed() > 150_000) {
+      return Response.json(
+        { error: "The article took too long to generate — please hit Generate again." },
+        { status: 503 }
+      );
+    }
     const fbRes = await generateText({
       model: drafting.model,
       prompt: fbPrompt,
       temperature: 0.3,
       maxOutputTokens,
     });
-    const fbBody = await polishHindi(fbRes.text.trim());
+    // Same tail budgeting as the primary path: skip polish / fall back to the
+    // bare topic for headlines if we're near the cutoff.
+    const fbBody =
+      elapsed() < 150_000 ? await polishHindi(fbRes.text.trim()) : fbRes.text.trim();
     return Response.json({
-      titles: await headlinesFrom(fbBody),
+      titles: elapsed() < 170_000 ? await headlinesFrom(fbBody) : [topic],
       title: topic,
       body: fbBody,
       mode: parsed.data.mode,
