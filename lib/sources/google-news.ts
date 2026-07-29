@@ -166,13 +166,19 @@ export type TopicHit = { source: string; title: string; url: string; publishedAt
 /**
  * On-demand topic search against Google News RSS — used by "Write on a topic"
  * to ground an article in CURRENT reporting instead of the model's stale memory.
- * Returns the most recent, de-duplicated hits (last ~10 days). Never throws:
- * on any failure it returns [] so the caller falls back to a knowledge-only draft.
+ * Returns the most recent, de-duplicated hits. Never throws: on any failure it
+ * returns [] so the caller falls back to a knowledge-only draft.
+ *
+ * `maxAgeDays` bounds how far back hits may be. The default 10 days suits
+ * "what's breaking now" callers (idea generation, corroboration); article
+ * GROUNDING passes a wider window so an event's recent OUTCOME (a bill passed /
+ * defeated weeks ago, a new appointment) is caught, not just today's headlines.
  */
 export async function searchGoogleNews(
   query: string,
   lang: "en" | "hi",
-  limit = 10
+  limit = 10,
+  maxAgeDays = 10
 ): Promise<TopicHit[]> {
   const q = query.trim().slice(0, 250);
   if (!q) return [];
@@ -201,7 +207,7 @@ export async function searchGoogleNews(
   }
 
   const items = parsed.rss?.channel?.item ?? [];
-  const cutoff = Date.now() - 10 * 86_400_000; // last ~10 days
+  const cutoff = Date.now() - maxAgeDays * 86_400_000;
   const hits: TopicHit[] = [];
   for (const item of items) {
     const titleRaw = s(item.title);

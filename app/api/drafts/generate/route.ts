@@ -685,7 +685,11 @@ ${text}`,
     let groundingHits: TopicHit[] = [];
     let sourceGrounding = "";
     try {
-      groundingHits = await searchGoogleNews(topic, parsed.data.lang, 8);
+      // Wider window (60 days, vs the 10-day default) so a recent OUTCOME — a
+      // bill passed/defeated, a new appointment weeks ago — is surfaced for
+      // grounding, not just the last week's headlines. Older outcomes (and any
+      // topic Google News RSS doesn't index) are the OpenAI web search's job.
+      groundingHits = await searchGoogleNews(topic, parsed.data.lang, 8, 60);
       const relevant = groundingHits.filter((h) => isRelevant(h.title)).slice(0, 5);
       if (relevant.length) {
         // Cap each source's fetch chain (decode page + batchexecute + enrich =
@@ -749,6 +753,7 @@ STEP 2 — RESEARCH for that form:
 • EXPLAINER: the substance a reader actually needs — how it works, the practical steps and options, expert-recommended best practices, real benefits with evidence, precautions and common mistakes, relatable examples.
 • EVIDENCE — REAL OR NOTHING. When your research gives you a REAL, verifiable study / institution / expert / official figure, name it precisely (name + year + the exact finding: sample size, percentage, figure) and weave it in. But NEVER invent one to sound authoritative: do NOT fabricate an expert, a person, a quote, a study, an institution or a statistic. A made-up "कृषि विशेषज्ञ डॉ. राजेश वर्मा ने कहा…" or "एक अध्ययन के अनुसार 7%…" with no real source is a SERIOUS error — worse than having no quote at all. If you do not have a real, named source for a point, either state it as plain general guidance with NO fake attribution, or leave it out. Also avoid the vague "एक अध्ययन में पाया गया / a study found" with no name. Accuracy beats specificity: prefer fewer real facts over more invented ones. Do not attach a fake expert name or a made-up number to generic advice.
 • CHRONOLOGY & SEQUENCE — when the story involves a series of events (a movement, controversy, campaign, protest, timeline), verify the ORDER, DATES and PLACES of each event from the sources and cross-check them. Do NOT guess or assume which happened FIRST/second, the exact date, or the location — a wrong "पहला प्रदर्शन X में हुआ" or a wrong date is a serious error. If the exact date/order/place cannot be confirmed, keep it general rather than asserting a wrong specific.
+• LATEST STATUS / OUTCOME — this is critical: for EVERY event, bill, policy, appointment, contest, case or claim you mention, research and report its CURRENT status, not the point at which it was announced. Actively search for what happened NEXT: was the bill passed, defeated, withdrawn or stalled? did the leader win, lose, resign or get appointed — and who holds the post NOW? was the scheme launched, delayed or scrapped? A story frozen at its announcement is a factual error: "a bill was introduced" is worthless (even harmful) if it has since been defeated. Search terms like "[topic] latest / result / outcome / passed or defeated / new [post]" and lead with what is true TODAY (${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}). If you cannot confirm the current status, do not assert an outdated one — describe it in general terms.
 • Either way: verify names, numbers, dates and claims; if something can't be verified, leave it out. Never fabricate a source, quote, figure, name or date, and never leave a placeholder like "[सोर्स जोड़ें]".
 
 STEP 3 — WRITE:
@@ -756,7 +761,8 @@ STEP 3 — WRITE:
 • SIMPLE, EVERYDAY LANGUAGE for the common reader (आम पाठक). Avoid hard, bookish or heavily Sanskritised words and unexplained English/scientific jargon — e.g. do NOT write "परिसंचरण" (say "खून का दौरा/रक्त का बहाव"). If a technical term is truly needed (VO2max, ग्लाइसेमिक, बायोमार्कर, इंसुलिन प्रतिरोध), explain it in plain words in brackets. Keep it conversational and easy to follow.
 • CORRECT HINDI: grammatically correct, with accurate spelling and matras/vowel-signs — e.g. "चलो" not "चलों", "जैमर" not "जामर" — and natural, well-formed sentences (सही वाक्य-बनावट).
 • INTERNAL CONSISTENCY: keep numbers, frequencies and dosages consistent and non-contradictory. If different studies used different protocols (e.g. 10 min 3×/week vs 10 min 2×/day), attribute each figure clearly to its own study, and give the reader ONE clear, coherent recommendation — never blend conflicting frequencies into confusing advice.
-• FACTUAL INTEGRITY: every named person, quote, statistic, and proper noun (a scheme / report / law / place name) in the article must be REAL and traceable to your research — never invented, never a placeholder name. Get official names EXACTLY right (e.g. a government scheme's official title); if you are not sure of the exact official name, use the wording your sources actually use and don't guess a title. Do not present a number as precise ("7% राजस्व घाटा", "76,633 करोड़") unless a source gives it — otherwise keep it general.
+• FACTUAL INTEGRITY: every named person, quote, statistic, and proper noun (a scheme / report / law / place name) in the article must be REAL and traceable to your research — never invented, never a placeholder name. Get official names EXACTLY right (e.g. a government scheme's official title); if you are not sure of the exact official name, use the wording your sources actually use and don't guess a title. Do not present a number as precise ("7% राजस्व घाटा", "76,633 करोड़") unless a source gives it — otherwise keep it general. Report the CURRENT status of every event (a bill's actual outcome, who holds a post NOW), never a stale "was announced / introduced" framing.
+• SILENT — never show your working. If you cannot confirm a specific (a figure, a dated quote, an event's status), simply DROP it and write the sentence as the plain general truth — do NOT keep the specific with a caveat and do NOT tell the reader you did this. NEVER write meta-lines like "इसकी पुष्टि नहीं मिली", "सामान्य रूप में प्रस्तुत किया गया है", "नाम/उद्धरण उपलब्ध नहीं हैं" or "सभी तथ्य की पुष्टि की गई है". The reader sees only a clean, confident article.
 • LENGTH: about ${targetWords} words — treat this as a firm target, not a rough hint. If you are running short, ADD more genuine depth (more practical detail, more sections, examples) — never stop early, and never pad with filler.
 • Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…", "Here is…" or any line that describes this as a feature/article.
 • FLOWING PARAGRAPHS are the default — 2–4 sentence paragraphs under SHORT natural subheadings (a question or short phrase; plain text — no #, no **). Weave facts, evidence and expert views INTO the prose, attributed.
@@ -813,13 +819,16 @@ ${framing}${magazineBlock}`;
 
 Verify: every named person and their quotes; every statistic / number / amount / percentage; every proper noun — scheme / yojana / report / law / place / organisation names (get the OFFICIAL name EXACTLY right); every date and the ORDER of events.
 
+MOST IMPORTANT — CHECK THE LATEST STATUS OF EVERY EVENT, not just whether the claim was once true. For every bill, policy, appointment, contest, case or announcement in the draft, search for what happened SINCE and whether the draft's framing is still current: a bill the draft calls "proposed / pending / introduced" may since have been PASSED, DEFEATED or WITHDRAWN; a leader the draft calls "in the running / state president" may since have WON, LOST, RESIGNED or become CM. If the draft froze the story at its announcement, UPDATE it to today's reality (${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}) and add the outcome. A true-but-stale statement (correct when written, wrong now) is a factual error and must be fixed.
+
 Then rewrite so that:
 - Any named expert / person / quote you CANNOT verify as real is REMOVED — turn it into plain, unattributed guidance or drop it. NEVER keep an invented person (e.g. a generic "डॉ. राजेश वर्मा ने कहा…"). Do not replace it with another made-up name.
 - Any statistic / number you cannot corroborate is corrected to the real figure, or made general — no fake-precise numbers (e.g. do not assert "7% राजस्व घाटा" or "76,633 करोड़" if no source supports it).
-- Proper nouns are corrected to their official / correct form (e.g. a government scheme's real official name); if the exact official name is unclear, use the wording sources use rather than guessing.
-- Wrong dates / sequences are fixed; anything you cannot confirm is kept general, not asserted.
-- Everything you CAN verify stays — do NOT strip a fact merely because you did not personally re-find it; only remove things that are clearly fabricated or contradicted. Add any missing key real fact you find while checking.${expandNote}
-- Preserve the voice, structure, flowing-prose style and SIMPLE everyday language. Do NOT introduce any NEW unverified claim. Do NOT add a preface or any note about fact-checking / length / sources. Do NOT name news outlets. ${langLine}${sourceGrounding}
+- Proper nouns are corrected to their official / correct form; stale statuses are updated to the current one.
+- Wrong or outdated dates / sequences / statuses are fixed; anything you cannot confirm is DROPPED and the sentence rewritten as the plain general truth — never kept with a hedge.
+- Everything you CAN verify stays — do NOT strip a fact merely because you did not personally re-find it; only remove things that are clearly fabricated, contradicted or outdated. Add any missing key real fact you find while checking.${expandNote}
+- SILENT OUTPUT: never tell the reader about your checking. Do NOT write any preface (no "नीचे प्रस्तुत है… संशोधित/तथ्यपरक फीचर", no "सभी तथ्य/आंकड़े की पुष्टि की गई है"), no confidence notes ("इसकी पुष्टि नहीं मिली", "सामान्य रूप में प्रस्तुत किया गया है", "नाम/उद्धरण उपलब्ध नहीं हैं"), and no word-count / sources line. The output is ONLY the clean, confident finished article.
+- Preserve the voice, structure, flowing-prose style and SIMPLE everyday language. Do NOT introduce any NEW unverified claim. Do NOT name news outlets. ${langLine}${sourceGrounding}
 
 Return ONLY the corrected article — nothing else.
 
@@ -905,6 +914,7 @@ ${sourcesBlock}${langLine}
 ${sourcesRule}
 • Do NOT invent specific figures, names or dates beyond what's given/established — keep unverified specifics general rather than fabricating.
 • NEVER fabricate a named expert, person, quote, study or statistic to sound authoritative (no made-up "डॉ. राजेश वर्मा ने कहा…", no "एक अध्ययन के अनुसार 7%…"). If you lack a real named source, give plain unattributed guidance or omit it. Get official proper nouns (scheme / report / law names) exactly right, or use the wording you are sure of.
+• Report the CURRENT status/outcome of any event (a bill's result, who holds a post now) rather than freezing it at its announcement. If you can't confirm a specific, DROP it and write the general truth — never keep it with a hedge, and NEVER write meta-lines like "इसकी पुष्टि नहीं मिली" / "सामान्य रूप में प्रस्तुत" / "सभी तथ्य की पुष्टि की गई है". Output only the clean article.
 • End with the conclusion itself — no note about word count or sources.
 • Never refuse; always produce the article. Do NOT name other news outlets.
 ${framing}${magazineBlock}`;
