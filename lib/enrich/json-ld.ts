@@ -20,6 +20,10 @@
 
 export type EnrichedFields = {
   description: string | null;
+  // Fuller article body text when the page ships JSON-LD `articleBody` — richer
+  // than the short SEO `description`. Optional + only populated from JSON-LD, so
+  // the news pipeline (which reads `description`) is completely unaffected.
+  articleBody?: string | null;
   keywords: string[];
   publisher_section: string | null;
   image: string | null;
@@ -78,6 +82,7 @@ export function parseJsonLd(html: string): EnrichedFields | null {
 
   return {
     description: description ?? null,
+    articleBody: jl?.articleBody ?? null,
     keywords,
     publisher_section: publisher_section ?? null,
     image: image ?? null,
@@ -126,11 +131,16 @@ function pickFromJsonLd(html: string): EnrichedFields | null {
   }
   if (!best) return null;
 
+  // Full-ish article body (decoded, generously capped) for callers that want to
+  // GROUND on real reporting rather than the SEO teaser. `description` keeps its
+  // original computation so the news pipeline's behaviour is byte-identical.
+  const bodyRaw = pickStr(best.articleBody);
   return {
     description:
       pickStr(best.description) ??
       pickStr(best.articleBody)?.slice(0, 600) ??
       null,
+    articleBody: bodyRaw ? decodeEntities(bodyRaw).slice(0, 2000) : null,
     keywords: parseKeywords(best.keywords),
     publisher_section:
       pickStr(best.articleSection) ?? pickStr(best.section) ?? null,
@@ -212,15 +222,36 @@ function pickImageUrl(v: unknown): string | null {
   return null;
 }
 
-function decodeEntities(s: string): string {
+function safeCodePoint(cp: number): string {
+  try {
+    return Number.isFinite(cp) && cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Decode the HTML entities that survive JSON parsing / meta scraping. Numeric
+ * entities run FIRST and `&amp;` runs LAST so a bare `&` can't be mis-chained.
+ * Covers the hex (`&#x27;`) + decimal (`&#8217;`) numerics and the curly-quote /
+ * dash named entities Indian publishers ship, which the old decoder missed and
+ * which were leaking raw into grounded copy.
+ */
+export function decodeEntities(s: string): string {
   return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_m, h: string) => safeCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_m, d: string) => safeCodePoint(parseInt(d, 10)))
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, "&")
+    .replace(/&lsquo;|&rsquo;/g, "’")
+    .replace(/&ldquo;|&rdquo;/g, "”")
+    .replace(/&hellip;/g, "…")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ");
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
 }
 
 function unwrap(x: unknown): unknown[] {

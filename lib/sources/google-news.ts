@@ -234,3 +234,82 @@ export async function searchGoogleNews(
     })
     .slice(0, limit);
 }
+
+/**
+ * Resolve a Google News `/rss/articles/…` redirect link to the REAL publisher
+ * article URL, so we can then fetch and read the actual article body.
+ *
+ * Google no longer 302-redirects these links server-side (a plain fetch just
+ * lands back on Google's own interstitial). The current, documented way to get
+ * the target is Google's internal `batchexecute` endpoint: the article page
+ * carries a per-article signature (`data-n-a-sg`) + timestamp (`data-n-a-ts`) +
+ * id (`data-n-a-id`); posting those to DotsSplashUi returns the publisher URL.
+ *
+ * Best-effort by design — Google can change this scheme without notice, and it
+ * may rate-limit a server IP. On ANY failure it returns null and the caller
+ * falls back to the headline / web-search grounding. Never throws.
+ */
+export async function resolveArticleUrl(googleNewsUrl: string): Promise<string | null> {
+  if (!/news\.google\.com\/rss\/articles\//.test(googleNewsUrl)) {
+    // Already a direct publisher URL (or not a Google News link) — pass through.
+    return /^https?:\/\//.test(googleNewsUrl) && !/news\.google\.com/.test(googleNewsUrl)
+      ? googleNewsUrl
+      : null;
+  }
+  try {
+    // 1. Fetch the article page for the signature/timestamp/id triple.
+    const pageRes = await fetch(googleNewsUrl, {
+      headers: BROWSER_HEADERS,
+      signal: AbortSignal.timeout(10_000),
+      redirect: "follow",
+    });
+    if (!pageRes.ok) return null;
+    const html = await pageRes.text();
+    const ts = /data-n-a-ts="([^"]+)"/.exec(html)?.[1];
+    const sg = /data-n-a-sg="([^"]+)"/.exec(html)?.[1];
+    const aid = /data-n-a-id="([^"]+)"/.exec(html)?.[1];
+    if (!ts || !sg || !aid) return null;
+
+    // 2. Ask Google's batchexecute endpoint to decode the id into a real URL.
+    const inner = JSON.stringify([
+      "garturlreq",
+      [
+        ["X", "X", ["X", "X"], null, null, 1, 1, "US:en", null, 1, null, null, null, null, null, 0, 1],
+        "X", "X", 1, [1, 1, 1], 1, 1, null, 0, 0, null, 0,
+      ],
+      aid,
+      Number(ts),
+      sg,
+    ]);
+    const freq = JSON.stringify([[["Fbv4je", inner, null, "generic"]]]);
+    const beRes = await fetch(
+      "https://news.google.com/_/DotsSplashUi/data/batchexecute",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+          "User-Agent": BROWSER_HEADERS["User-Agent"],
+        },
+        body: new URLSearchParams({ "f.req": freq }).toString(),
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+    if (!beRes.ok) return null;
+    const raw = await beRes.text();
+
+    // Response is XSSI-guarded JSON: strip the )]}' prefix, then find the
+    // Fbv4je payload whose inner ["garturlres", "<url>"] holds the target.
+    const jsonText = raw.replace(/^\)\]\}'/, "").trim();
+    const outer = JSON.parse(jsonText) as unknown[];
+    for (const row of outer) {
+      if (Array.isArray(row) && row[1] === "Fbv4je" && typeof row[2] === "string") {
+        const decoded = JSON.parse(row[2]) as unknown[];
+        const target = decoded[1];
+        if (typeof target === "string" && /^https?:\/\//.test(target)) return target;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
