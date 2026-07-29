@@ -6,7 +6,8 @@ import { getSession } from "@/lib/auth/session";
 import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { getEffectiveDirectives } from "@/lib/ai/directives";
 import { MAGAZINE_BY_KEY } from "@/lib/magazines";
-import { searchGoogleNews } from "@/lib/sources/google-news";
+import { searchGoogleNews, resolveArticleUrl } from "@/lib/sources/google-news";
+import { enrichFromUrl, decodeEntities } from "@/lib/enrich/json-ld";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 160;
@@ -67,21 +68,40 @@ export async function POST(req: Request) {
           return true;
         })
         .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
-        .slice(0, 28);
+        .slice(0, 12);
       if (items.length) {
-        currentContext =
-          items
-            .map((h) => {
-              const d = new Date(h.publishedAt).toLocaleDateString("hi-IN", {
-                timeZone: "Asia/Kolkata", day: "numeric", month: "short",
-              });
-              return `• ${h.title} — ${h.source} (${d})`;
-            })
-            .join("\n");
+        // READ THE WHOLE STORY, not just the headline. Decode each Google News
+        // link to the publisher and pull the article body (same fetch+extract
+        // the article generator uses), so ideas are built on what a story is
+        // ACTUALLY about — not a misread of its headline. Best-effort and
+        // per-source time-capped; falls back to headline-only on any failure.
+        const capped = <T,>(p: Promise<T>, fb: T): Promise<T> =>
+          Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fb), 14_000))]);
+        const read = await Promise.all(
+          items.map((h) =>
+            capped(
+              (async () => {
+                const real = await resolveArticleUrl(h.url).catch(() => null);
+                const ef = real ? await enrichFromUrl(real).catch(() => null) : null;
+                const body = decodeEntities((ef?.articleBody ?? ef?.description ?? "").trim());
+                return { title: h.title, publishedAt: h.publishedAt, body };
+              })(),
+              { title: h.title, publishedAt: h.publishedAt, body: "" }
+            )
+          )
+        );
+        currentContext = read
+          .map((h) => {
+            const d = new Date(h.publishedAt).toLocaleDateString("hi-IN", {
+              timeZone: "Asia/Kolkata", day: "numeric", month: "short",
+            });
+            return `• ${h.title} (${d})${h.body ? `\n  ${h.body.slice(0, 900)}` : ""}`;
+          })
+          .join("\n");
         contextSource = "news";
       }
     } catch (e) {
-      console.error("Google News fetch for ideas failed:", e);
+      console.error("Google News fetch/read for ideas failed:", e);
     }
   }
 
@@ -129,7 +149,7 @@ export async function POST(req: Request) {
   const contextBlock = !currentContext
     ? ""
     : contextSource === "news"
-    ? `\n\nपिछले कुछ दिनों की असली, ताज़ा राजनीतिक हेडलाइनें (Google News से) — इन्हीं में जो अभी चर्चा में है, उसी पर आधारित अलग-अलग, विविध आइडिया बनाओ। इन्हीं ताज़ा मुद्दों से चुनो, पुरानी/स्मृति-आधारित बातें मत डालो:\n${currentContext}`
+    ? `\n\nनीचे पिछले कुछ दिनों की असली, ताज़ा राजनीतिक खबरें हैं (Google News से — हर हेडलाइन के साथ खबर का असली अंश भी)। हर खबर को ध्यान से पढ़ो और समझो कि मामला असल में किस बारे में है — सिर्फ़ हेडलाइन के अनुमान पर मत जाओ। फिर इन्हीं ताज़ा, चर्चित मुद्दों पर आधारित अलग-अलग, विविध आइडिया बनाओ, और खबर के अंश में दिए तथ्यों/घटनाक्रम के अनुरूप ही आइडिया गढ़ो। पुरानी/स्मृति-आधारित बातें मत डालो:\n${currentContext}`
     : `\n\nवर्तमान संदर्भ (इन ताज़ा, ठोस तथ्यों पर आधारित समयोचित आइडिया बनाओ — इनमें से जो प्रासंगिक हो उसका उपयोग करो):\n${currentContext}`;
   const prompt = `${basePrompt}${filterBlock}${contextBlock}`;
 

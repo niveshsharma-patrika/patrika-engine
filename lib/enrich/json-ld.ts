@@ -140,7 +140,7 @@ function pickFromJsonLd(html: string): EnrichedFields | null {
       pickStr(best.description) ??
       pickStr(best.articleBody)?.slice(0, 600) ??
       null,
-    articleBody: bodyRaw ? decodeEntities(bodyRaw).slice(0, 2000) : null,
+    articleBody: bodyRaw ? decodeEntities(bodyRaw).slice(0, 4000) : null,
     keywords: parseKeywords(best.keywords),
     publisher_section:
       pickStr(best.articleSection) ?? pickStr(best.section) ?? null,

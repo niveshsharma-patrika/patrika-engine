@@ -718,7 +718,7 @@ ${text}`,
         // the facts; the excerpt (real article body where we could read it) adds
         // the specifics the writer must not get from memory.
         const list = read
-          .map((r) => `• ${r.title} (${r.date})${r.excerpt ? `\n  ${r.excerpt.slice(0, 900)}` : ""}`)
+          .map((r) => `• ${r.title} (${r.date})${r.excerpt ? `\n  ${r.excerpt.slice(0, 2200)}` : ""}`)
           .join("\n");
         sourceGrounding = `\n\n═══════════════════════════════════════════
 SOURCE REPORTING — recent reports that match this topic (cross-check against these)
