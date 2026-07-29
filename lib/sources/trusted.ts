@@ -1,0 +1,81 @@
+/**
+ * Allowlist of legitimate, established news publishers that Patrika+ content is
+ * allowed to be built from. Both the Google-News grounding AND the OpenAI
+ * web-search citations are filtered through this, so generated articles (and the
+ * source list shown to the desk) draw only from KNOWN outlets — never arbitrary
+ * blogs, SEO/press-release pages or content farms.
+ *
+ * Matching is deliberately generous WITHIN the allowlist (domain OR publisher
+ * name) but closed to anything not listed. Extend the lists below as the desk
+ * approves more outlets — this is the single place to do it.
+ */
+
+// Known publisher domains (exact host or any subdomain of these).
+const TRUSTED_DOMAINS: string[] = [
+  // National English
+  "ndtv.com", "timesofindia.com", "indiatimes.com", "hindustantimes.com", "thehindu.com",
+  "indianexpress.com", "newindianexpress.com", "indiatoday.in", "news18.com", "theprint.in",
+  "thewire.in", "scroll.in", "livemint.com", "business-standard.com", "economictimes.com",
+  "moneycontrol.com", "firstpost.com", "deccanherald.com", "tribuneindia.com", "telegraphindia.com",
+  "outlookindia.com", "thequint.com", "dnaindia.com", "businesstoday.in", "financialexpress.com",
+  // Hindi
+  "bhaskar.com", "dainikbhaskar.com", "bhaskarhindi.com", "jagran.com", "amarujala.com",
+  "patrika.com", "livehindustan.com", "aajtak.in", "abplive.com", "zeenews.india.com",
+  "jansatta.com", "prabhatkhabar.com", "punjabkesari.in", "naidunia.com", "lokmat.news",
+  "lokmatnews.in", "etvbharat.com", "tv9hindi.com", "tv9bharatvarsh.com", "indiatv.in",
+  "indiatvnews.com", "oneindia.com", "jagranjosh.com", "thelallantop.com", "gaonconnection.com",
+  "nationalheraldindia.com", "theweek.in", "frontline.thehindu.com",
+  // TV / other national
+  "cnbctv18.com", "republicworld.com", "timesnownews.com", "wionews.com", "mid-day.com",
+  // Wires / official
+  "ptinews.com", "aninews.in", "uniindia.com", "prsindia.org",
+  // World (for the world desk)
+  "reuters.com", "apnews.com", "bbc.com", "bbc.co.uk", "aljazeera.com", "theguardian.com",
+];
+
+// Government / official domains are always trusted.
+const TRUSTED_TLDS: string[] = [".gov.in", ".nic.in", ".gov"];
+
+// Distinctive publisher-name keywords — used to match the Google-News <source>
+// NAME, which we have before resolving the redirect URL. Kept ≥4 chars / clearly
+// distinctive so they don't false-match arbitrary text.
+const TRUSTED_NAME_KEYWORDS: string[] = [
+  "bhaskar", "jagran", "amar ujala", "amarujala", "patrika", "navbharat times", "hindustan times",
+  "livehindustan", "aaj tak", "aajtak", "abplive", "abp news", "zee news", "zeenews", "ndtv",
+  "times of india", "the hindu", "indian express", "india today", "news18", "theprint",
+  "the print", "the wire", "livemint", "business standard", "economic times", "moneycontrol",
+  "firstpost", "deccan herald", "tribune india", "quint", "lokmat", "etv bharat", "tv9",
+  "india tv", "jansatta", "prabhat khabar", "punjab kesari", "nai dunia", "naidunia", "cnbc",
+  "republic world", "republic bharat", "times now", "reuters", "associated press", "ap news",
+  "al jazeera", "the guardian", "dd news", "doordarshan", "kisan tak", "bharat express",
+  "oneindia", "financial express", "lallantop", "gaon connection", "national herald",
+];
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+/** True when the URL's host is a known publisher (or a government domain). */
+export function isTrustedUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const h = hostOf(url);
+  if (!h) return false;
+  if (TRUSTED_TLDS.some((t) => h === t.slice(1) || h.endsWith(t))) return true;
+  return TRUSTED_DOMAINS.some((d) => h === d || h.endsWith("." + d));
+}
+
+/** True when a Google-News publisher NAME matches a known outlet. */
+export function isTrustedPublisherName(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return TRUSTED_NAME_KEYWORDS.some((k) => n.includes(k));
+}
+
+/** Trusted if EITHER the (resolved) URL host is known OR the publisher name matches. */
+export function isTrustedSource(url: string | null | undefined, publisherName?: string | null): boolean {
+  return isTrustedUrl(url) || isTrustedPublisherName(publisherName);
+}

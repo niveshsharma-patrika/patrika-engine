@@ -7,6 +7,7 @@ import { z } from "zod";
 import { TRENDS } from "@/lib/data/trends";
 import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { searchGoogleNews, resolveArticleUrl, type TopicHit } from "@/lib/sources/google-news";
+import { isTrustedUrl, isTrustedPublisherName } from "@/lib/sources/trusted";
 import { enrichFromUrl, decodeEntities } from "@/lib/enrich/json-ld";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
@@ -715,7 +716,7 @@ ${text}`,
         // up to 3 hops) so a slow/hung publisher can't stall the whole batch.
         const capped = <T,>(p: Promise<T>, fb: T): Promise<T> =>
           Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fb), 16_000))]);
-        const read = await Promise.all(
+        const readAll = await Promise.all(
           relevant.map((h) =>
             capped(
               (async () => {
@@ -725,15 +726,23 @@ ${text}`,
                 const realUrl = await resolveArticleUrl(h.url).catch(() => null);
                 const ef = realUrl ? await enrichFromUrl(realUrl).catch(() => null) : null;
                 const excerpt = decodeEntities((ef?.articleBody ?? ef?.description ?? "").trim());
-                return { title: h.title, source: h.source, url: h.url, date: fmtDate(h.publishedAt), excerpt };
+                return { title: h.title, source: h.source, realUrl, url: realUrl ?? h.url, date: fmtDate(h.publishedAt), excerpt };
               })(),
-              { title: h.title, source: h.source, url: h.url, date: fmtDate(h.publishedAt), excerpt: "" }
+              { title: h.title, source: h.source, realUrl: null as string | null, url: h.url, date: fmtDate(h.publishedAt), excerpt: "" }
             )
           )
         );
+        // Keep ONLY legitimate, known publishers — Patrika+ must not be built
+        // from arbitrary blogs / SEO pages. The RESOLVED domain is authoritative
+        // (so lookalikes like "navbharatlive.com" are rejected even though the
+        // name contains "navbharat"); fall back to the publisher name only when
+        // the redirect could not be decoded to a real URL.
+        const read = readAll.filter((r) =>
+          r.realUrl ? isTrustedUrl(r.realUrl) : isTrustedPublisherName(r.source)
+        );
         const bodiesRead = read.filter((r) => r.excerpt.length > 80).length;
-        // Keep the source list (with publisher + url) for the composer UI — this
-        // is desk-facing transparency, separate from the body prompt which still
+        // Keep the source list (publisher + real article link) for the composer —
+        // desk-facing transparency, separate from the body prompt which still
         // withholds outlet names so they never reach the published article.
         sourceArticles = read.map((r) => ({
           title: r.title, publisher: r.source, url: r.url, date: r.date,
@@ -745,7 +754,7 @@ ${text}`,
         const list = read
           .map((r) => `• ${r.title} (${r.date})${r.excerpt ? `\n  ${r.excerpt.slice(0, 2200)}` : ""}`)
           .join("\n");
-        sourceGrounding = `\n\n═══════════════════════════════════════════
+        sourceGrounding = read.length === 0 ? "" : `\n\n═══════════════════════════════════════════
 SOURCE REPORTING — recent reports that match this topic (cross-check against these)
 ═══════════════════════════════════════════
 Below are recent published reports that appear to match this topic (headline, date${
@@ -768,7 +777,9 @@ ${list}
       for (const raw of srcs ?? []) {
         const s = raw as { url?: string; title?: string };
         const url = typeof s?.url === "string" ? s.url : "";
-        if (!url || seen.has(url)) continue;
+        // Only list citations from known publishers — the web search otherwise
+        // cites arbitrary blogs / SEO pages, which is what "unknown sources" were.
+        if (!url || seen.has(url) || !isTrustedUrl(url)) continue;
         seen.add(url);
         let publisher = "";
         try {
@@ -807,6 +818,7 @@ STEP 2 — RESEARCH for that form:
 • LATEST STATUS / OUTCOME — this is critical: for EVERY event, bill, policy, appointment, contest, case or claim you mention, research and report its CURRENT status, not the point at which it was announced. Actively search for what happened NEXT: was the bill passed, defeated, withdrawn or stalled? did the leader win, lose, resign or get appointed — and who holds the post NOW? was the scheme launched, delayed or scrapped? A story frozen at its announcement is a factual error: "a bill was introduced" is worthless (even harmful) if it has since been defeated. Search terms like "[topic] latest / result / outcome / passed or defeated / new [post]" and lead with what is true TODAY (${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}). If you cannot confirm the current status, do not assert an outdated one — describe it in general terms.
 • REAL CAUSE / DON'T TRUST THE FRAMING — do NOT assume the topic's own framing is the full or correct story. For the central event, protest, movement, controversy or decision, separately research WHY it is actually happening and what it is PRIMARILY about — search "[event] असल वजह / किसलिए / what is it really about / main reason". If the DOMINANT trigger or context differs from the angle you were given (e.g. a farmers' march framed as being about MSP but actually triggered mainly by a proposed trade deal, or a protest framed on one demand when a different one is the real driver), lead with the REAL primary cause and give the supplied angle its correct, secondary weight. Never omit the main driver of an event just because the topic named a narrower one.
 • Either way: verify names, numbers, dates and claims; if something can't be verified, leave it out. Never fabricate a source, quote, figure, name or date, and never leave a placeholder like "[सोर्स जोड़ें]".
+• REPUTABLE SOURCES ONLY — take facts only from established, credible news outlets (e.g. Patrika, Dainik Bhaskar, Amar Ujala, Jagran, NDTV, India Today, The Hindu, Indian Express, Times of India, Reuters, PTI/ANI) and official/government sources. Do NOT rely on unknown blogs, forums, social posts, or SEO / press-release / content-farm pages for any specific fact.
 
 STEP 3 — WRITE:
 • ${langLine}
@@ -938,7 +950,7 @@ ${finalBody}`,
         title: topic,
         body: finalBody,
         mode: parsed.data.mode,
-        sources: sourceArticles.length || sourceCount,
+        sources: sourceArticles.length,
         sourceArticles,
       });
      } catch (e) {
@@ -1000,7 +1012,7 @@ ${framing}${magazineBlock}`;
       title: topic,
       body: fbBody,
       mode: parsed.data.mode,
-      sources: sourceArticles.length || hits.length,
+      sources: sourceArticles.length,
       sourceArticles,
     });
   }

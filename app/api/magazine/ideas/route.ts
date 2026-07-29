@@ -7,6 +7,7 @@ import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { getEffectiveDirectives } from "@/lib/ai/directives";
 import { MAGAZINE_BY_KEY } from "@/lib/magazines";
 import { searchGoogleNews, resolveArticleUrl } from "@/lib/sources/google-news";
+import { isTrustedPublisherName } from "@/lib/sources/trusted";
 import { enrichFromUrl, decodeEntities } from "@/lib/enrich/json-ld";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +62,9 @@ export async function POST(req: Request) {
       const seen = new Set<string>();
       const items = batches
         .flat()
+        // Only established, known outlets — ideas must come from legitimate news,
+        // not arbitrary blogs / SEO pages.
+        .filter((h) => isTrustedPublisherName(h.source))
         .filter((h) => {
           const k = h.title.toLowerCase().slice(0, 60);
           if (seen.has(k)) return false;
