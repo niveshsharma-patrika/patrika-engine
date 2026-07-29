@@ -606,6 +606,40 @@ ${article.slice(0, 2500)}`;
     };
 
     const openaiKey = await getApiKey("openai");
+
+    // Hindi copy-editor pass. AI reliably makes Devanagari spelling / matra
+    // mistakes and some awkward sentences; a focused final pass fixes ONLY the
+    // language (spelling, matras, grammar, flow) without touching facts,
+    // numbers, names, structure or meaning. Uses gpt-4.1 when available (better
+    // Hindi than gpt-4o), else the configured drafting model.
+    const polishHindi = async (text: string): Promise<string> => {
+      if (!isHi || !text.trim()) return text;
+      try {
+        const polishModel = openaiKey
+          ? createOpenAI({ apiKey: openaiKey })(process.env.STYLE_DRAFT_MODEL ?? "gpt-4.1")
+          : drafting.model;
+        const r = await generateText({
+          model: polishModel,
+          prompt: `तुम राजस्थान पत्रिका के अनुभवी हिंदी कॉपी-एडिटर हो। नीचे दिए लेख की केवल भाषा सुधारो:
+• वर्तनी और मात्राओं की हर गलती ठीक करो (उदाहरण: 'चलों' → 'चलो', 'जामर' → 'जैमर')।
+• अटपटे या गलत बनावट वाले वाक्यों को स्वाभाविक, शुद्ध हिंदी में ठीक करो; व्याकरण, कारक और लिंग-वचन सही करो; प्रवाह बेहतर करो।
+• तथ्य, संख्याएँ, नाम, संरचना, उप-शीर्षक और अर्थ बिल्कुल मत बदलो — केवल भाषा सुधारो, और लंबाई लगभग वही रखो।
+• कोई टिप्पणी, शीर्षक या भूमिका मत जोड़ो — सिर्फ सुधरा हुआ पूरा लेख लौटाओ।
+
+लेख:
+${text}`,
+          temperature: 0.2,
+          maxOutputTokens,
+        });
+        const out = r.text.trim();
+        // Guard against a truncated/blank return — keep the original if so.
+        return out.length > text.length * 0.6 ? out : text;
+      } catch (e) {
+        console.error("Hindi polish pass failed; using unpolished text:", e);
+        return text;
+      }
+    };
+
     if (openaiKey) {
      try {
       // Primary: the model researches live sources with web search and grounds
@@ -629,6 +663,7 @@ STEP 2 — RESEARCH for that form:
 STEP 3 — WRITE:
 • ${langLine}
 • SIMPLE, EVERYDAY LANGUAGE for the common reader (आम पाठक). Avoid hard, bookish or heavily Sanskritised words and unexplained English/scientific jargon — e.g. do NOT write "परिसंचरण" (say "खून का दौरा/रक्त का बहाव"). If a technical term is truly needed (VO2max, ग्लाइसेमिक, बायोमार्कर, इंसुलिन प्रतिरोध), explain it in plain words in brackets. Keep it conversational and easy to follow.
+• CORRECT HINDI: grammatically correct, with accurate spelling and matras/vowel-signs — e.g. "चलो" not "चलों", "जैमर" not "जामर" — and natural, well-formed sentences (सही वाक्य-बनावट).
 • INTERNAL CONSISTENCY: keep numbers, frequencies and dosages consistent and non-contradictory. If different studies used different protocols (e.g. 10 min 3×/week vs 10 min 2×/day), attribute each figure clearly to its own study, and give the reader ONE clear, coherent recommendation — never blend conflicting frequencies into confusing advice.
 • LENGTH: about ${targetWords} words — treat this as a firm target, not a rough hint. If you are running short, ADD more genuine depth (more practical detail, more sections, examples) — never stop early, and never pad with filler.
 • Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…", "Here is…" or any line that describes this as a feature/article.
@@ -689,6 +724,9 @@ ${finalBody}`,
         }
       }
 
+      // Final Hindi language clean-up (spelling / matras / sentence flow).
+      finalBody = await polishHindi(finalBody);
+
       return Response.json({
         titles: await headlinesFrom(finalBody),
         title: topic,
@@ -731,10 +769,11 @@ ${framing}${magazineBlock}`;
       temperature: 0.3,
       maxOutputTokens,
     });
+    const fbBody = await polishHindi(fbRes.text.trim());
     return Response.json({
-      titles: await headlinesFrom(fbRes.text),
+      titles: await headlinesFrom(fbBody),
       title: topic,
-      body: fbRes.text.trim(),
+      body: fbBody,
       mode: parsed.data.mode,
       sources: hits.length,
     });
