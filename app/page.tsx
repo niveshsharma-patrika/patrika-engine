@@ -528,6 +528,9 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
   const [imageError, setImageError] = useState<string | null>(null);
   // "Write on a topic" grounding note (how many live sources fed the draft).
   const [genNote, setGenNote] = useState<string | null>(null);
+  const [sourceArticles, setSourceArticles] = useState<
+    { title: string; publisher: string; url: string; date: string }[]
+  >([]);
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const data = e.data as Record<string, unknown> | null;
@@ -565,6 +568,7 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
 
   async function handleGenerate() {
     setGenerating(true);
+    setSourceArticles([]);
     try {
       const res = await fetch("/api/drafts/generate", {
         method: "POST",
@@ -603,6 +607,7 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
         setTitleOptions(opts);
         if (opts.length > 0) setTitle(opts[0]);
         if (json.body) setBody(json.body);
+        setSourceArticles(Array.isArray(json.sourceArticles) ? json.sourceArticles : []);
         if (typeof json.sources === "number") {
           setGenNote(
             json.sources > 0
@@ -975,8 +980,35 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
               className="w-full text-[24px] font-bold leading-tight outline-none mb-2 placeholder:text-[var(--text-3)] placeholder:font-normal"
             />
             {genNote && (
-              <div className="text-[11px] text-[var(--text-3)] mb-4 flex items-center gap-1.5">
+              <div className="text-[11px] text-[var(--text-3)] mb-2 flex items-center gap-1.5">
                 <Rss size={11} className="text-[var(--green)]" /> {genNote}
+              </div>
+            )}
+
+            {sourceArticles.length > 0 && (
+              <div className="mb-4 border border-[var(--border)] rounded-lg bg-[var(--surface-2)] p-3">
+                <div className="text-[11px] font-semibold text-[var(--text-2)] mb-1.5">
+                  {lang === "hi"
+                    ? "स्रोत लेख — इन्हीं खबरों से यह लेख बना है (प्रकाशन से पहले सत्यापित करें)"
+                    : "Source articles — this piece was built from these (verify before publishing)"}
+                </div>
+                <ol className="list-decimal ml-4 space-y-1">
+                  {sourceArticles.map((s, i) => (
+                    <li key={i} className="text-[12px] leading-snug text-[var(--text-2)]">
+                      <a
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-[var(--red)] hover:underline"
+                      >
+                        {s.title}
+                      </a>
+                      <span className="text-[var(--text-3)]">
+                        {s.publisher ? ` · ${s.publisher}` : ""}{s.date ? ` · ${s.date}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
               </div>
             )}
 

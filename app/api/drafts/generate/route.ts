@@ -552,7 +552,7 @@ export async function POST(req: Request) {
       ? `\n\nएंगल/फ़िल्टर — यह पूरा लेख इसी एंगल से लिखो: "${magFilter.label}" — ${magFilter.brief}`
       : "";
     const magazineBlock = (magPrompt
-      ? `\n\nPATRIKA+ SPECIAL CONTENT — write in the voice of the Patrika+ "${magKey}" desk. This is almost always a PRACTICAL EXPLAINER / feature / guide for the reader (wellness, lifestyle, finance, how-to) — NOT a breaking-news roundup; write it that way unless the topic is genuinely a news event. Use the brief below ONLY as guidance for voice, tone and WHAT to cover. However the brief is worded, your OUTPUT MUST be ONE continuous, fully-written article body in flowing prose:
+      ? `\n\nPATRIKA+ SPECIAL CONTENT — write in the voice of the Patrika+ "${magKey}" desk. Patrika+ is SPECIAL CONTENT: an EXPLAINER / ANGLE / feature whose job is to explain the NEWS and — above all — WHAT IT MEANS and WHAT EFFECTS IT HAS for the reader (who is affected, how, why it matters, what to watch, what it could change). It is NOT a breaking-news roundup and NOT a recital of fresh figures. Take the FACTS from the source reporting; spend the article on making sense of them — the impact, the stakes, the angle. Use the brief below ONLY as guidance for voice, tone and WHAT to cover. However the brief is worded, your OUTPUT MUST be ONE continuous, fully-written article body in flowing prose:
 - Do NOT print field labels ("हेडलाइन:", "हुक इंट्रो:", "समस्या:", "CTA:", "टैग:", "WhatsApp…", "इन्फोग्राफिक…", "Suggested Tags", etc.).
 - Do NOT include a separate headline line, a WhatsApp teaser, infographic bullet points, or a tag list in the body — ONLY the article itself. (The headline is generated separately.)
 - Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…" or any sentence describing that this is a feature.
@@ -684,6 +684,9 @@ ${text}`,
 
     let groundingHits: TopicHit[] = [];
     let sourceGrounding = "";
+    // The real source articles we ground on — returned to the composer so the
+    // desk sees (and can open) exactly what the piece was built from.
+    let sourceArticles: { title: string; publisher: string; url: string; date: string }[] = [];
     try {
       // Wider window (60 days, vs the 10-day default) so a recent OUTCOME — a
       // bill passed/defeated, a new appointment weeks ago — is surfaced for
@@ -706,13 +709,19 @@ ${text}`,
                 const realUrl = await resolveArticleUrl(h.url).catch(() => null);
                 const ef = realUrl ? await enrichFromUrl(realUrl).catch(() => null) : null;
                 const excerpt = decodeEntities((ef?.articleBody ?? ef?.description ?? "").trim());
-                return { title: h.title, date: fmtDate(h.publishedAt), excerpt };
+                return { title: h.title, source: h.source, url: h.url, date: fmtDate(h.publishedAt), excerpt };
               })(),
-              { title: h.title, date: fmtDate(h.publishedAt), excerpt: "" }
+              { title: h.title, source: h.source, url: h.url, date: fmtDate(h.publishedAt), excerpt: "" }
             )
           )
         );
         const bodiesRead = read.filter((r) => r.excerpt.length > 80).length;
+        // Keep the source list (with publisher + url) for the composer UI — this
+        // is desk-facing transparency, separate from the body prompt which still
+        // withholds outlet names so they never reach the published article.
+        sourceArticles = read.map((r) => ({
+          title: r.title, publisher: r.source, url: r.url, date: r.date,
+        }));
         // Outlet names are deliberately omitted — the reader must never see them,
         // and every other prompt path withholds them too. Headline + date anchor
         // the facts; the excerpt (real article body where we could read it) adds
@@ -764,6 +773,7 @@ STEP 3 — WRITE:
 • INTERNAL CONSISTENCY: keep numbers, frequencies and dosages consistent and non-contradictory. If different studies used different protocols (e.g. 10 min 3×/week vs 10 min 2×/day), attribute each figure clearly to its own study, and give the reader ONE clear, coherent recommendation — never blend conflicting frequencies into confusing advice.
 • FACTUAL INTEGRITY: every named person, quote, statistic, and proper noun (a scheme / report / law / place name) in the article must be REAL and traceable to your research — never invented, never a placeholder name. Get official names EXACTLY right (e.g. a government scheme's official title); if you are not sure of the exact official name, use the wording your sources actually use and don't guess a title. Do not present a number as precise ("7% राजस्व घाटा", "76,633 करोड़") unless a source gives it — otherwise keep it general. Report the CURRENT status of every event (a bill's actual outcome, who holds a post NOW), never a stale "was announced / introduced" framing.
 • SILENT — never show your working. If you cannot confirm a specific (a figure, a dated quote, an event's status), simply DROP it and write the sentence as the plain general truth — do NOT keep the specific with a caveat and do NOT tell the reader you did this. NEVER write meta-lines like "इसकी पुष्टि नहीं मिली", "सामान्य रूप में प्रस्तुत किया गया है", "नाम/उद्धरण उपलब्ध नहीं हैं" or "सभी तथ्य की पुष्टि की गई है". The reader sees only a clean, confident article.
+• SPECIFICS COME FROM THE SOURCES — this is the safety rule. Every specific number, amount, statistic, name, date, quote and named event MUST come from the SOURCE REPORTING below (or, if you search, only from reporting on THIS SAME story). Do NOT import an unrelated figure/study/expert from elsewhere or from memory, and NEVER invent one. If the sources don't give a specific, don't state one — say it in general terms. You MAY and SHOULD add general explanatory context (what a term/policy/process is, how it works) and reasoned analysis of the news's EFFECTS and implications — that is analysis, not new facts — but it must not smuggle in invented specifics.
 • LENGTH: about ${targetWords} words — treat this as a firm target, not a rough hint. If you are running short, ADD more genuine depth (more practical detail, more sections, examples) — never stop early, and never pad with filler.
 • Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…", "Here is…" or any line that describes this as a feature/article.
 • FLOWING PARAGRAPHS are the default — 2–4 sentence paragraphs under SHORT natural subheadings (a question or short phrase; plain text — no #, no **). Weave facts, evidence and expert views INTO the prose, attributed.
@@ -885,6 +895,7 @@ ${finalBody}`,
         body: finalBody,
         mode: parsed.data.mode,
         sources: sourceCount,
+        sourceArticles,
       });
      } catch (e) {
        console.error("Web-search draft failed; falling back to headline search:", e);
@@ -946,6 +957,7 @@ ${framing}${magazineBlock}`;
       body: fbBody,
       mode: parsed.data.mode,
       sources: hits.length,
+      sourceArticles,
     });
   }
 
