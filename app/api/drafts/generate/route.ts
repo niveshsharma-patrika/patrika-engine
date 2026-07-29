@@ -759,6 +759,32 @@ ${list}
       console.error("Source-reporting grounding failed; continuing with web search only:", e);
     }
 
+    // Add the OpenAI web-search citations to the desk's source list. These are
+    // the actual sources the model cited (real URLs + titles) — previously only
+    // COUNTED ("written from 11 sources") but never listed. Dedupe by URL against
+    // the Google-News grounding sources already collected.
+    const addWebSources = (srcs: readonly unknown[] | undefined): void => {
+      const seen = new Set(sourceArticles.map((s) => s.url));
+      for (const raw of srcs ?? []) {
+        const s = raw as { url?: string; title?: string };
+        const url = typeof s?.url === "string" ? s.url : "";
+        if (!url || seen.has(url)) continue;
+        seen.add(url);
+        let publisher = "";
+        try {
+          publisher = new URL(url).hostname.replace(/^www\./, "");
+        } catch {
+          /* keep publisher empty on an unparseable URL */
+        }
+        sourceArticles.push({
+          title: String(s.title || publisher || url).slice(0, 200),
+          publisher,
+          url,
+          date: "",
+        });
+      }
+    };
+
     if (openaiKey) {
      try {
       // Primary: the model researches live sources with web search and grounds
@@ -818,6 +844,7 @@ ${framing}${magazineBlock}`;
 
       let finalBody = stripCitations(bodyRes.text);
       let sourceCount = bodyRes.sources?.length ?? 0;
+      addWebSources(bodyRes.sources);
       const wc = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
       // Fact-check + refine pass. The draft can still (a) invent a named expert
@@ -879,6 +906,7 @@ ${finalBody}`,
             },
           });
           const refined = stripCitations(verifyRes.text);
+          addWebSources(verifyRes.sources);
           // Accept the fact-checked version unless it looks structurally BROKEN
           // (empty, or truncated mid-sentence). Deliberately NOT gated on a ratio
           // of the ORIGINAL length: a good fact-check legitimately SHORTENS a
@@ -910,7 +938,7 @@ ${finalBody}`,
         title: topic,
         body: finalBody,
         mode: parsed.data.mode,
-        sources: sourceCount,
+        sources: sourceArticles.length || sourceCount,
         sourceArticles,
       });
      } catch (e) {
@@ -972,7 +1000,7 @@ ${framing}${magazineBlock}`;
       title: topic,
       body: fbBody,
       mode: parsed.data.mode,
-      sources: hits.length,
+      sources: sourceArticles.length || hits.length,
       sourceArticles,
     });
   }
