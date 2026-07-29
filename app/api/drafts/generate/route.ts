@@ -692,8 +692,11 @@ ${text}`,
       // bill passed/defeated, a new appointment weeks ago — is surfaced for
       // grounding, not just the last week's headlines. Older outcomes (and any
       // topic Google News RSS doesn't index) are the OpenAI web search's job.
-      groundingHits = await searchGoogleNews(topic, parsed.data.lang, 8, 60);
-      const relevant = groundingHits.filter((h) => isRelevant(h.title)).slice(0, 5);
+      groundingHits = await searchGoogleNews(topic, parsed.data.lang, 14, 60);
+      // Read + ground on ALL relevant sources found (not just a top handful), so
+      // the desk's source list is complete. Capped at 12 to bound latency (they
+      // fetch in parallel, each time-capped) and prompt size.
+      const relevant = groundingHits.filter((h) => isRelevant(h.title)).slice(0, 12);
       if (relevant.length) {
         // Cap each source's fetch chain (decode page + batchexecute + enrich =
         // up to 3 hops) so a slow/hung publisher can't stall the whole batch.
