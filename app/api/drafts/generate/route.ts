@@ -7,7 +7,7 @@ import { z } from "zod";
 import { TRENDS } from "@/lib/data/trends";
 import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { searchGoogleNews, resolveArticleUrl, type TopicHit } from "@/lib/sources/google-news";
-import { isTrustedUrl, isTrustedPublisherName } from "@/lib/sources/trusted";
+import { isTrustedUrl, isTrustedPublisherName, isEvidenceDesk } from "@/lib/sources/trusted";
 import { enrichFromUrl, decodeEntities } from "@/lib/enrich/json-ld";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
@@ -544,6 +544,13 @@ export async function POST(req: Request) {
     // Patrika+ idea, layer that section's content prompt on top of the grounded
     // draft — it drives voice/structure/format, facts still come from research.
     const magKey = parsed.data.magazine?.trim();
+    // Evidence desks (health / food / education / public-service) draw facts from
+    // authoritative references, so they also trust medical/scientific/gov/edu
+    // sources and get an authoritative-evidence instruction in the prompt.
+    const referenceOk = isEvidenceDesk(magKey);
+    const evidenceBlock = referenceOk
+      ? `\n\nAUTHORITATIVE EVIDENCE — this is a reader explainer, so ground every factual / health / scientific / how-it-works claim in AUTHORITATIVE reference sources, NOT news or blogs: named peer-reviewed studies (name the journal + year + the finding) and official/expert bodies — WHO, ICMR, AIIMS, NIH / PubMed, CDC, Mayo Clinic, NHS for health; FSSAI, NIN, USDA for food & nutrition; UNESCO, NCERT, universities for education. Name the specific study or institution. If you cannot find a real authoritative source for a claim, keep it general — NEVER invent a study, statistic, dosage or expert.`
+      : "";
     const magPrompt = magKey ? directives.magazineContent?.[magKey] : undefined;
     // Desk angle filter (e.g. politics: current topic / on this day / profile).
     const magFilter = magKey
@@ -738,7 +745,7 @@ ${text}`,
         // name contains "navbharat"); fall back to the publisher name only when
         // the redirect could not be decoded to a real URL.
         const read = readAll.filter((r) =>
-          r.realUrl ? isTrustedUrl(r.realUrl) : isTrustedPublisherName(r.source)
+          r.realUrl ? isTrustedUrl(r.realUrl, { reference: referenceOk }) : isTrustedPublisherName(r.source)
         );
         const bodiesRead = read.filter((r) => r.excerpt.length > 80).length;
         // Keep the source list (publisher + real article link) for the composer —
@@ -777,9 +784,10 @@ ${list}
       for (const raw of srcs ?? []) {
         const s = raw as { url?: string; title?: string };
         const url = typeof s?.url === "string" ? s.url : "";
-        // Only list citations from known publishers — the web search otherwise
-        // cites arbitrary blogs / SEO pages, which is what "unknown sources" were.
-        if (!url || seen.has(url) || !isTrustedUrl(url)) continue;
+        // Only list citations from known publishers (plus authoritative reference
+        // sources for evidence desks) — the web search otherwise cites arbitrary
+        // blogs / SEO pages, which is what "unknown sources" were.
+        if (!url || seen.has(url) || !isTrustedUrl(url, { reference: referenceOk })) continue;
         seen.add(url);
         let publisher = "";
         try {
@@ -835,7 +843,7 @@ STEP 3 — WRITE:
 • End with a natural, forward-looking conclusion — and nothing after it (no note about word count, sources or "facts verified").
 • Patrika voice. Do NOT name other news outlets. No source links or URLs in the text, but keep every specific fact, date, number and name you use.
 • Never refuse; always produce the full finished article.
-${framing}${magazineBlock}`;
+${framing}${magazineBlock}${evidenceBlock}`;
 
       const bodyRes = await generateText({
         model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
@@ -896,7 +904,7 @@ Then rewrite so that:
 - Wrong or outdated dates / sequences / statuses are fixed; anything you cannot confirm is DROPPED and the sentence rewritten as the plain general truth — never kept with a hedge.
 - Everything you CAN verify stays — do NOT strip a fact merely because you did not personally re-find it; only remove things that are clearly fabricated, contradicted or outdated. Add any missing key real fact you find while checking.${expandNote}
 - SILENT OUTPUT: never tell the reader about your checking. Do NOT write any preface (no "नीचे प्रस्तुत है… संशोधित/तथ्यपरक फीचर", no "सभी तथ्य/आंकड़े की पुष्टि की गई है"), no confidence notes ("इसकी पुष्टि नहीं मिली", "सामान्य रूप में प्रस्तुत किया गया है", "नाम/उद्धरण उपलब्ध नहीं हैं"), and no word-count / sources line. The output is ONLY the clean, confident finished article.
-- Preserve the voice, structure, flowing-prose style and SIMPLE everyday language. Do NOT introduce any NEW unverified claim. Do NOT name news outlets. ${langLine}${sourceGrounding}
+- Preserve the voice, structure, flowing-prose style and SIMPLE everyday language. Do NOT introduce any NEW unverified claim. Do NOT name news outlets. ${langLine}${evidenceBlock}${sourceGrounding}
 
 Return ONLY the corrected article — nothing else.
 
@@ -987,7 +995,7 @@ ${sourcesRule}
 • Report the CURRENT status/outcome of any event (a bill's result, who holds a post now) rather than freezing it at its announcement. If you can't confirm a specific, DROP it and write the general truth — never keep it with a hedge, and NEVER write meta-lines like "इसकी पुष्टि नहीं मिली" / "सामान्य रूप में प्रस्तुत" / "सभी तथ्य की पुष्टि की गई है". Output only the clean article.
 • End with the conclusion itself — no note about word count or sources.
 • Never refuse; always produce the article. Do NOT name other news outlets.
-${framing}${magazineBlock}`;
+${framing}${magazineBlock}${evidenceBlock}`;
     // If the web-search path already burned most of the budget before throwing,
     // don't start a fresh full generation that would 504 anyway — fail cleanly
     // so the user can retry, rather than losing everything to a proxy timeout.

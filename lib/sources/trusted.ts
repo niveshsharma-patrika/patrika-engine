@@ -51,6 +51,41 @@ const TRUSTED_NAME_KEYWORDS: string[] = [
   "oneindia", "financial express", "lallantop", "gaon connection", "national herald",
 ];
 
+// ── Authoritative reference / evidence sources (evergreen desks) ──────────
+// Health, food, education and public-service explainers must take facts from
+// AUTHORITATIVE references — named studies, medical / scientific / government /
+// academic bodies — not news outlets or blogs. These are trusted IN ADDITION to
+// the news list when the desk is an evidence desk (isEvidenceDesk below).
+const REFERENCE_DOMAINS: string[] = [
+  // Global health / medical
+  "who.int", "nih.gov", "ncbi.nlm.nih.gov", "pubmed.ncbi.nlm.nih.gov", "medlineplus.gov",
+  "cdc.gov", "nhs.uk", "mayoclinic.org", "clevelandclinic.org", "hopkinsmedicine.org",
+  "health.harvard.edu", "healthline.com", "medicalnewstoday.com", "webmd.com",
+  // Journals / science
+  "thelancet.com", "bmj.com", "nejm.org", "nature.com", "sciencedirect.com", "jamanetwork.com",
+  // India — health / nutrition / food safety / ayush
+  "icmr.gov.in", "mohfw.gov.in", "aiims.edu", "nin.res.in", "fssai.gov.in", "ayush.gov.in",
+  "nhp.gov.in",
+  // Nutrition / food
+  "eatright.org", "nutritionsource.hsph.harvard.edu", "usda.gov", "fao.org",
+  // Education / academic / science
+  "unesco.org", "ncert.nic.in", "ugc.gov.in", "aicte-india.org", "arxiv.org", "ieee.org",
+  "mit.edu", "stanford.edu", "nasa.gov",
+];
+// Academic / research TLDs — trusted only for evidence desks.
+const REFERENCE_TLDS: string[] = [".edu", ".ac.in", ".edu.in", ".res.in"];
+
+// Desks whose content is an evidence-based explainer (not news). They ADD the
+// reference sources above to the trusted set.
+const EVIDENCE_DESKS = new Set<string>([
+  "health-plus", "food-culture", "ai-education", "public-guide", "nari-shakti",
+]);
+
+/** True for desks whose facts should come from authoritative references, not news. */
+export function isEvidenceDesk(magKey: string | null | undefined): boolean {
+  return !!magKey && EVIDENCE_DESKS.has(magKey);
+}
+
 function hostOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
@@ -59,13 +94,25 @@ function hostOf(url: string): string {
   }
 }
 
-/** True when the URL's host is a known publisher (or a government domain). */
-export function isTrustedUrl(url: string | null | undefined): boolean {
+/**
+ * True when the URL's host is a known publisher (or a government domain). Pass
+ * `{ reference: true }` for evidence desks to ALSO accept authoritative medical /
+ * scientific / academic reference sources.
+ */
+export function isTrustedUrl(
+  url: string | null | undefined,
+  opts?: { reference?: boolean }
+): boolean {
   if (!url) return false;
   const h = hostOf(url);
   if (!h) return false;
   if (TRUSTED_TLDS.some((t) => h === t.slice(1) || h.endsWith(t))) return true;
-  return TRUSTED_DOMAINS.some((d) => h === d || h.endsWith("." + d));
+  if (TRUSTED_DOMAINS.some((d) => h === d || h.endsWith("." + d))) return true;
+  if (opts?.reference) {
+    if (REFERENCE_TLDS.some((t) => h.endsWith(t))) return true;
+    if (REFERENCE_DOMAINS.some((d) => h === d || h.endsWith("." + d))) return true;
+  }
+  return false;
 }
 
 /** True when a Google-News publisher NAME matches a known outlet. */
