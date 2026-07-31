@@ -557,6 +557,19 @@ export async function POST(req: Request) {
       ? `\n\nAUTHORITATIVE EVIDENCE — this is a reader explainer, so ground every factual / health / scientific / how-it-works claim in AUTHORITATIVE reference sources, NOT news or blogs: named peer-reviewed studies (name the journal + year + the finding) and official/expert bodies — WHO, ICMR, AIIMS, NIH / PubMed, CDC, Mayo Clinic, NHS for health; FSSAI, NIN, USDA for food & nutrition; UNESCO, NCERT, universities for education. Name the specific study or institution. If you cannot find a real authoritative source for a claim, keep it general — NEVER invent a study, statistic, dosage or expert.`
       : "";
     const magPrompt = magKey ? directives.magazineContent?.[magKey] : undefined;
+
+    // Remember this idea as "used" so the idea generator never surfaces the same
+    // topic again for this desk. Fire-and-forget; never blocks generation. Skip
+    // the custom desk (freeform topics have no idea list to dedupe).
+    if (magKey && magKey !== "custom" && topic) {
+      const headlineKey = topic.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 120);
+      void pool
+        .query(
+          `INSERT INTO used_ideas (magazine, filter, headline, headline_key) VALUES ($1, $2, $3, $4)`,
+          [magKey, parsed.data.magazineFilter?.trim() || null, topic.slice(0, 300), headlineKey]
+        )
+        .catch(() => {});
+    }
     // Desk angle filter (e.g. politics: current topic / on this day / profile).
     const magFilter = magKey
       ? MAGAZINE_BY_KEY[magKey]?.filters?.find((f) => f.key === parsed.data.magazineFilter?.trim())
