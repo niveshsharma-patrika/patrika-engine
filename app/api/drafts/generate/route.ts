@@ -635,6 +635,24 @@ ${article.slice(0, 2500)}`;
       }
     };
 
+    // A 1–2 sentence short description / standfirst for the article — shown in
+    // the composer above the body. Small, cheap generateObject; "" on failure.
+    const describeFrom = async (article: string): Promise<string> => {
+      try {
+        const r = await generateObject({
+          model: drafting.model,
+          schema: z.object({ description: z.string() }),
+          prompt: isHi
+            ? `नीचे दिए लेख का 1–2 वाक्य का संक्षिप्त विवरण (स्टैंडफर्स्ट) लिखो — लेख किस बारे में है और पाठक के लिए क्यों अहम है। सरल, आकर्षक हिंदी में, लगभग 25–40 शब्द। कोई शीर्षक, भूमिका या उद्धरण-चिह्न नहीं — सिर्फ़ विवरण।\n\nलेख:\n${article.slice(0, 2500)}`
+            : `Write a 1–2 sentence short description (standfirst) for the article below — what it is about and why it matters to the reader. Punchy and accurate, ~25–40 words. No title, no preface, no quotes — just the description.\n\nARTICLE:\n${article.slice(0, 2500)}`,
+          temperature: 0.5,
+        });
+        return r.object.description.trim();
+      } catch {
+        return "";
+      }
+    };
+
     const openaiKey = await getApiKey("openai");
 
     // Hindi copy-editor pass. AI reliably makes Devanagari spelling / matra
@@ -971,10 +989,17 @@ ${finalBody}`,
       // with budget left.
       if (!verified && elapsed() < 125_000) finalBody = await polishHindi(finalBody);
 
+      // Headlines + short description are cheap but not free; if we're near the
+      // cutoff, fall back to just the topic so the finished body still returns
+      // instead of 504ing. Run them in parallel so the description adds no
+      // wall-clock over the headline pass.
+      const [titles, description] =
+        elapsed() < 170_000
+          ? await Promise.all([headlinesFrom(finalBody), describeFrom(finalBody)])
+          : [[topic], ""];
       return Response.json({
-        // Headlines are cheap but not free; if we're near the cutoff, fall back
-        // to just the topic so the finished body still returns instead of 504ing.
-        titles: elapsed() < 170_000 ? await headlinesFrom(finalBody) : [topic],
+        titles,
+        description,
         title: topic,
         body: finalBody,
         mode: parsed.data.mode,
@@ -1035,8 +1060,13 @@ ${framing}${magazineBlock}${evidenceBlock}`;
     // bare topic for headlines if we're near the cutoff.
     const fbBody =
       elapsed() < 150_000 ? await polishHindi(fbRes.text.trim()) : fbRes.text.trim();
+    const [fbTitles, fbDescription] =
+      elapsed() < 170_000
+        ? await Promise.all([headlinesFrom(fbBody), describeFrom(fbBody)])
+        : [[topic], ""];
     return Response.json({
-      titles: elapsed() < 170_000 ? await headlinesFrom(fbBody) : [topic],
+      titles: fbTitles,
+      description: fbDescription,
       title: topic,
       body: fbBody,
       mode: parsed.data.mode,

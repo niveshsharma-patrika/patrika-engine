@@ -477,6 +477,7 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
   const { t, lang } = useLang();
   const [body, setBody] = useState("");
   const [titleOptions, setTitleOptions] = useState<string[]>([]);
+  const [description, setDescription] = useState("");
   const [generating, setGenerating] = useState(false);
 
   // AI Enhancement controls
@@ -569,6 +570,7 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
   async function handleGenerate() {
     setGenerating(true);
     setSourceArticles([]);
+    setDescription("");
     try {
       const res = await fetch("/api/drafts/generate", {
         method: "POST",
@@ -607,6 +609,7 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
         setTitleOptions(opts);
         if (opts.length > 0) setTitle(opts[0]);
         if (json.body) setBody(json.body);
+        setDescription(typeof json.description === "string" ? json.description : "");
         setSourceArticles(Array.isArray(json.sourceArticles) ? json.sourceArticles : []);
         if (typeof json.sources === "number") {
           setGenNote(
@@ -1044,6 +1047,20 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {description && (
+              <div className="mb-4">
+                <label className="block text-[12px] font-semibold text-[var(--text-2)] mb-1.5">
+                  {lang === "hi" ? "संक्षिप्त विवरण" : "Short description"}
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  className="w-full bg-white border border-[var(--border)] rounded-lg px-3 py-2 text-[13.5px] leading-snug text-[var(--text)] outline-none focus:border-[var(--purple)] resize-y"
+                />
               </div>
             )}
 
