@@ -467,6 +467,41 @@ function stripCitations(text: string): string {
     .trim();
 }
 
+/**
+ * Remove a leading META-PREFACE the model sometimes prepends despite being told
+ * not to — a short opening blurb that talks ABOUT the article and its
+ * verification/sourcing (e.g. "नीचे प्रस्तुत लेख … संशोधित किया गया है। सभी तथ्य …
+ * सत्यापित हैं।" / "This article has been revised from reliable sources…"). The
+ * prompt bans it, but the verify pass still leaks it occasionally, so we strip it
+ * deterministically. Only removes the FIRST short paragraph, and only when it
+ * both refers to "the article" AND to verification/sourcing/revision — so a real
+ * opening line is never touched.
+ */
+function stripLeadingMetaPreface(text: string): string {
+  const stripRules = (s: string) => s.replace(/^\s*(?:-{3,}\s*\n+)+/, "");
+  let t = stripRules(text.replace(/^﻿/, "").trim());
+
+  const blank = t.search(/\n\s*\n/);
+  const rule = t.search(/\n\s*-{3,}\s*(?:\n|$)/);
+  const cands = [blank, rule].filter((i) => i >= 0);
+  const cut = cands.length ? Math.min(...cands) : -1;
+  const firstPara = (cut >= 0 ? t.slice(0, cut) : t).trim();
+
+  const mentionsArticle =
+    /यह लेख|इस लेख|प्रस्तुत लेख|नीचे (?:प्रस्तुत|दिए|दिया)|यहाँ प्रस्तुत|प्रस्तुत है|this article|the following article|below is|here is|this piece/i.test(
+      firstPara
+    );
+  const mentionsMeta =
+    /संशोधित|सत्यापित|सत्यापन|आधिकारिक स्रोत|स्रोत(?:ों)? के आधार|विश्वसनीय स्रोत|सभी (?:तथ्य|आंकड़े|जानकारी)|verified|revised|fact[- ]?check|reliable sources|official sources|accurate and reliable/i.test(
+      firstPara
+    );
+
+  if (cut >= 0 && firstPara.length <= 500 && mentionsArticle && mentionsMeta) {
+    return stripRules(t.slice(cut).trimStart()).trim();
+  }
+  return text.trim();
+}
+
 export async function POST(req: Request) {
   if (!process.env.DATABASE_URL) {
     return Response.json(
@@ -998,6 +1033,11 @@ ${finalBody}`,
       // with budget left.
       if (!verified && elapsed() < 125_000) finalBody = await polishHindi(finalBody);
 
+      // Deterministic backstop: strip any leading meta-preface the verify pass
+      // may have prepended ("नीचे प्रस्तुत लेख … संशोधित/सत्यापित …"). Done before
+      // titles/description so those are generated from the clean body.
+      finalBody = stripLeadingMetaPreface(finalBody);
+
       // Headlines + short description are cheap but not free; if we're near the
       // cutoff, fall back to just the topic so the finished body still returns
       // instead of 504ing. Run them in parallel so the description adds no
@@ -1067,8 +1107,9 @@ ${framing}${magazineBlock}${evidenceBlock}`;
     });
     // Same tail budgeting as the primary path: skip polish / fall back to the
     // bare topic for headlines if we're near the cutoff.
-    const fbBody =
-      elapsed() < 150_000 ? await polishHindi(fbRes.text.trim()) : fbRes.text.trim();
+    const fbBody = stripLeadingMetaPreface(
+      elapsed() < 150_000 ? await polishHindi(fbRes.text.trim()) : fbRes.text.trim()
+    );
     const [fbTitles, fbDescription] =
       elapsed() < 170_000
         ? await Promise.all([headlinesFrom(fbBody), describeFrom(fbBody)])
