@@ -86,44 +86,45 @@ export default function MagazinesPage() {
           <h1 className="text-2xl font-medium">{lang === "hi" ? "पत्रिका+ विशेष कंटेंट" : "Patrika+ Special Content"}</h1>
           <p className="text-[13px] text-[var(--text-3)] mt-1 max-w-2xl">
             {lang === "hi"
-              ? "10 प्रीमियम कंटेंट पॉकेट्स — मैगज़ीन चुनें, टॉपिक-आइडिया जनरेट करें, फिर पूरा आर्टिकल लिखवाएं। प्रॉम्प्ट Writing Directives में एडिट करें।"
-              : "10 premium content pockets — pick a magazine, generate topic ideas, then write a full article. Tune the prompts in Writing Directives."}
+              ? "अपना विषय लिखें या कोई तैयार डेस्क चुनें — फिर टॉपिक-आइडिया और पूरा आर्टिकल जनरेट करें। प्रॉम्प्ट Writing Directives में एडिट करें।"
+              : "Write on your own topic or pick a ready desk — then generate ideas and a full article. Tune the prompts in Writing Directives."}
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {MAGAZINES.map((m) => {
-            const v = VISUALS[m.key] ?? FALLBACK_VISUAL;
-            return (
-              <button
-                key={m.key}
-                onClick={() => open(m.key)}
-                className="text-left bg-white border border-[var(--border)] rounded-lg overflow-hidden hover:border-[var(--red)] hover:shadow-sm transition-colors"
-              >
-                <div
-                  className="h-24 flex items-center justify-center relative overflow-hidden"
-                  style={{ background: `linear-gradient(135deg, ${v.from}, ${v.to})` }}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+          {[...MAGAZINES]
+            .sort((a, b) => (a.key === "custom" ? -1 : b.key === "custom" ? 1 : 0))
+            .map((m) => {
+              const v = VISUALS[m.key] ?? FALLBACK_VISUAL;
+              return (
+                <button
+                  key={m.key}
+                  onClick={() => open(m.key)}
+                  className="text-left bg-white border border-[var(--border)] rounded-lg overflow-hidden hover:border-[var(--red)] hover:shadow-sm transition-colors"
                 >
-                  <v.Icon size={34} strokeWidth={1.5} className="text-white/90" />
-                  {/* AI-generated cover overlays the gradient; falls back to it if absent. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/magazines/${m.key}.jpg`}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                </div>
-                <div className="p-4">
-                  <div className="text-[15px] font-semibold text-[var(--text)]">{m.nameHi}</div>
-                  <div className="text-[11px] text-[var(--text-3)] uppercase tracking-wide mb-1.5">{m.nameEn}</div>
-                  <div className="text-[12.5px] text-[var(--text-2)] leading-snug">{m.tagline}</div>
-                  <div className="text-[11px] text-[var(--text-3)] mt-2">{m.reader} · {m.age}</div>
-                </div>
-              </button>
-            );
-          })}
+                  <div
+                    className="h-14 flex items-center justify-center relative overflow-hidden"
+                    style={{ background: `linear-gradient(135deg, ${v.from}, ${v.to})` }}
+                  >
+                    <v.Icon size={22} strokeWidth={1.5} className="text-white/90" />
+                    {/* AI-generated cover overlays the gradient; falls back to it if absent. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/magazines/${m.key}.jpg`}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+                  <div className="p-2.5">
+                    <div className="text-[13px] font-semibold text-[var(--text)] leading-tight">{m.nameHi}</div>
+                    <div className="text-[9px] text-[var(--text-3)] uppercase tracking-wide mb-1">{m.nameEn}</div>
+                    <div className="text-[11px] text-[var(--text-2)] leading-snug line-clamp-2">{m.tagline}</div>
+                  </div>
+                </button>
+              );
+            })}
         </div>
       </>
     );
