@@ -643,9 +643,18 @@ ${article.slice(0, 2500)}`;
           model: drafting.model,
           schema: z.object({ description: z.string() }),
           prompt: isHi
-            ? `नीचे दिए लेख का 1–2 वाक्य का संक्षिप्त विवरण (स्टैंडफर्स्ट) लिखो — लेख किस बारे में है और पाठक के लिए क्यों अहम है। सरल, आकर्षक हिंदी में, लगभग 25–40 शब्द। कोई शीर्षक, भूमिका या उद्धरण-चिह्न नहीं — सिर्फ़ विवरण।\n\nलेख:\n${article.slice(0, 2500)}`
-            : `Write a 1–2 sentence short description (standfirst) for the article below — what it is about and why it matters to the reader. Punchy and accurate, ~25–40 words. No title, no preface, no quotes — just the description.\n\nARTICLE:\n${article.slice(0, 2500)}`,
-          temperature: 0.5,
+            ? `नीचे दिए लेख के लिए 1–2 वाक्य का आकर्षक, जिज्ञासा जगाने वाला टीज़र/हुक लिखो — जैसे किसी सोशल-मीडिया कैप्शन या दिलचस्प इंट्रो में होता है। यह लेख का सूखा "विवरण" नहीं, बल्कि पाठक को खींचकर पढ़ने पर मजबूर करने वाली लाइन है।
+• सीधे पाठक से बात करो (आप/आपकी/आपको)। सवाल वाला हुक ("सोचिए, अगर…?", "क्या आप जानते हैं…?") या कोई दमदार वादा/फायदा इस्तेमाल करो।
+• कभी भी "यह लेख … के बारे में है", "इस लेख में", "यह तकनीक/खबर …" जैसी वर्णनात्मक/मेटा शुरुआत मत करो — पाठक को यह मत बताओ कि यह एक लेख है।
+• रोज़मर्रा की, चटपटी, बोलचाल वाली हिंदी; पढ़ने की उत्सुकता जगाए। लगभग 25–40 शब्द। कोई शीर्षक, भूमिका या उद्धरण-चिह्न नहीं।
+उदाहरण शैली: "सोचिए, अगर आपकी किताब आपसे बातें करने लगे तो? …अब किताबें सिर्फ कहानी नहीं सुनाएंगी, बल्कि आपके सवालों के जवाब भी देंगी — वह भी बिना कहानी का रोमांच बिगाड़े।"
+
+लेख:\n${article.slice(0, 2500)}`
+            : `Write a 1–2 sentence catchy, curiosity-driven TEASER / hook for the article below — like a social-media caption or an intriguing intro, NOT a dry description. It should make the reader want to click and read.
+• Speak DIRECTLY to the reader (you / your). Use a question hook ("Imagine if…?", "Ever wondered…?") or a bold promise / benefit.
+• NEVER open with "This article is about…", "This piece…", "This technology/news…" or any meta description — do not tell the reader it is an article.
+• Everyday, punchy, conversational language that sparks curiosity. ~25–40 words. No title, no preface, no quotes.\n\nARTICLE:\n${article.slice(0, 2500)}`,
+          temperature: 0.7,
         });
         return r.object.description.trim();
       } catch {
