@@ -27,6 +27,7 @@ const VISUALS: Record<string, { from: string; to: string; Icon: LucideIcon }> = 
   "ai-education":    { from: "#7c3aed", to: "#2e1065", Icon: GraduationCap },
   "game-on":         { from: "#ea580c", to: "#7c2d12", Icon: Trophy },
   "food-culture":    { from: "#d97706", to: "#78350f", Icon: UtensilsCrossed },
+  "custom":          { from: "#475569", to: "#1e293b", Icon: PenSquare },
 };
 const FALLBACK_VISUAL = { from: "#6b7280", to: "#374151", Icon: BookOpen };
 
@@ -39,6 +40,7 @@ export default function MagazinesPage() {
   const [ideasErr, setIdeasErr] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState("");
+  const [customTopic, setCustomTopic] = useState("");
 
   const mag = MAGAZINES.find((m) => m.key === selected) ?? null;
 
@@ -179,7 +181,41 @@ export default function MagazinesPage() {
         </div>
       )}
 
+      {/* Custom desk: type your own topic, then run the full pipeline on it. */}
+      {mag.key === "custom" && (
+        <section className="max-w-2xl">
+          <h2 className="text-[15px] font-semibold flex items-center gap-1.5 mb-1.5">
+            <PenSquare size={16} className="text-[var(--text-2)]" />
+            {lang === "hi" ? "अपना विषय लिखें" : "Write your own topic"}
+          </h2>
+          <p className="text-[12px] text-[var(--text-3)] mb-3">
+            {lang === "hi"
+              ? "जो भी विषय आप लिखवाना चाहते हैं, उसे नीचे लिखें। हमारा पूरा रिसर्च, सोर्स-वेरिफिकेशन और फैक्ट-चेक पाइपलाइन उसी पर आर्टिकल बनाएगा।"
+              : "Type any topic you want written. Our full research, source-verification and fact-check pipeline runs on it — same as every Patrika+ story."}
+          </p>
+          <textarea
+            value={customTopic}
+            onChange={(e) => setCustomTopic(e.target.value)}
+            rows={2}
+            maxLength={280}
+            placeholder={lang === "hi"
+              ? "जैसे: भारत में यूपीआई से डिजिटल पेमेंट का असर और आगे की राह"
+              : "e.g. The impact of UPI on India's cash economy and what comes next"}
+            className="w-full bg-white border border-[var(--border)] text-[14px] px-3 py-2.5 rounded-lg outline-none focus:border-[var(--red)] resize-none"
+          />
+          <button
+            onClick={() => openComposer(customTopic)}
+            disabled={!customTopic.trim()}
+            className="mt-3 bg-[var(--red)] hover:bg-[var(--red-hover)] disabled:opacity-40 text-white text-[13px] font-medium px-4 py-2 rounded flex items-center gap-1.5"
+          >
+            <PenSquare size={13} />
+            {lang === "hi" ? "आर्टिकल बनाएँ" : "Generate article"}
+          </button>
+        </section>
+      )}
+
       {/* Ideas — generate, then pick one to open the full composer */}
+      {mag.key !== "custom" && (
       <section>
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
@@ -237,6 +273,7 @@ export default function MagazinesPage() {
           ))}
         </div>
       </section>
+      )}
 
       {/* The full composer — identical to the one opened from a trending story */}
       {composerOpen && (

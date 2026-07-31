@@ -172,6 +172,21 @@ export const MAGAZINES: Magazine[] = [
     structure: "व्यंजन/जगह की कहानी व संदर्भ / विधि या खास बात के पॉइंट्स / पाठक के लिए स्वाद-अनुभव या सीख",
     compliance: "कॉपीराइट-फ्री या ओरिजिनल विजुअल; किसी समुदाय/परंपरा का मजाक नहीं।",
   },
+  {
+    // Freeform desk: the writer supplies their OWN topic and the full research +
+    // verification pipeline generates the article. No idea generator — you type
+    // the topic and hit Generate.
+    key: "custom",
+    nameEn: "Your Topic",
+    nameHi: "अपना विषय",
+    tagline: "अपना टॉपिक लिखें — रिसर्च, सोर्स-वेरिफिकेशन और फैक्ट-चेक हमारा पाइपलाइन करेगा",
+    reader: "कोई भी विषय — जो आप लिखवाना चाहें",
+    age: "सभी",
+    cadence: "जब चाहें",
+    subVerticals: ["आपका चुना हुआ कोई भी विषय"],
+    structure: "विषय की मांग के अनुसार — व्याख्या, प्रभाव और एंगल पर केंद्रित",
+    compliance: "तथ्य सत्यापित सूत्रों से; कोई मनगढ़ंत आँकड़ा/विशेषज्ञ नहीं; संतुलित व तटस्थ।",
+  },
 ];
 
 export const MAGAZINE_BY_KEY: Record<string, Magazine> = Object.fromEntries(
