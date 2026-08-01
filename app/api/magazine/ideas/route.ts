@@ -53,12 +53,14 @@ export async function POST(req: Request) {
   let contextSource: "news" | "search" | "" = "";
 
   // (A) LIVE Google-News headlines — the freshest source of "what's in the news
-  // now". Used for filters that carry newsQueries (e.g. current political
-  // issues). Real, dated headlines from the last few days across several themes.
-  if (filter?.newsQueries?.length) {
+  // now". Used when a FILTER carries newsQueries (e.g. current political issues)
+  // OR the whole DESK is news-oriented (mag.newsQueries — business, world, kisan,
+  // tech, climate). Real, dated headlines from the last few days across themes.
+  const newsQueries = filter?.newsQueries ?? mag.newsQueries;
+  if (newsQueries?.length) {
     try {
       const batches = await Promise.all(
-        filter.newsQueries.map((q) => searchGoogleNews(q, "hi", 8))
+        newsQueries.map((q) => searchGoogleNews(q, "hi", 8))
       );
       const seen = new Set<string>();
       const items = batches

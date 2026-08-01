@@ -5,6 +5,7 @@ import {
   ArrowLeft, Lightbulb, Loader2, PenSquare,
   ShieldAlert, Landmark, Building2, Wheat, Scale, HeartHandshake,
   HeartPulse, GraduationCap, Trophy, UtensilsCrossed, BookOpen,
+  Globe, TrendingUp, Cpu, Leaf, Sprout, Flame, Star, Plane,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,6 +28,14 @@ const VISUALS: Record<string, { from: string; to: string; Icon: LucideIcon }> = 
   "ai-education":    { from: "#7c3aed", to: "#2e1065", Icon: GraduationCap },
   "game-on":         { from: "#ea580c", to: "#7c2d12", Icon: Trophy },
   "food-culture":    { from: "#d97706", to: "#78350f", Icon: UtensilsCrossed },
+  "world":           { from: "#1e40af", to: "#172554", Icon: Globe },
+  "business":        { from: "#0891b2", to: "#164e63", Icon: TrendingUp },
+  "tech-pulse":      { from: "#4f46e5", to: "#312e81", Icon: Cpu },
+  "climate":         { from: "#0284c7", to: "#0c4a6e", Icon: Leaf },
+  "kisan":           { from: "#65a30d", to: "#3f6212", Icon: Sprout },
+  "aastha":          { from: "#f59e0b", to: "#92400e", Icon: Flame },
+  "astro-guide":     { from: "#7e22ce", to: "#3b0764", Icon: Star },
+  "travel":          { from: "#e11d48", to: "#881337", Icon: Plane },
   "custom":          { from: "#475569", to: "#1e293b", Icon: PenSquare },
 };
 const FALLBACK_VISUAL = { from: "#6b7280", to: "#374151", Icon: BookOpen };

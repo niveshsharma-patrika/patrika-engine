@@ -772,6 +772,7 @@ ${text}`,
     // "yoga for seniors" guide).
     const NEWS_DESKS = new Set([
       "politics-power", "crime-files", "city-pulse", "game-on", "rural-panchayat", "custom",
+      "world", "business", "tech-pulse", "climate", "kisan",
     ]);
     const newsLike = !magKey || NEWS_DESKS.has(magKey);
     const isRelevant = (title: string): boolean => {
