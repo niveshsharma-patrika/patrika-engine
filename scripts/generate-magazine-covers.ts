@@ -1,6 +1,7 @@
 /**
- * One-off: AI-generate a cover image for each of the 10 magazines into
- * public/magazines/<key>.png. Run it once (locally or on the server):
+ * AI-generate a cover image for each magazine into public/magazines/<key>.png.
+ * Skips any desk that already has a cover (.png or .jpg), so re-running only
+ * fills in NEW desks. Run it (locally or on the server):
  *
  *   OPENAI_API_KEY=sk-... npx tsx scripts/generate-magazine-covers.ts
  *
@@ -37,6 +38,15 @@ const COVERS: Array<{ key: string; prompt: string }> = [
   { key: "ai-education", prompt: `Indian school and college students studying together around a laptop in a bright classroom, ${STYLE}` },
   { key: "game-on", prompt: `an Indian athlete sprinting on a stadium running track under floodlights, motion and effort, ${STYLE}` },
   { key: "food-culture", prompt: `a colourful traditional Indian thali of regional dishes and spices on a wooden table, top-down food photography, ${STYLE}` },
+  // ── New desks ──
+  { key: "world", prompt: `a large desk globe beside a folded newspaper and a cup of tea by a bright window in a study, world-affairs mood, ${STYLE}` },
+  { key: "business", prompt: `an Indian small-business owner reviewing finances on a smartphone and a calculator at a shop counter, ledger and rupee notes, warm daylight, entrepreneurial mood, ${STYLE}` },
+  { key: "tech-pulse", prompt: `a young Indian professional working on a laptop in a bright modern co-working space, smartphone and notebook beside, focused tech-career mood, ${STYLE}` },
+  { key: "climate", prompt: `an Indian city skyline under a hazy hot summer sun with heat shimmer, a few green trees in the foreground, environmental weather mood, ${STYLE}` },
+  { key: "kisan", prompt: `an Indian farmer at golden hour in a lush green crop field, holding a smartphone while inspecting the crop, a tractor softly blurred behind, hopeful modern-farming mood, ${STYLE}` },
+  { key: "aastha", prompt: `a traditional Indian temple at dawn with lit oil lamps (diyas) and marigold flowers in the foreground, serene devotional mood, ${STYLE}` },
+  { key: "astro-guide", prompt: `a starry night sky over a calm Indian landscape with a softly silhouetted temple, a brass oil lamp and marigold on a table in the foreground, warm mystical traditional mood, ${STYLE}` },
+  { key: "travel", prompt: `a traveller with a backpack looking out over a scenic Indian landscape of hills and a lake at golden hour, wanderlust mood, ${STYLE}` },
 ];
 
 async function generate(prompt: string): Promise<Buffer> {
@@ -73,12 +83,12 @@ async function main() {
   for (const c of COVERS) {
     const file = join(OUT_DIR, `${c.key}.png`);
     if (!FORCE) {
-      try {
-        await access(file);
+      // Skip if EITHER the raw PNG or the web JPG already exists, so re-running
+      // only fills in the missing desks (the live covers are .jpg).
+      const has = async (f: string) => access(f).then(() => true).catch(() => false);
+      if ((await has(file)) || (await has(join(OUT_DIR, `${c.key}.jpg`)))) {
         console.log(`  skip ${c.key} (exists — FORCE=1 to redo)`);
         continue;
-      } catch {
-        /* not present, generate */
       }
     }
     process.stdout.write(`  → ${c.key} … `);
@@ -91,8 +101,12 @@ async function main() {
     }
   }
   console.log("done. Raw PNGs written to public/magazines/.");
-  console.log("Now optimise to .jpg for the web — the cards load /magazines/<key>.jpg (macOS):");
+  console.log("Now optimise to .jpg for the web — the cards load /magazines/<key>.jpg.");
+  console.log("macOS:");
   console.log('  for f in public/magazines/*.png; do sips -Z 1024 -s format jpeg "$f" --out "${f%.png}.jpg" && rm "$f"; done');
+  console.log("Linux (ImageMagick):");
+  console.log('  for f in public/magazines/*.png; do convert "$f" -resize 1024x -quality 82 "${f%.png}.jpg" && rm "$f"; done');
+  console.log("Then commit the new .jpg files so every deploy has them.");
 }
 
 main();
