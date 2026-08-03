@@ -1,4 +1,5 @@
 import { SourceTable, type SourceRow } from "@/components/source-table";
+import { SocialSources } from "@/components/social-sources";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,15 @@ export default async function SourcesPage() {
       </div>
 
       <SourceTable rows={rows} />
+
+      {/* Social sources — subreddits / X queries the Social Center crawls. */}
+      <div className="mt-8 pt-6 border-t border-[var(--border)]">
+        <h2 className="text-[15px] font-medium mb-1">Social sources</h2>
+        <p className="text-[12px] text-[var(--text-3)] mb-3 max-w-2xl">
+          Subreddits and X queries the Social Center crawls for trending posts.
+        </p>
+        <SocialSources />
+      </div>
 
       <div className="mt-6 text-[12px] text-[var(--text-3)] leading-relaxed max-w-3xl">
         <p className="mb-2">
