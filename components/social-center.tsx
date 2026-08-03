@@ -4,6 +4,7 @@ import { TrendingUp } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
 import { SocialTrends } from "@/components/social-trends";
+import { SocialSources } from "@/components/social-sources";
 
 /**
  * Social command center — a single dashboard of what's trending on social
@@ -27,6 +28,7 @@ export function SocialCenter() {
         {t("What's trending on social right now — click any trend to generate a ready-to-post creative.",
            "अभी सोशल पर जो ट्रेंड कर रहा है — किसी भी ट्रेंड पर क्लिक करके पोस्ट बनाएँ।")}
       </p>
+      <SocialSources />
       <SocialTrends />
     </div>
   );
