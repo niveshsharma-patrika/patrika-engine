@@ -58,6 +58,11 @@ export function SocialTrends() {
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [pack, setPack] = useState<Pack | null>(null);
+  const [corroboration, setCorroboration] = useState<
+    { title: string; source: string; url: string; date: string }[]
+  >([]);
+  const [image, setImage] = useState<string | null>(null);
+  const [imgBusy, setImgBusy] = useState(false);
   const [genBusy, setGenBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -100,10 +105,27 @@ export function SocialTrends() {
       const json = await res.json();
       if (!res.ok || json.ok === false) throw new Error(json.error ?? "Failed");
       setPack(json.pack);
+      setCorroboration(Array.isArray(json.corroboration) ? json.corroboration : []);
+      setImage(null);
       setOpenId(id);
       setTrends((prev) => prev.map((tr) => (tr.id === id ? { ...tr, has_creative: true } : tr)));
     } catch (e) { setError(e instanceof Error ? e.message : "Generation failed"); }
     finally { setGenBusy(null); }
+  }
+
+  async function genImage(id: string) {
+    if (!pack?.image_concept) return;
+    setImgBusy(true); setError(null);
+    try {
+      const res = await fetch(`/api/social/trends/${id}/image`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ concept: pack.image_concept }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.image) throw new Error(json.error ?? "Failed");
+      setImage(json.image);
+    } catch (e) { setError(e instanceof Error ? e.message : "Image generation failed"); }
+    finally { setImgBusy(false); }
   }
 
   function copy(key: string, text: string) {
@@ -198,6 +220,58 @@ export function SocialTrends() {
                     <span className="font-semibold">{t("Image concept", "इमेज कॉन्सेप्ट")}: </span>
                     <span className="text-[var(--text-2)]">{pack.image_concept}</span>
                   </div>
+
+                  {/* Creative image — render the concept on demand */}
+                  <div>
+                    {image ? (
+                      <div className="space-y-1.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={image} alt="" className="w-full max-w-[320px] rounded-lg border border-[var(--border)]" />
+                        <div className="flex gap-3">
+                          <a href={image} download={`patrika-social-${tr.id}.png`} className="text-[11px] text-[var(--purple)] hover:underline">
+                            {t("Download", "डाउनलोड")}
+                          </a>
+                          <button onClick={() => genImage(tr.id)} disabled={imgBusy} className="text-[11px] text-[var(--text-3)] hover:text-[var(--text)]">
+                            {imgBusy ? t("Generating…", "बना रहे…") : t("↻ Regenerate image", "↻ इमेज फिर बनाएँ")}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => genImage(tr.id)} disabled={imgBusy}
+                        className="text-[11px] font-medium bg-[var(--text)] hover:bg-black text-white px-3 py-1.5 rounded disabled:opacity-50">
+                        {imgBusy ? t("Generating image…", "इमेज बना रहे…") : t("🖼 Generate creative image", "🖼 क्रिएटिव इमेज बनाएँ")}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* News cross-check — is trusted media actually reporting this? */}
+                  <div className="text-[11.5px]">
+                    {corroboration.length > 0 ? (
+                      <div className="bg-[#ecfdf5] border border-[#a7f3d0] rounded-lg px-3 py-2">
+                        <div className="font-semibold text-[#065f46] mb-1">
+                          {t("✓ Reported by trusted media", "✓ विश्वसनीय मीडिया में मौजूद")}
+                        </div>
+                        <ul className="space-y-0.5">
+                          {corroboration.map((c, i) => (
+                            <li key={i} className="text-[var(--text-2)] leading-snug">
+                              <a href={c.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                {c.title.slice(0, 72)}
+                              </a>
+                              <span className="text-[var(--text-3)]"> · {c.source}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="bg-[#fef2f2] border border-[#fecaca] rounded-lg px-3 py-2 text-[#991b1b] leading-snug">
+                        {t(
+                          "⚠ No trusted news coverage found — likely unverified. Verify before posting.",
+                          "⚠ किसी विश्वसनीय समाचार स्रोत में नहीं मिला — असत्यापित हो सकता है। पोस्ट करने से पहले जांचें।"
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {pack.caution && (
                     <div className="text-[11.5px] text-[#92400e] bg-[#fef3c7] rounded-lg px-3 py-2 leading-snug">
                       ⚠ {pack.caution}

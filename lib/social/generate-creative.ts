@@ -3,7 +3,11 @@ import { z } from "zod";
 
 import { pool } from "@/lib/db";
 import { getModelFor } from "@/lib/ai/provider";
+import { searchGoogleNews } from "@/lib/sources/google-news";
+import { isTrustedPublisherName } from "@/lib/sources/trusted";
 import type { CreativePack } from "./trend-types";
+
+export type Corroboration = { title: string; source: string; url: string; date: string };
 
 /**
  * Turn one social trend into a ready-to-post creative pack for Patrika.
@@ -41,7 +45,7 @@ type TrendRow = {
 export async function generateCreative(
   trendId: string,
   lang: "en" | "hi" = "hi"
-): Promise<{ ok: boolean; pack?: CreativePack; error?: string }> {
+): Promise<{ ok: boolean; pack?: CreativePack; corroboration?: Corroboration[]; error?: string }> {
   const { rows } = await pool.query<TrendRow>(
     `SELECT id, platform, title, body, origin, author, score, comments, url, permalink
        FROM social_trend_items WHERE id = $1`,
@@ -52,6 +56,25 @@ export async function generateCreative(
 
   const resolved = await getModelFor("drafting");
   if (!resolved) return { ok: false, error: "No AI model configured (Admin → API Keys)." };
+
+  // Cross-check the social trend against REAL news coverage from trusted outlets.
+  // This grounds the angle AND — the key value — tells the desk whether credible
+  // media is actually reporting this, or it is an unverified social rumour.
+  let corroboration: Corroboration[] = [];
+  try {
+    const hits = await searchGoogleNews(trend.title.slice(0, 200), lang, 8);
+    corroboration = hits
+      .filter((h) => isTrustedPublisherName(h.source))
+      .slice(0, 5)
+      .map((h) => ({ title: h.title, source: h.source, url: h.url, date: h.publishedAt }));
+  } catch {
+    /* best-effort — a failed cross-check just yields no corroboration */
+  }
+  const crossCheckBlock = corroboration.length
+    ? `\n\nNEWS CROSS-CHECK — credible outlets ARE reporting related news. Use these to ground the angle and keep every fact accurate; do NOT contradict them:\n${corroboration
+        .map((c, i) => `[${i + 1}] ${c.title}`)
+        .join("\n")}`
+    : `\n\nNEWS CROSS-CHECK — NO credible mainstream outlet was found reporting this. Treat it as UNVERIFIED / possibly rumour or satire: keep the copy cautious and questioning (attribute to "social media", never state as fact), and make the caution line explicitly say this needs verification before posting.`;
 
   const langLine =
     lang === "hi"
@@ -70,7 +93,7 @@ TRENDING ITEM (source: ${src}, ${trend.score.toLocaleString()} upvotes/likes, ${
 """
 ${trend.title}
 ${trend.body}
-"""
+"""${crossCheckBlock}
 
 Produce a social creative pack for Patrika:
 - angle: the specific news angle Patrika should take on this (one sentence).
@@ -91,13 +114,13 @@ RULES:
       maxOutputTokens: 1500,
     });
 
-    // Persist so re-opening the trend shows the pack.
+    // Persist so re-opening the trend shows the pack + its news cross-check.
     await pool.query(
       `UPDATE social_trend_items SET generated = $2::jsonb, generated_at = now() WHERE id = $1`,
-      [trendId, JSON.stringify(object)]
+      [trendId, JSON.stringify({ ...object, corroboration })]
     );
 
-    return { ok: true, pack: object };
+    return { ok: true, pack: object, corroboration };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message.slice(0, 200) : "generation failed" };
   }
