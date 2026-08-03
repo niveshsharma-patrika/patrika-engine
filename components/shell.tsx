@@ -22,7 +22,6 @@ import {
   BookOpen,
   MessageSquare,
   AtSign,
-  Inbox,
   LogOut,
 } from "lucide-react";
 
@@ -47,8 +46,6 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: E
   { href: "/magazines",         icon: <BookOpen size={16} />,      key: "navMagazines",   editions: ["digital"] },
   { href: "/twitter",           icon: <AtSign size={16} />,        key: "navTwitter",     editions: ["digital"], roles: ["admin", "editor"] },
   { href: "/social",            icon: <TrendingUp size={16} />,    key: "navSocial",      editions: ["digital"], roles: ["admin", "editor"] },
-  { href: "/submit",            icon: <Newspaper size={16} />,     key: "navSubmit",      editions: ["digital", "print"], roles: ["admin"] },
-  { href: "/inbox",             icon: <Inbox size={16} />,         key: "navInbox",       editions: ["digital"], roles: ["admin"] },
   { href: "/feedback",          icon: <MessageSquare size={16} />, key: "navFeedback",    editions: ["digital", "print"] },
   { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin",       editions: ["digital"], roles: ["admin"] },
   { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers",       editions: ["digital"], roles: ["admin"] },
@@ -71,9 +68,8 @@ export function Shell({ children, edition, role }: { children: React.ReactNode; 
     (n) => n.editions.includes(edition) && (!n.roles || n.roles.includes(role))
   );
 
-  // Standalone pages render with no masthead / sidebar chrome: the login page,
-  // and the public /submit news-tip form (shareable to people without a login).
-  if (pathname === "/login" || pathname === "/submit") {
+  // Standalone pages render with no masthead / sidebar chrome: the login page.
+  if (pathname === "/login") {
     return <>{children}</>;
   }
 

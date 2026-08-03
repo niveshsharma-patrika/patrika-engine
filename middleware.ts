@@ -8,12 +8,8 @@ import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/jwt";
  *   • /login + the auth APIs (so you can sign in)
  *   • /api/cron/* (authenticates with CRON_SECRET, not a user session)
  */
-// /submit is a shareable, standalone news-tip form usable without a login, so
-// it and the news API are public. The news GET/PATCH/promote handlers still
-// enforce admin in-handler, so only anonymous POST is actually open.
 const PUBLIC_PATHS = [
   "/login", "/api/auth/login", "/api/auth/logout",
-  "/submit", "/api/news",
 ];
 
 export async function middleware(request: NextRequest) {
@@ -47,12 +43,10 @@ export async function middleware(request: NextRequest) {
       pathname === "/all-stories" ||
       pathname === "/generated" ||
       pathname === "/feedback" ||
-      pathname === "/submit" ||
       pathname.startsWith("/today/") ||
       pathname.startsWith("/all-stories/") ||
       pathname.startsWith("/generated/") ||
-      pathname.startsWith("/feedback/") ||
-      pathname.startsWith("/submit/");
+      pathname.startsWith("/feedback/");
     if (!printOk) {
       const url = request.nextUrl.clone();
       url.pathname = "/today";
@@ -75,14 +69,11 @@ export async function middleware(request: NextRequest) {
           // Stats + Style module are admin-only (hidden from editors and writers).
           pathname.startsWith("/stats") ||
           pathname.startsWith("/style") ||
-          // News Inbox is admin-only (everyone can /submit into it).
-          pathname.startsWith("/inbox") ||
           sourcesBlocked
         : pathname.startsWith("/admin") ||
           pathname.startsWith("/directives") ||
           pathname.startsWith("/stats") ||
           pathname.startsWith("/style") ||
-          pathname.startsWith("/inbox") ||
           // Twitter monitoring + Social center are for editors + admins only.
           pathname.startsWith("/twitter") ||
           pathname.startsWith("/social") ||
