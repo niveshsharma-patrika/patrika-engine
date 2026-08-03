@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, KeyRound } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
 
@@ -14,27 +14,9 @@ type Source = {
   last_error: string | null;
   item_count?: number;
 };
-type Settings = {
-  youtube_api_key: boolean;
-  meta_access_token: boolean;
-  meta_ig_user_id: boolean;
-  x_auth_token: boolean;
-  reddit_client_id: boolean;
-  reddit_client_secret: boolean;
-};
 
-const CRED_FIELDS: Array<{ key: keyof Settings; label: string; hint: string }> = [
-  { key: "reddit_client_id",     label: "Reddit client id",     hint: "reddit.com/prefs/apps" },
-  { key: "reddit_client_secret", label: "Reddit client secret", hint: "reddit.com/prefs/apps" },
-  { key: "x_auth_token",         label: "X auth token",         hint: "or set it in Twitter → Settings" },
-  { key: "meta_access_token",    label: "Meta access token",    hint: "long-lived, instagram_basic + pages_read_engagement" },
-  { key: "meta_ig_user_id",      label: "Meta IG business id",  hint: "your IG business account id" },
-  { key: "youtube_api_key",      label: "YouTube API key",      hint: "optional" },
-];
-
-/** Manage what the Social crawl reads (subreddits / X queries) + the platform
- * credentials. Sources are editor+admin; credentials are admin-only (the
- * settings GET 403s for editors, so that block simply hides). */
+/** Manage what the Social crawl reads (subreddits / X queries). Editor+admin.
+ * Platform CREDENTIALS live in Admin → Social & platform keys, not here. */
 export function SocialSources({ onChanged }: { onChanged?: () => void }) {
   const { lang } = useLang();
   const t = (en: string, hi: string) => (lang === "hi" ? hi : en);
@@ -46,11 +28,6 @@ export function SocialSources({ onChanged }: { onChanged?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [creds, setCreds] = useState<Partial<Record<keyof Settings, string>>>({});
-  const [savingCreds, setSavingCreds] = useState(false);
-  const [credNote, setCredNote] = useState<string | null>(null);
-
   const load = useCallback(async () => {
     try {
       const r = await fetch("/api/social/trend-sources");
@@ -58,12 +35,6 @@ export function SocialSources({ onChanged }: { onChanged?: () => void }) {
       const rows: Source[] = Array.isArray(j.sources) ? j.sources : [];
       setSources(rows);
       if (rows.length === 0) setOpen(true); // no sources yet → guide the desk
-    } catch {
-      /* ignore */
-    }
-    try {
-      const s = await fetch("/api/social/settings");
-      if (s.ok) setSettings(await s.json()); // admin only; editors get 403 → hidden
     } catch {
       /* ignore */
     }
@@ -90,24 +61,6 @@ export function SocialSources({ onChanged }: { onChanged?: () => void }) {
     catch { /* ignore */ }
   }
 
-  async function saveCreds() {
-    const payload = Object.fromEntries(
-      Object.entries(creds).filter(([, v]) => typeof v === "string" && v.trim())
-    );
-    if (Object.keys(payload).length === 0) return;
-    setSavingCreds(true); setCredNote(null);
-    try {
-      const r = await fetch("/api/social/settings", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? "Failed");
-      setCreds({}); setCredNote(t("Saved ✓", "सेव हो गया ✓")); await load();
-    } catch (e) { setCredNote(e instanceof Error ? e.message : "Failed"); }
-    finally { setSavingCreds(false); }
-  }
-
   return (
     <div className="mb-5 border border-[var(--border)] rounded-lg bg-white">
       <button
@@ -115,9 +68,9 @@ export function SocialSources({ onChanged }: { onChanged?: () => void }) {
         className="w-full flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium text-[var(--text-2)]"
       >
         {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-        {t("Sources & credentials", "स्रोत और क्रेडेंशियल")}
+        {t("Sources to crawl", "क्रॉल स्रोत")}
         <span className="text-[11px] text-[var(--text-3)] font-normal">
-          ({sources.length} {t("sources", "स्रोत")})
+          ({sources.length})
         </span>
       </button>
 
@@ -126,7 +79,7 @@ export function SocialSources({ onChanged }: { onChanged?: () => void }) {
           {/* Add a source */}
           <div>
             <div className="text-[11px] font-semibold text-[var(--text-2)] mb-1.5">
-              {t("Add a source to crawl", "क्रॉल करने के लिए स्रोत जोड़ें")}
+              {t("Add a source", "स्रोत जोड़ें")}
             </div>
             <div className="flex flex-wrap gap-2">
               <select
@@ -153,6 +106,10 @@ export function SocialSources({ onChanged }: { onChanged?: () => void }) {
               </button>
             </div>
             {err && <div className="text-[11px] text-[var(--red)] mt-1">{err}</div>}
+            <div className="text-[10.5px] text-[var(--text-3)] mt-1.5">
+              {t("Platform keys (Reddit / Meta / X / YouTube) live in Admin → Social & platform keys.",
+                 "प्लेटफ़ॉर्म कीज़ (Reddit / Meta / X / YouTube) Admin → Social & platform keys में हैं।")}
+            </div>
           </div>
 
           {/* Existing sources */}
@@ -169,43 +126,6 @@ export function SocialSources({ onChanged }: { onChanged?: () => void }) {
                   </button>
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* Credentials (admin only — hidden for editors) */}
-          {settings && (
-            <div className="pt-1 border-t border-[var(--border)]">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-2)] mt-3 mb-2">
-                <KeyRound size={12} /> {t("Platform credentials", "प्लेटफ़ॉर्म क्रेडेंशियल")}
-              </div>
-              <div className="space-y-1.5">
-                {CRED_FIELDS.map((f) => (
-                  <div key={f.key} className="flex items-center gap-2">
-                    <div className="w-[150px] shrink-0">
-                      <div className="text-[11.5px] text-[var(--text-2)]">{f.label}</div>
-                      <div className="text-[9.5px] text-[var(--text-3)]">{f.hint}</div>
-                    </div>
-                    <input
-                      type="password"
-                      value={creds[f.key] ?? ""}
-                      onChange={(e) => setCreds((c) => ({ ...c, [f.key]: e.target.value }))}
-                      placeholder={settings[f.key] ? t("set ✓ — enter to replace", "सेट ✓ — बदलने के लिए भरें") : t("not set", "सेट नहीं")}
-                      className="flex-1 bg-white border border-[var(--border)] text-[12px] px-2.5 py-1.5 rounded outline-none focus:border-[var(--purple)]"
-                    />
-                    {settings[f.key] && <span className="text-[var(--green)] text-[12px]">✓</span>}
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-3 mt-2">
-                <button
-                  onClick={saveCreds}
-                  disabled={savingCreds}
-                  className="bg-[var(--purple)] hover:opacity-90 text-white text-[12px] font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
-                >
-                  {savingCreds ? t("Saving…", "सेव हो रहा…") : t("Save credentials", "क्रेडेंशियल सेव करें")}
-                </button>
-                {credNote && <span className="text-[11px] text-[var(--text-3)]">{credNote}</span>}
-              </div>
             </div>
           )}
         </div>
