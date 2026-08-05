@@ -31,6 +31,8 @@ const TRUSTED_DOMAINS: string[] = [
   "ptinews.com", "aninews.in", "uniindia.com", "prsindia.org",
   // World (for the world desk)
   "reuters.com", "apnews.com", "bbc.com", "bbc.co.uk", "aljazeera.com", "theguardian.com",
+  // Reference — authoritative panchang / almanac for the Astro desk's dates.
+  "drikpanchang.com",
 ];
 
 // Government / official domains are always trusted.

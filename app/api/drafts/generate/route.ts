@@ -9,6 +9,7 @@ import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { searchGoogleNews, resolveArticleUrl, type TopicHit } from "@/lib/sources/google-news";
 import { isTrustedUrl, isTrustedPublisherName, isEvidenceDesk } from "@/lib/sources/trusted";
 import { enrichFromUrl, decodeEntities } from "@/lib/enrich/json-ld";
+import { normalizeHindiTypography } from "@/lib/text/hindi";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { MAGAZINE_BY_KEY } from "@/lib/magazines";
@@ -616,7 +617,7 @@ export async function POST(req: Request) {
       ? `\n\nPATRIKA+ SPECIAL CONTENT — write in the voice of the Patrika+ "${magKey}" desk. Patrika+ is SPECIAL CONTENT: an EXPLAINER / ANGLE / feature whose job is to explain the NEWS and — above all — WHAT IT MEANS and WHAT EFFECTS IT HAS for the reader (who is affected, how, why it matters, what to watch, what it could change). It is NOT a breaking-news roundup and NOT a recital of fresh figures. Take the FACTS from the source reporting; spend the article on making sense of them — the impact, the stakes, the angle. Use the brief below ONLY as guidance for voice, tone and WHAT to cover. However the brief is worded, your OUTPUT MUST be ONE continuous, fully-written article body in flowing prose:
 - Do NOT print field labels ("हेडलाइन:", "हुक इंट्रो:", "समस्या:", "CTA:", "टैग:", "WhatsApp…", "इन्फोग्राफिक…", "Suggested Tags", etc.).
 - Do NOT include a separate headline line, a WhatsApp teaser, infographic bullet points, or a tag list in the body — ONLY the article itself. (The headline is generated separately.)
-- Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…" or any sentence describing that this is a feature.
+- Open with a SHORT, engaging INTRO paragraph (2–3 sentences) that hooks the reader — the first subheading comes AFTER it, never before. Do NOT open with a subheading, and NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…" or any sentence describing that this is a feature.
 - Write in FLOWING PARAGRAPHS as the default; use a list only for a genuine step-by-step or one short key-points summary — never render explanation, research or context as bullets.
 - NEVER leave a placeholder such as "[सोर्स जोड़ें]" / "[स्रोत/लिंक जोड़ें]" — use a real, verified detail from your research or omit it. Never fabricate a source, quote, name or number.
 - Weave any required elements (expert view, data, reader takeaway, any disclaimer) naturally into the prose and short plain-text subheadings — not as a checklist.
@@ -920,7 +921,7 @@ STEP 3 — WRITE:
 • LENGTH: at least ${targetWords} words — this is a MINIMUM, not a rough hint. Do NOT finish before ${targetWords} words; if you are running short, ADD more genuine depth (more sections, examples, practical detail) — never pad with filler or repetition.
 • STRUCTURE — the article MUST be organized under AT LEAST 5 short, descriptive subheadings, each on its OWN line as plain text (a question or short phrase; no #, no **, no bold). Each subheading has 2–4 sentence paragraphs under it.
 • TABLE — if the topic involves comparable DATA (figures side by side, options, before/after, a schedule, pros & cons, a plan by day/step), present that data as a simple Markdown table (| … | … |) where it genuinely helps the reader. NOT required — include one only when the content actually calls for it, never forced.
-• Open DIRECTLY with the article's first line. NEVER start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…", "Here is…" or any line that describes this as a feature/article.
+• Open with a SHORT, engaging INTRO paragraph (2–3 sentences) that hooks the reader and sets up the topic — the first SUBHEADING comes AFTER this intro, never before it. Do NOT open with a subheading, and do NOT start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…", "Here is…" or any line that describes this as a feature/article.
 • FLOWING PARAGRAPHS are the default — weave facts, evidence and expert views INTO the prose, attributed. A bulleted/numbered list ONLY for a genuine step-by-step how-to or ONE short "key points" summary (at most one or two lists in the whole piece); NEVER render ordinary explanation, research or context as bullets.
 • End with a natural, forward-looking conclusion — and nothing after it (no note about word count, sources or "facts verified").
 • Patrika voice. Do NOT name other news outlets. No source links or URLs in the text, but keep every specific fact, date, number and name you use.
@@ -1038,6 +1039,8 @@ ${finalBody}`,
       // may have prepended ("नीचे प्रस्तुत लेख … संशोधित/सत्यापित …"). Done before
       // titles/description so those are generated from the clean body.
       finalBody = stripLeadingMetaPreface(finalBody);
+      // House-style Hindi typography (nuqta / chandrabindu) — deterministic.
+      finalBody = normalizeHindiTypography(finalBody);
 
       // Headlines + short description are cheap but not free; if we're near the
       // cutoff, fall back to just the topic so the finished body still returns
@@ -1048,8 +1051,8 @@ ${finalBody}`,
           ? await Promise.all([headlinesFrom(finalBody), describeFrom(finalBody)])
           : [[topic], ""];
       return Response.json({
-        titles,
-        description,
+        titles: titles.map(normalizeHindiTypography),
+        description: normalizeHindiTypography(description),
         title: topic,
         body: finalBody,
         mode: parsed.data.mode,
@@ -1116,10 +1119,10 @@ ${framing}${magazineBlock}${evidenceBlock}`;
         ? await Promise.all([headlinesFrom(fbBody), describeFrom(fbBody)])
         : [[topic], ""];
     return Response.json({
-      titles: fbTitles,
-      description: fbDescription,
+      titles: fbTitles.map(normalizeHindiTypography),
+      description: normalizeHindiTypography(fbDescription),
       title: topic,
-      body: fbBody,
+      body: normalizeHindiTypography(fbBody),
       mode: parsed.data.mode,
       sources: sourceArticles.length,
       sourceArticles,
@@ -1206,11 +1209,12 @@ ${framing}${magazineBlock}${evidenceBlock}`;
 
   // The article is exactly what the left-side controls produce — no second
   // "humanize" rewrite pass (it was fighting the settings and hurting quality).
-  const bodyText = body.text.trim();
+  const bodyText = normalizeHindiTypography(body.text.trim());
+  const normTitles = titles.map(normalizeHindiTypography);
 
   return Response.json({
-    title: titles[0] ?? "",
-    titles,
+    title: normTitles[0] ?? "",
+    titles: normTitles,
     body: bodyText,
     mode: parsed.data.mode,
     meta: {

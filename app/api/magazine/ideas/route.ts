@@ -10,6 +10,7 @@ import { pool } from "@/lib/db";
 import { searchGoogleNews, resolveArticleUrl } from "@/lib/sources/google-news";
 import { isTrustedPublisherName } from "@/lib/sources/trusted";
 import { enrichFromUrl, decodeEntities } from "@/lib/enrich/json-ld";
+import { normalizeHindiTypography as nz } from "@/lib/text/hindi";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 160;
@@ -216,7 +217,14 @@ export async function POST(req: Request) {
     });
     // Drop any idea that (despite the prompt) still matches an already-used one.
     const norm = (h: string) => h.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 120);
-    const ideas = res.object.ideas.filter((i) => !usedKeys.has(norm(i.headline)));
+    const ideas = res.object.ideas
+      .filter((i) => !usedKeys.has(norm(i.headline)))
+      .map((i) => ({
+        headline: nz(i.headline),
+        subVertical: nz(i.subVertical),
+        hook: nz(i.hook),
+        benefit: nz(i.benefit),
+      }));
     return Response.json({ ideas, researched: Boolean(currentContext) });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Generation failed.";
