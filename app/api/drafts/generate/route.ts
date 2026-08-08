@@ -632,7 +632,11 @@ ${magPrompt}`
       : "Write the entire article in English.";
     // Roomier budget — a rich, structured feature with explainer sections runs
     // longer than a flat report, so allow the model to expand for depth.
-    const maxOutputTokens = Math.min(15000, Math.ceil(targetWords * (isHi ? 9 : 3)) + 800);
+    // Devanagari tokenizes to ~10–14 tokens/word, so an 800-word Hindi article
+    // needs ~9–11k output tokens — the old 9×+800 cap (8k for 800 words) was
+    // truncating drafts to ~550–650 words. Provision generously; it's only a
+    // ceiling, the length target still controls where the model stops.
+    const maxOutputTokens = Math.min(16000, Math.ceil(targetWords * (isHi ? 14 : 4)) + 1000);
 
     // Headline options generated from the finished article (no search needed).
     // Catchy, click-worthy Hindi-web style — NOT dry academic headlines.
@@ -773,7 +777,7 @@ ${text}`,
     // "yoga for seniors" guide).
     const NEWS_DESKS = new Set([
       "politics-power", "crime-files", "city-pulse", "game-on", "rural-panchayat", "custom",
-      "world", "business", "tech-pulse", "climate", "kisan",
+      "world", "business", "tech-pulse", "climate", "kisan", "entertainment",
     ]);
     const newsLike = !magKey || NEWS_DESKS.has(magKey);
     const isRelevant = (title: string): boolean => {
@@ -918,7 +922,7 @@ STEP 3 — WRITE:
 • FACTUAL INTEGRITY: every named person, quote, statistic, and proper noun (a scheme / report / law / place name) in the article must be REAL and traceable to your research — never invented, never a placeholder name. Get official names EXACTLY right (e.g. a government scheme's official title); if you are not sure of the exact official name, use the wording your sources actually use and don't guess a title. Do not present a number as precise ("7% राजस्व घाटा", "76,633 करोड़") unless a source gives it — otherwise keep it general. Report the CURRENT status of every event (a bill's actual outcome, who holds a post NOW), never a stale "was announced / introduced" framing.
 • SILENT — never show your working. If you cannot confirm a specific (a figure, a dated quote, an event's status), simply DROP it and write the sentence as the plain general truth — do NOT keep the specific with a caveat and do NOT tell the reader you did this. NEVER write meta-lines like "इसकी पुष्टि नहीं मिली", "सामान्य रूप में प्रस्तुत किया गया है", "नाम/उद्धरण उपलब्ध नहीं हैं" or "सभी तथ्य की पुष्टि की गई है". The reader sees only a clean, confident article.
 • SPECIFICS COME FROM THE SOURCES — this is the safety rule. Every specific number, amount, statistic, name, date, quote and named event MUST come from the SOURCE REPORTING below (or, if you search, only from reporting on THIS SAME story). Do NOT import an unrelated figure/study/expert from elsewhere or from memory, and NEVER invent one. If the sources don't give a specific, don't state one — say it in general terms. You MAY and SHOULD add general explanatory context (what a term/policy/process is, how it works) and reasoned analysis of the news's EFFECTS and implications — that is analysis, not new facts — but it must not smuggle in invented specifics.
-• LENGTH: at least ${targetWords} words — this is a MINIMUM, not a rough hint. Do NOT finish before ${targetWords} words; if you are running short, ADD more genuine depth (more sections, examples, practical detail) — never pad with filler or repetition.
+• LENGTH: this is a LONG in-depth feature of AT LEAST ${targetWords} words — a hard MINIMUM, not a hint. That is roughly ${Math.round(targetWords / 85)}+ solid paragraphs across your 5+ sections. Write in real depth: if you feel finished before ${targetWords} words, the topic is under-developed — add another section, more examples, more practical detail, more context. Do NOT summarise, do NOT stop early, and never pad with filler or repetition. Count as you go and keep going until you clearly pass ${targetWords} words.
 • STRUCTURE — the article MUST be organized under AT LEAST 5 short, descriptive subheadings, each on its OWN line as plain text (a question or short phrase; no #, no **, no bold). Each subheading has 2–4 sentence paragraphs under it.
 • TABLE — if the topic involves comparable DATA (figures side by side, options, before/after, a schedule, pros & cons, a plan by day/step), present that data as a simple Markdown table (| … | … |) where it genuinely helps the reader. NOT required — include one only when the content actually calls for it, never forced.
 • Open with a SHORT, engaging INTRO paragraph (2–3 sentences) that hooks the reader and sets up the topic — the first SUBHEADING comes AFTER this intro, never before it. Do NOT open with a subheading, and do NOT start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…", "Here is…" or any line that describes this as a feature/article.
@@ -968,8 +972,8 @@ ${framing}${magazineBlock}${evidenceBlock}`;
       if (elapsed() < 90_000) {
         try {
           const expandNote = short
-            ? `\n- LENGTH: the draft is about ${wc(finalBody)} words but should be about ${targetWords} — expand it to roughly ${targetWords} words by ADDING real, VERIFIED substance (more genuine detail, examples, sections), never filler or repetition.`
-            : `\n- Keep the length about the same (~${wc(finalBody)} words); do not pad. If removing fabricated material makes it shorter, that is fine — a shorter, fully-true article is better than a padded one.`;
+            ? `\n- LENGTH (IMPORTANT): the draft is only about ${wc(finalBody)} words but MUST be at least ${targetWords}. Expand it to at least ${targetWords} words by ADDING 2–3 more substantial sections/paragraphs of real, VERIFIED depth (more examples, practical detail, context, expert-backed points) — never filler or repetition. Do not return anything shorter than ${targetWords} words.`
+            : `\n- Keep the length at least ${targetWords} words; do not pad. If removing fabricated material makes it shorter, add real verified depth back so it still reaches ${targetWords}.`;
           const verifyRes = await generateText({
             model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
             prompt: `You are a rigorous fact-checker AND copy-editor for Patrika. Below is a draft article. Using web search AND the SOURCE REPORTING provided, VERIFY every check-worthy specific and return a CORRECTED, publish-ready version.

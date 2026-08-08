@@ -5,7 +5,7 @@ import {
   ArrowLeft, Lightbulb, Loader2, PenSquare,
   ShieldAlert, Landmark, Building2, Wheat, Scale, HeartHandshake,
   HeartPulse, GraduationCap, Trophy, UtensilsCrossed, BookOpen,
-  Globe, TrendingUp, Cpu, Leaf, Sprout, Flame, Star, Plane,
+  Globe, TrendingUp, Cpu, Leaf, Sprout, Flame, Star, Plane, Clapperboard,
   type LucideIcon,
 } from "lucide-react";
 
@@ -36,6 +36,7 @@ const VISUALS: Record<string, { from: string; to: string; Icon: LucideIcon }> = 
   "aastha":          { from: "#f59e0b", to: "#92400e", Icon: Flame },
   "astro-guide":     { from: "#7e22ce", to: "#3b0764", Icon: Star },
   "travel":          { from: "#e11d48", to: "#881337", Icon: Plane },
+  "entertainment":   { from: "#c026d3", to: "#4a044e", Icon: Clapperboard },
   "custom":          { from: "#475569", to: "#1e293b", Icon: PenSquare },
 };
 const FALLBACK_VISUAL = { from: "#6b7280", to: "#374151", Icon: BookOpen };
