@@ -7,7 +7,7 @@ import { useLang } from "@/lib/i18n/context";
 
 type Source = {
   id: string;
-  platform: "reddit" | "x";
+  platform: "reddit" | "x" | "instagram";
   query: string;
   label: string | null;
   is_active: boolean;
@@ -22,7 +22,7 @@ export function SocialSources({ onChanged }: { onChanged?: () => void }) {
   const t = (en: string, hi: string) => (lang === "hi" ? hi : en);
 
   const [sources, setSources] = useState<Source[]>([]);
-  const [platform, setPlatform] = useState<"reddit" | "x">("reddit");
+  const [platform, setPlatform] = useState<"reddit" | "x" | "instagram">("reddit");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -64,17 +64,24 @@ export function SocialSources({ onChanged }: { onChanged?: () => void }) {
       <div className="flex flex-wrap gap-2">
         <select
           value={platform}
-          onChange={(e) => setPlatform(e.target.value as "reddit" | "x")}
+          onChange={(e) => setPlatform(e.target.value as "reddit" | "x" | "instagram")}
           className="bg-white border border-[var(--border)] text-[13px] px-2 py-1.5 rounded-lg outline-none"
         >
           <option value="reddit">Reddit</option>
           <option value="x">X / Twitter</option>
+          <option value="instagram">Instagram</option>
         </select>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder={platform === "reddit" ? t("subreddit e.g. india", "सबरेडिट जैसे india") : t("keyword / #hashtag", "कीवर्ड / #hashtag")}
+          placeholder={
+            platform === "reddit"
+              ? t("subreddit e.g. india", "सबरेडिट जैसे india")
+              : platform === "instagram"
+              ? t("IG handle e.g. rajasthanpatrika", "IG हैंडल जैसे rajasthanpatrika")
+              : t("keyword / #hashtag", "कीवर्ड / #hashtag")
+          }
           className="flex-1 min-w-[200px] bg-white border border-[var(--border)] text-[13px] px-3 py-1.5 rounded-lg outline-none focus:border-[var(--purple)]"
         />
         <button

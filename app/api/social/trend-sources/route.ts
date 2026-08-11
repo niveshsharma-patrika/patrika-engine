@@ -11,15 +11,17 @@ async function requireEditor() {
 }
 
 const Body = z.object({
-  platform: z.enum(["reddit", "x"]),
+  platform: z.enum(["reddit", "x", "instagram"]),
   query: z.string().min(1).max(120),
   label: z.string().max(120).optional(),
 });
 
-/** Normalise: strip r/ and @ / # so storage is consistent. */
+/** Normalise: strip r/, @ / #, and any instagram.com/ prefix so storage is consistent. */
 function normalise(platform: string, raw: string): string {
-  let q = raw.trim();
+  const q = raw.trim();
   if (platform === "reddit") return q.replace(/^\/?r\//i, "").replace(/[^\w]/g, "");
+  if (platform === "instagram")
+    return q.replace(/^@/, "").replace(/.*instagram\.com\//i, "").split(/[/?#]/)[0].trim();
   return q.replace(/^[@#]/, "").trim();
 }
 
@@ -55,7 +57,7 @@ export async function POST(req: Request) {
             VALUES ($1,$2,$3)
        ON CONFLICT (platform, query) DO NOTHING
          RETURNING id, platform, query, label, is_active, last_crawled_at, last_error`,
-      [parsed.data.platform, query, parsed.data.label?.trim() || (parsed.data.platform === "reddit" ? `r/${query}` : query)]
+      [parsed.data.platform, query, parsed.data.label?.trim() || (parsed.data.platform === "reddit" ? `r/${query}` : parsed.data.platform === "instagram" ? `@${query}` : query)]
     );
     if (rows.length === 0) return Response.json({ error: "Already a source." }, { status: 409 });
     return Response.json({ source: { ...rows[0], item_count: 0 } }, { status: 201 });

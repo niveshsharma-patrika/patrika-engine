@@ -1,6 +1,7 @@
 import { pool } from "@/lib/db";
 import { fetchRedditTrends } from "./reddit";
 import { fetchXTrends } from "./x-trends";
+import { fetchInstagramTrends } from "./instagram";
 import type { FetchedTrendItem } from "./trend-types";
 
 /**
@@ -12,7 +13,7 @@ import type { FetchedTrendItem } from "./trend-types";
  */
 const CONCURRENCY = 3;
 
-type SourceRow = { id: string; platform: "reddit" | "x"; query: string };
+type SourceRow = { id: string; platform: "reddit" | "x" | "instagram"; query: string };
 
 export type TrendsCrawlStats = {
   sources: number;
@@ -27,6 +28,8 @@ async function crawlSource(src: SourceRow): Promise<number> {
   const items: FetchedTrendItem[] =
     src.platform === "reddit"
       ? await fetchRedditTrends(src.query, "hot")
+      : src.platform === "instagram"
+      ? await fetchInstagramTrends(src.query)
       : await fetchXTrends(src.query);
 
   let upserted = 0;

@@ -1,5 +1,6 @@
 import { getSecret } from "@/lib/twitter/secrets";
 import { META_TOKEN, META_IG_USER_ID, type FetchedAccount, type FetchedPost } from "./types";
+import type { FetchedTrendItem } from "./trend-types";
 
 /**
  * Instagram fetcher via Meta Graph "business discovery".
@@ -82,4 +83,33 @@ export async function fetchInstagram(handle: string): Promise<FetchedAccount> {
     followers: bd.followers_count ?? null,
     posts,
   };
+}
+
+/**
+ * Adapt an IG handle's business-discovery posts to the trend-crawl's
+ * FetchedTrendItem shape, so a news outlet's Instagram flows into the SAME
+ * trends → cross-check → creative pipeline as Reddit / X. `handle` is the IG
+ * username to read. Throws (like the other fetchers) on missing token / non-
+ * business account, so the crawl records it as the source's last_error.
+ */
+export async function fetchInstagramTrends(handle: string): Promise<FetchedTrendItem[]> {
+  const acct = await fetchInstagram(handle);
+  const author = acct.displayName || handle;
+  return acct.posts.map((p: FetchedPost): FetchedTrendItem => {
+    const caption = (p.content || "").trim();
+    const title = (caption.split("\n")[0] || caption).slice(0, 200) || `@${author} पोस्ट`;
+    return {
+      externalId: `ig:${p.postId}`,
+      title,
+      body: caption,
+      url: p.url,
+      permalink: p.url,
+      thumbnail: p.mediaUrl,
+      author,
+      origin: handle,
+      score: p.likes,
+      comments: p.comments,
+      postedAt: p.postedAt,
+    };
+  });
 }
