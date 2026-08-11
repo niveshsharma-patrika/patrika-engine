@@ -24,8 +24,8 @@ export function SocialCenter() {
         {t("Social Center", "सोशल सेंटर")}
       </h1>
       <p className="text-[13px] text-[var(--text-3)] mb-5">
-        {t("Turn confirmed news and trending social posts into ready-to-post creatives — each scored for priority before you post.",
-           "पुष्ट खबरों और ट्रेंडिंग सोशल पोस्ट को पोस्ट-रेडी क्रिएटिव में बदलें — हर एक को पोस्ट करने से पहले प्राथमिकता स्कोर मिलता है।")}
+        {t("Turn confirmed news into ready-to-post packs, spin up engagement ideas for your audience, and save the best — each scored before you post.",
+           "पुष्ट खबरों को पोस्ट-रेडी पैक बनाएँ, पाठकों के लिए एंगेजमेंट आइडिया तैयार करें, और बेहतरीन को सहेजें — हर एक पोस्ट से पहले स्कोर के साथ।")}
       </p>
       <SocialTrends />
     </div>
