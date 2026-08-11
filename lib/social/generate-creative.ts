@@ -5,6 +5,7 @@ import { pool } from "@/lib/db";
 import { getModelFor } from "@/lib/ai/provider";
 import { searchGoogleNews } from "@/lib/sources/google-news";
 import { isTrustedPublisherName } from "@/lib/sources/trusted";
+import { createAdminClient } from "@/lib/supabase/server";
 import type { CreativePack } from "./trend-types";
 
 export type Corroboration = { title: string; source: string; url: string; date: string };
@@ -120,6 +121,83 @@ RULES:
       [trendId, JSON.stringify({ ...object, corroboration })]
     );
 
+    return { ok: true, pack: object, corroboration };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message.slice(0, 200) : "generation failed" };
+  }
+}
+
+type NewsSignal = { author: string | null; content: string | null; url: string | null; sources?: { name: string | null } | null };
+type NewsTrendRow = { title: string; title_hi: string | null; desk: string | null; suggested_angle: string | null; signals?: NewsSignal[] };
+
+/**
+ * Make a social creative pack from a CONFIRMED NEWS trend (the dashboard's
+ * clustered stories), not a social rumour. Because a news trend requires 3+
+ * publishers to exist, it is already corroborated — its own publisher signals
+ * ARE the cross-check, and the copy can be confident (no "unverified" hedging).
+ */
+export async function generateNewsCreative(
+  newsTrendId: string,
+  lang: "en" | "hi" = "hi"
+): Promise<{ ok: boolean; pack?: CreativePack; corroboration?: Corroboration[]; error?: string }> {
+  if (!process.env.DATABASE_URL) return { ok: false, error: "Database not configured." };
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("trends")
+    .select(`title, title_hi, desk, suggested_angle, signals ( author, content, url, sources ( name ) )`)
+    .eq("id", newsTrendId)
+    .maybeSingle();
+  const trend = data as NewsTrendRow | null;
+  if (!trend) return { ok: false, error: "News story not found." };
+
+  const resolved = await getModelFor("drafting");
+  if (!resolved) return { ok: false, error: "No AI model configured (Admin → API Keys)." };
+
+  const title = (lang === "hi" && trend.title_hi) ? trend.title_hi : trend.title;
+  const signals = (trend.signals ?? []).filter((s) => (s.content ?? "").trim());
+  const corroboration: Corroboration[] = signals.slice(0, 5).map((s) => ({
+    title: (s.content ?? "").split(" — ")[0].trim().slice(0, 120),
+    source: s.sources?.name ?? s.author ?? "News",
+    url: s.url ?? "",
+    date: "",
+  }));
+  const reportBlock = signals.slice(0, 6).map((s) => `• ${(s.content ?? "").trim()}`).join("\n");
+
+  const langLine =
+    lang === "hi"
+      ? "Write ALL copy (angle, x, instagram, facebook, youtube_title, caution) in HINDI (Devanagari). Hashtags may be English or Hindi."
+      : "Write all copy in English.";
+
+  try {
+    const { object } = await generateObject({
+      model: resolved.model,
+      schema: Schema,
+      prompt: `You are the social media editor at Patrika, an Indian news publisher. Below is a CONFIRMED news story Patrika is covering — reported by ${signals.length} outlets, so it is established news, NOT a rumour. Produce a social creative pack to post it across our channels.
+
+NEWS STORY: ${title}${trend.suggested_angle ? `\nSuggested angle: ${trend.suggested_angle}` : ""}
+What the reporting says:
+"""
+${reportBlock}
+"""
+
+Produce a social creative pack for Patrika:
+- angle: the specific news angle for the post (one sentence).
+- x: a tweet (max 280 chars incl. hashtags), punchy, Patrika voice.
+- instagram: a caption with a strong first-line hook, then 1-2 lines, then hashtags.
+- facebook: a slightly longer post (2-3 sentences).
+- youtube_title: a compelling title if this became a video/short.
+- hashtags: 5-10 relevant, high-reach hashtags (mix broad + specific).
+- image_concept: describe ONE strong visual for the post (no text baked in).
+- caution: anything sensitive to handle with care — but this is CONFIRMED news, so keep it light (no "unverified" hedging).
+
+RULES:
+- Attribute facts to the people / institutions IN the story (police, officials, the company), NEVER to the outlets that reported it, and do not name any outlet in the copy.
+- No made-up statistics, names, dates or quotes beyond the reporting above.
+- Neutral and factual on religion / politics / communal / tragic topics. Dignified, no sensationalism.
+- ${langLine}`,
+      temperature: 0.7,
+      maxOutputTokens: 1500,
+    });
     return { ok: true, pack: object, corroboration };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message.slice(0, 200) : "generation failed" };
