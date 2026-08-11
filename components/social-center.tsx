@@ -21,11 +21,11 @@ export function SocialCenter() {
     <div className="p-8 max-w-[1100px]">
       <h1 className="text-[22px] font-semibold flex items-center gap-2 mb-1">
         <TrendingUp size={20} className="text-[var(--purple)]" />
-        {t("Social trends", "सोशल ट्रेंड")}
+        {t("Social Center", "सोशल सेंटर")}
       </h1>
       <p className="text-[13px] text-[var(--text-3)] mb-5">
-        {t("What's trending on social right now — click any trend to generate a ready-to-post creative.",
-           "अभी सोशल पर जो ट्रेंड कर रहा है — किसी भी ट्रेंड पर क्लिक करके पोस्ट बनाएँ।")}
+        {t("Turn confirmed news and trending social posts into ready-to-post creatives — each scored for priority before you post.",
+           "पुष्ट खबरों और ट्रेंडिंग सोशल पोस्ट को पोस्ट-रेडी क्रिएटिव में बदलें — हर एक को पोस्ट करने से पहले प्राथमिकता स्कोर मिलता है।")}
       </p>
       <SocialTrends />
     </div>
