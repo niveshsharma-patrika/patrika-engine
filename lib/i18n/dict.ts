@@ -23,6 +23,7 @@ export const DICT = {
   navStyle:           { en: "Style module",   hi: "शैली मॉड्यूल" },
   navDirectives:      { en: "Writing Directives", hi: "लेखन निर्देश" },
   navMagazines:       { en: "Patrika+ Special Content", hi: "पत्रिका+ विशेष कंटेंट" },
+  navContentGenerator: { en: "Content Generator", hi: "कंटेंट जनरेटर" },
   navTwitter:         { en: "Twitter",        hi: "ट्विटर" },
   navSocial:          { en: "Social Center",  hi: "सोशल सेंटर" },
   navFeedback:        { en: "Feedback",       hi: "फ़ीडबैक" },

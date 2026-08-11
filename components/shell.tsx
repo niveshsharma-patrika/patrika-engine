@@ -22,6 +22,7 @@ import {
   BookOpen,
   MessageSquare,
   AtSign,
+  Wand2,
   LogOut,
 } from "lucide-react";
 
@@ -44,6 +45,7 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: E
   { href: "/style",             icon: <Type size={16} />,          key: "navStyle",       editions: ["digital"], roles: ["admin"] },
   { href: "/directives",        icon: <SlidersHorizontal size={16} />, key: "navDirectives", editions: ["digital"], roles: ["admin"] },
   { href: "/magazines",         icon: <BookOpen size={16} />,      key: "navMagazines",   editions: ["digital"] },
+  { href: "/content-generator", icon: <Wand2 size={16} />,         key: "navContentGenerator", editions: ["digital"] },
   { href: "/twitter",           icon: <AtSign size={16} />,        key: "navTwitter",     editions: ["digital"], roles: ["admin", "editor"] },
   { href: "/social",            icon: <TrendingUp size={16} />,    key: "navSocial",      editions: ["digital"], roles: ["admin", "editor"] },
   { href: "/feedback",          icon: <MessageSquare size={16} />, key: "navFeedback",    editions: ["digital", "print"] },

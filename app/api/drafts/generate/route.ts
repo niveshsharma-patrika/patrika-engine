@@ -186,8 +186,10 @@ ${samplesText}
 const Body = z.object({
   trendId: z.union([z.number(), z.string()]).nullable(),
   // The editor's typed headline/topic — used as the subject on the no-trend
-  // ("Write on a topic") path. Ignored when a trend is selected.
-  title: z.string().max(300).optional(),
+  // ("Write on a topic") path. Ignored when a trend is selected. Allows a longer
+  // paste (headline + notes/source text) for the Content Generator; the search
+  // query is bounded separately below.
+  title: z.string().max(6000).optional(),
   mode: z.enum(["factual", "angle"]).default("factual"),
   lang: z.enum(["en", "hi"]).default("en"),
   // Patrika+ magazine key. When set (article generated from a Patrika+ idea),
@@ -799,7 +801,7 @@ ${text}`,
       // bill passed/defeated, a new appointment weeks ago — is surfaced for
       // grounding, not just the last week's headlines. Older outcomes (and any
       // topic Google News RSS doesn't index) are the OpenAI web search's job.
-      groundingHits = await searchGoogleNews(topic, parsed.data.lang, 14, 60);
+      groundingHits = await searchGoogleNews(topic.slice(0, 300), parsed.data.lang, 14, 60);
       // Read + ground on ALL relevant sources found (not just a top handful), so
       // the desk's source list is complete. Capped at 12 to bound latency (they
       // fetch in parallel, each time-capped) and prompt size.
@@ -1073,7 +1075,7 @@ ${finalBody}`,
     // second identical Google News round-trip (and extra rate-limit exposure).
     const hits = groundingHits.length
       ? groundingHits
-      : await searchGoogleNews(topic, parsed.data.lang, 10);
+      : await searchGoogleNews(topic.slice(0, 300), parsed.data.lang, 10);
     const sourcesBlock = hits.length
       ? `LATEST NEWS on this topic — ${hits.length} recent reports. Use these for the CURRENT facts and developments:\n${hits
           .map((h, i) => `[${i + 1}] ${h.title}`)
