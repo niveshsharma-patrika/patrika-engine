@@ -23,6 +23,7 @@ import {
   MessageSquare,
   AtSign,
   Wand2,
+  Lock,
   LogOut,
 } from "lucide-react";
 
@@ -66,9 +67,13 @@ const SYSTEM_ROWS: Array<[string, string, "live" | "warn"]> = [
 export function Shell({ children, edition, role }: { children: React.ReactNode; edition: Edition; role: Role }) {
   const pathname = usePathname();
   const { lang, setLang, t } = useLang();
-  const nav = NAV.filter(
-    (n) => n.editions.includes(edition) && (!n.roles || n.roles.includes(role))
-  );
+  // A "print" user sees the standard (non-admin) tabs but every one except the
+  // Content Generator is locked — shown with a lock icon and rewritten to the
+  // locked screen on click. Edition doesn't gate them.
+  const isPrint = role === "print";
+  const nav = isPrint
+    ? NAV.filter((n) => !n.roles)
+    : NAV.filter((n) => n.editions.includes(edition) && (!n.roles || n.roles.includes(role)));
 
   // Standalone pages render with no masthead / sidebar chrome: the login page.
   if (pathname === "/login") {
@@ -134,7 +139,7 @@ export function Shell({ children, edition, role }: { children: React.ReactNode; 
         </div>
       </header>
 
-      <LiveTicker label={lang === "hi" ? "ताज़ा" : "On the wire"} />
+      {!isPrint && <LiveTicker label={lang === "hi" ? "ताज़ा" : "On the wire"} />}
 
       {/* Layout */}
       <div className="grid grid-cols-[232px_1fr] min-h-[calc(100vh-96px)]">
@@ -152,6 +157,7 @@ export function Shell({ children, edition, role }: { children: React.ReactNode; 
                   candidates[0] ?? { href: "" }
                 );
                 const isActive = bestMatch?.href === item.href;
+                const locked = isPrint && item.href !== "/content-generator";
                 return (
                   <li key={item.href}>
                     <Link
@@ -160,12 +166,13 @@ export function Shell({ children, edition, role }: { children: React.ReactNode; 
                         isActive
                           ? "bg-[var(--red-soft)] text-[var(--red)] font-medium"
                           : "text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-                      }`}
+                      } ${locked ? "opacity-55" : ""}`}
                     >
                       <span className={isActive ? "text-[var(--red)]" : "text-[var(--text-3)]"}>
                         {item.icon}
                       </span>
                       {t(item.key as Parameters<typeof t>[0])}
+                      {locked && <Lock size={12} className="ml-auto text-[var(--text-3)]" />}
                       {NAV_BADGES[item.href] && (
                         <span
                           className={`ml-auto px-1.5 py-px font-mono text-[11px] font-semibold rounded-full ${

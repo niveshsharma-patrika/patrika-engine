@@ -43,6 +43,19 @@ export default async function RootLayout({
     redirect("/login");
   }
 
+  // "print" users may use only the Content Generator. The edge middleware
+  // enforces this on the (up-to-7-day-cached) JWT role; re-check the LIVE role
+  // here so a just-demoted user is confined on their very next request.
+  if (
+    session?.role === "print" &&
+    pathname &&
+    pathname !== "/login" &&
+    pathname !== "/locked" &&
+    !pathname.startsWith("/content-generator")
+  ) {
+    redirect("/locked");
+  }
+
   return (
     <html
       lang="en"

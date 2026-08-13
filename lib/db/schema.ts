@@ -175,7 +175,7 @@ export const profiles = pgTable("profiles", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	unique("profiles_email_key").on(table.email),
-	check("profiles_role_check", sql`role = ANY (ARRAY['admin'::text, 'editor'::text, 'writer'::text])`),
+	check("profiles_role_check", sql`role = ANY (ARRAY['admin'::text, 'editor'::text, 'writer'::text, 'print'::text])`),
 	check("profiles_edition_check", sql`edition = ANY (ARRAY['print'::text, 'digital'::text])`),
 ]);
 

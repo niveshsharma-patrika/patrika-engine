@@ -23,7 +23,12 @@ export default function LoginPage() {
       const json = await res.json();
       if (res.ok) {
         const next = new URLSearchParams(window.location.search).get("next") || "/";
-        router.replace(next.startsWith("/") ? next : "/");
+        // A "print" user can only use the Content Generator — send them there
+        // rather than to a dashboard they'd only see locked.
+        const dest = json.user?.role === "print"
+          ? "/content-generator"
+          : next.startsWith("/") ? next : "/";
+        router.replace(dest);
         router.refresh();
       } else {
         setError(json.error ?? "Login failed");

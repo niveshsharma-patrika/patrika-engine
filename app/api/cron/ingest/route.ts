@@ -12,13 +12,15 @@ export const dynamic = "force-dynamic";
  *   - `Authorization: Bearer <CRON_SECRET>` (for manual invocation)
  */
 export async function GET(req: Request) {
-  const isVercelCron = req.headers.get("x-vercel-cron") !== null;
+  // Require the shared secret UNCONDITIONALLY. The old `x-vercel-cron` header
+  // shortcut was a Vercel-only trust signal; on the Azure/nginx deployment that
+  // header is caller-spoofable, so it must never bypass auth. Both the scheduled
+  // cron and the dev timer already send `Authorization: Bearer $CRON_SECRET`.
   const auth = req.headers.get("authorization");
   const expected = process.env.CRON_SECRET
     ? `Bearer ${process.env.CRON_SECRET}`
     : null;
-
-  if (!isVercelCron && (!expected || auth !== expected)) {
+  if (!expected || auth !== expected) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -30,7 +32,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const result = await ingestAllRss(isVercelCron ? "cron" : "manual");
+    const result = await ingestAllRss("cron");
     return Response.json({ ok: true, ...result });
   } catch (err) {
     return Response.json(

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,12 @@ type RunRow = {
  * "idle"  = last run succeeded, sitting between cron ticks.
  */
 export async function GET() {
+  // Admin-only — this exposes ingestion internals (error text, counts) and is
+  // consumed solely by the admin IngestStatus widget.
+  const session = await getSession();
+  if (session?.role !== "admin") {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
   if (!process.env.DATABASE_URL) {
     return Response.json({ state: "never", reason: "supabase_not_configured" });
   }

@@ -13,11 +13,12 @@ type User = {
   createdAt: string | null;
 };
 
-const ROLES = ["admin", "editor", "writer"];
+const ROLES = ["admin", "editor", "writer", "print"];
 const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
   editor: "Editor",
   writer: "Writer",
+  print: "Print (Content Gen only)",
 };
 const EDITIONS = ["digital", "print"];
 const EDITION_LABEL: Record<string, string> = { digital: "Digital", print: "Print" };

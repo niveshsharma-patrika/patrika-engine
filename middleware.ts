@@ -15,15 +15,25 @@ const PUBLIC_PATHS = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (
-    pathname.startsWith("/api/cron") ||
-    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
-  ) {
+  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();
   }
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifySessionToken(token) : null;
+
+  // Cron endpoints are secret-gated at the route and must stay reachable by the
+  // session-less runner — but a signed-in "print" user (confined to the Content
+  // Generator) must never reach them.
+  if (pathname.startsWith("/api/cron")) {
+    if (session?.role === "print") {
+      return NextResponse.json(
+        { error: "This account only has access to the Content Generator." },
+        { status: 403 }
+      );
+    }
+    return NextResponse.next();
+  }
 
   if (!session) {
     if (pathname.startsWith("/api/")) {
@@ -33,6 +43,37 @@ export async function middleware(request: NextRequest) {
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
+  }
+
+  // A "print" ROLE (distinct from the print edition) is a locked-down account
+  // that can use ONLY the Content Generator. Handle it fully here and return, so
+  // the edition/role checks below never apply. Pages other than the generator
+  // are rewritten to /locked (URL preserved so the clicked tab still reads as
+  // active); non-generator APIs get a 403.
+  if (session.role === "print") {
+    if (pathname.startsWith("/api/")) {
+      const apiOk = pathname.startsWith("/api/auth/") || pathname === "/api/drafts/generate";
+      if (!apiOk) {
+        return NextResponse.json(
+          { error: "This account only has access to the Content Generator." },
+          { status: 403 }
+        );
+      }
+      return NextResponse.next();
+    }
+    const allowed =
+      pathname === "/content-generator" ||
+      pathname.startsWith("/content-generator/") ||
+      pathname === "/locked";
+    if (!allowed) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/locked";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    const headers = new Headers(request.headers);
+    headers.set("x-pathname", pathname);
+    return NextResponse.next({ request: { headers } });
   }
 
   // Print-edition users get a reduced surface — only Trends today + All Stories
