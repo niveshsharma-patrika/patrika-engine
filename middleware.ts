@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/jwt";
+import { confinedFor } from "@/lib/auth/confined";
 
 /**
  * Native auth gate (replaces the old Supabase session refresh). Every request
@@ -23,12 +24,12 @@ export async function middleware(request: NextRequest) {
   const session = token ? await verifySessionToken(token) : null;
 
   // Cron endpoints are secret-gated at the route and must stay reachable by the
-  // session-less runner — but a signed-in "print" user (confined to the Content
-  // Generator) must never reach them.
+  // session-less runner — but a signed-in confined user (print / olloi, locked to
+  // one section) must never reach them.
   if (pathname.startsWith("/api/cron")) {
-    if (session?.role === "print") {
+    if (confinedFor(session?.role)) {
       return NextResponse.json(
-        { error: "This account only has access to the Content Generator." },
+        { error: "This account is restricted to its own section." },
         { status: 403 }
       );
     }
@@ -45,27 +46,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // A "print" ROLE (distinct from the print edition) is a locked-down account
-  // that can use ONLY the Content Generator. Handle it fully here and return, so
-  // the edition/role checks below never apply. Pages other than the generator
-  // are rewritten to /locked (URL preserved so the clicked tab still reads as
-  // active); non-generator APIs get a 403.
-  if (session.role === "print") {
+  // Confined single-section roles (print → Content Generator, olloi → Olloi
+  // Content). Handle fully here and return, so the edition/role checks below
+  // never apply. Their one section's pages + APIs are allowed; every other page
+  // redirects to /locked and every other API gets a 403.
+  const confined = confinedFor(session.role);
+  if (confined) {
     if (pathname.startsWith("/api/")) {
-      const apiOk = pathname.startsWith("/api/auth/") || pathname === "/api/drafts/generate";
-      if (!apiOk) {
+      if (!confined.isApi(pathname)) {
         return NextResponse.json(
-          { error: "This account only has access to the Content Generator." },
+          { error: "This account is restricted to its own section." },
           { status: 403 }
         );
       }
       return NextResponse.next();
     }
-    const allowed =
-      pathname === "/content-generator" ||
-      pathname.startsWith("/content-generator/") ||
-      pathname === "/locked";
-    if (!allowed) {
+    if (!(confined.isPage(pathname) || pathname === "/locked")) {
       const url = request.nextUrl.clone();
       url.pathname = "/locked";
       url.search = "";

@@ -23,11 +23,13 @@ import {
   MessageSquare,
   AtSign,
   Wand2,
+  Ribbon,
   Lock,
   LogOut,
 } from "lucide-react";
 
 import type { Edition, Role } from "@/lib/auth/jwt";
+import { confinedFor } from "@/lib/auth/confined";
 import { useLang } from "@/lib/i18n/context";
 import { IngestStatus } from "@/components/ingest-status";
 import { LiveTicker } from "@/components/live-ticker";
@@ -47,6 +49,7 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: E
   { href: "/directives",        icon: <SlidersHorizontal size={16} />, key: "navDirectives", editions: ["digital"], roles: ["admin"] },
   { href: "/magazines",         icon: <BookOpen size={16} />,      key: "navMagazines",   editions: ["digital"] },
   { href: "/content-generator", icon: <Wand2 size={16} />,         key: "navContentGenerator", editions: ["digital"] },
+  { href: "/olloi",             icon: <Ribbon size={16} />,        key: "navOlloi",       editions: ["digital"] },
   { href: "/twitter",           icon: <AtSign size={16} />,        key: "navTwitter",     editions: ["digital"], roles: ["admin", "editor"] },
   { href: "/social",            icon: <TrendingUp size={16} />,    key: "navSocial",      editions: ["digital"], roles: ["admin", "editor"] },
   { href: "/feedback",          icon: <MessageSquare size={16} />, key: "navFeedback",    editions: ["digital", "print"] },
@@ -67,11 +70,11 @@ const SYSTEM_ROWS: Array<[string, string, "live" | "warn"]> = [
 export function Shell({ children, edition, role }: { children: React.ReactNode; edition: Edition; role: Role }) {
   const pathname = usePathname();
   const { lang, setLang, t } = useLang();
-  // A "print" user sees the standard (non-admin) tabs but every one except the
-  // Content Generator is locked — shown with a lock icon and rewritten to the
-  // locked screen on click. Edition doesn't gate them.
-  const isPrint = role === "print";
-  const nav = isPrint
+  // A confined user (print / olloi) sees the standard (non-admin) tabs but every
+  // one except their own section is locked — shown with a lock icon and taken to
+  // the locked screen on click. Edition doesn't gate them.
+  const confined = confinedFor(role);
+  const nav = confined
     ? NAV.filter((n) => !n.roles)
     : NAV.filter((n) => n.editions.includes(edition) && (!n.roles || n.roles.includes(role)));
 
@@ -139,7 +142,7 @@ export function Shell({ children, edition, role }: { children: React.ReactNode; 
         </div>
       </header>
 
-      {!isPrint && <LiveTicker label={lang === "hi" ? "ताज़ा" : "On the wire"} />}
+      {!confined && <LiveTicker label={lang === "hi" ? "ताज़ा" : "On the wire"} />}
 
       {/* Layout */}
       <div className="grid grid-cols-[232px_1fr] min-h-[calc(100vh-96px)]">
@@ -157,7 +160,7 @@ export function Shell({ children, edition, role }: { children: React.ReactNode; 
                   candidates[0] ?? { href: "" }
                 );
                 const isActive = bestMatch?.href === item.href;
-                const locked = isPrint && item.href !== "/content-generator";
+                const locked = !!confined && item.href !== confined.home;
                 return (
                   <li key={item.href}>
                     <Link

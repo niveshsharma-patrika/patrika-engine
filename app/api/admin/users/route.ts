@@ -6,7 +6,7 @@ import { hashPassword } from "@/lib/auth/password";
 
 export const dynamic = "force-dynamic";
 
-const ROLES = ["admin", "editor", "writer", "print"];
+const ROLES = ["admin", "editor", "writer", "print", "olloi"];
 
 // User management is admin-only.
 async function requireAdmin() {

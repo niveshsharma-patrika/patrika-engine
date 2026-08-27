@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { confinedFor } from "@/lib/auth/confined";
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -23,11 +25,10 @@ export default function LoginPage() {
       const json = await res.json();
       if (res.ok) {
         const next = new URLSearchParams(window.location.search).get("next") || "/";
-        // A "print" user can only use the Content Generator — send them there
-        // rather than to a dashboard they'd only see locked.
-        const dest = json.user?.role === "print"
-          ? "/content-generator"
-          : next.startsWith("/") ? next : "/";
+        // A confined user (print / olloi) can only use one section — send them
+        // straight there rather than to a dashboard they'd only see locked.
+        const confined = confinedFor(json.user?.role);
+        const dest = confined ? confined.home : next.startsWith("/") ? next : "/";
         router.replace(dest);
         router.refresh();
       } else {

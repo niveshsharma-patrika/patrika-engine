@@ -12,7 +12,7 @@ import { enrichFromUrl, decodeEntities } from "@/lib/enrich/json-ld";
 import { normalizeHindiTypography } from "@/lib/text/hindi";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
-import { MAGAZINE_BY_KEY } from "@/lib/magazines";
+import { MAGAZINE_BY_KEY, isOlloiDesk, OLLOI_DISCLAIMER } from "@/lib/magazines";
 
 // Web-search-grounded drafting (write-on-a-topic) does live research — and now
 // a conditional second "expand" pass — so give it generous room before the
@@ -519,7 +519,12 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const trend = await resolveTrend(parsed.data.trendId);
+  let trend = await resolveTrend(parsed.data.trendId);
+  // SAFETY: Olloi (cancer) content MUST go through the guarded topic path — the
+  // only branch that injects the strict safety block and appends the mandatory
+  // patient-safety disclaimer. Never let it take the trend branch (which has
+  // neither), even if a request pairs a trendId with magazine="cancer-care".
+  if (isOlloiDesk(parsed.data.magazine?.trim())) trend = null;
   const drafting = await getModelFor("drafting");
   if (!drafting) {
     return Response.json(
@@ -594,6 +599,24 @@ export async function POST(req: Request) {
     const evidenceBlock = referenceOk
       ? `\n\nAUTHORITATIVE EVIDENCE — this is a reader explainer, so ground every factual / health / scientific / how-it-works claim in AUTHORITATIVE reference sources, NOT news or blogs: named peer-reviewed studies (name the journal + year + the finding) and official/expert bodies — WHO, ICMR, AIIMS, NIH / PubMed, CDC, Mayo Clinic, NHS for health; FSSAI, NIN, USDA for food & nutrition; UNESCO, NCERT, universities for education. Name the specific study or institution. If you cannot find a real authoritative source for a claim, keep it general — NEVER invent a study, statistic, dosage or expert.`
       : "";
+    // Olloi (cancer) desks: sensitive patient education. Enforce population-level
+    // safety in the prompt, and note the standard disclaimer is auto-appended so
+    // the model doesn't write its own (avoids a double disclaimer).
+    const olloiDesk = isOlloiDesk(magKey);
+    const olloiBlock = olloiDesk
+      ? `\n\nCANCER-PATIENT SAFETY (STRICT) — this is population-level patient education for cancer patients, families and survivors, NOT advice for any one person. NEVER give patient-level guidance: no diagnosis, staging, prognosis or survival prediction; no drug/chemo dose or regimen, radiation Gy/fractions, or supportive-med dosing; never tell anyone to start, stop, delay, change or refuse treatment; never interpret a specific report/scan/marker; no cure/miracle/guarantee claims; never present a supplement, herb or diet as anti-cancer or immunity-boosting (only: "show everything you take to your oncologist/pharmacist"). Compassionate, plain, hopeful-but-honest language; use "often/usually/for many people", never "always/never/everyone"; NO war/battle metaphors; never blame the patient. Every clinical claim must trace to an authoritative source (India-specific claims to an Indian source: Tata Memorial, ICMR-NCDIR, AIIMS, National Cancer Grid, MoHFW; schemes to PM-JAY/official portals) — if unsure, write less, not wrong. A standard patient-safety disclaimer (with emergency symptoms + helpline) is appended AUTOMATICALLY, so do NOT write your own disclaimer, helpline or "consult your doctor" closing block.`
+      : "";
+    // Deterministic guarantee: append the canonical safety disclaimer to every
+    // Olloi article, regardless of what the model wrote.
+    const withOlloiDisclaimer = (body: string): string => {
+      if (!olloiDesk) return body;
+      // Strip any trailing disclaimer / helpline block the model wrote despite
+      // the instruction, so the canonical one is never duplicated.
+      const sig = /(डिस्क्लेमर|अस्वीकरण|यह लेख केवल सामान्य जानकारी|डॉक्टर की सलाह का विकल्प|ऑन्कोलॉजिस्ट से|Tele-?MANAS|टेली-?मानस|हेल्पलाइन|disclaimer|not a substitute|consult your (doctor|oncologist))/i;
+      const paras = body.trimEnd().split(/\n{2,}/);
+      while (paras.length > 1 && sig.test(paras[paras.length - 1])) paras.pop();
+      return paras.join("\n\n").trimEnd() + "\n\n" + (isHi ? OLLOI_DISCLAIMER.hi : OLLOI_DISCLAIMER.en);
+    };
     const magPrompt = magKey ? directives.magazineContent?.[magKey] : undefined;
 
     // Remember this idea as "used" so the idea generator never surfaces the same
@@ -932,7 +955,7 @@ STEP 3 — WRITE:
 • End with a natural, forward-looking conclusion — and nothing after it (no note about word count, sources or "facts verified").
 • Patrika voice. Do NOT name other news outlets. No source links or URLs in the text, but keep every specific fact, date, number and name you use.
 • Never refuse; always produce the full finished article.
-${framing}${magazineBlock}${evidenceBlock}`;
+${framing}${magazineBlock}${evidenceBlock}${olloiBlock}`;
 
       const bodyRes = await generateText({
         model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
@@ -994,7 +1017,7 @@ Then rewrite so that:
 - Everything you CAN verify stays — do NOT strip a fact merely because you did not personally re-find it; only remove things that are clearly fabricated, contradicted or outdated. Add any missing key real fact you find while checking.${expandNote}
 - SILENT OUTPUT: never tell the reader about your checking. Do NOT write any preface (no "नीचे प्रस्तुत है… संशोधित/तथ्यपरक फीचर", no "सभी तथ्य/आंकड़े की पुष्टि की गई है"), no confidence notes ("इसकी पुष्टि नहीं मिली", "सामान्य रूप में प्रस्तुत किया गया है", "नाम/उद्धरण उपलब्ध नहीं हैं"), and no word-count / sources line. The output is ONLY the clean, confident finished article.
 - Preserve the voice, structure, flowing-prose style and SIMPLE everyday language. Do NOT introduce any NEW unverified claim. Do NOT name news outlets.
-- STRUCTURE: the final article must keep (or, if missing, gain) AT LEAST 5 short plain-text subheadings and at least ${targetWords} words; keep any data table the draft has (and add a simple one only if comparable data genuinely calls for it). ${langLine}${evidenceBlock}${sourceGrounding}
+- STRUCTURE: the final article must keep (or, if missing, gain) AT LEAST 5 short plain-text subheadings and at least ${targetWords} words; keep any data table the draft has (and add a simple one only if comparable data genuinely calls for it). ${langLine}${evidenceBlock}${olloiBlock}${sourceGrounding}
 
 Return ONLY the corrected article — nothing else.
 
@@ -1060,7 +1083,7 @@ ${finalBody}`,
         titles: titles.map(normalizeHindiTypography),
         description: normalizeHindiTypography(description),
         title: topic,
-        body: finalBody,
+        body: withOlloiDisclaimer(finalBody),
         mode: parsed.data.mode,
         sources: sourceArticles.length,
         sourceArticles,
@@ -1099,7 +1122,7 @@ ${sourcesRule}
 • Report the CURRENT status/outcome of any event (a bill's result, who holds a post now) rather than freezing it at its announcement. If you can't confirm a specific, DROP it and write the general truth — never keep it with a hedge, and NEVER write meta-lines like "इसकी पुष्टि नहीं मिली" / "सामान्य रूप में प्रस्तुत" / "सभी तथ्य की पुष्टि की गई है". Output only the clean article.
 • End with the conclusion itself — no note about word count or sources.
 • Never refuse; always produce the article. Do NOT name other news outlets.
-${framing}${magazineBlock}${evidenceBlock}`;
+${framing}${magazineBlock}${evidenceBlock}${olloiBlock}`;
     // If the web-search path already burned most of the budget before throwing,
     // don't start a fresh full generation that would 504 anyway — fail cleanly
     // so the user can retry, rather than losing everything to a proxy timeout.
@@ -1128,7 +1151,7 @@ ${framing}${magazineBlock}${evidenceBlock}`;
       titles: fbTitles.map(normalizeHindiTypography),
       description: normalizeHindiTypography(fbDescription),
       title: topic,
-      body: normalizeHindiTypography(fbBody),
+      body: withOlloiDisclaimer(normalizeHindiTypography(fbBody)),
       mode: parsed.data.mode,
       sources: sourceArticles.length,
       sourceArticles,

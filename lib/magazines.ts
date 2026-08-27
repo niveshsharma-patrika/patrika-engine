@@ -11,6 +11,10 @@
 
 export type Magazine = {
   key: string;
+  // Which side-section the desk belongs to. Omitted = "patrika" (Patrika+
+  // Special Content). "olloi" desks render under the separate Olloi Content
+  // section (e.g. the Saath cancer-support content).
+  group?: "patrika" | "olloi";
   nameEn: string;
   nameHi: string;
   tagline: string;       // positioning (Hindi)
@@ -357,6 +361,41 @@ export const MAGAZINES: Magazine[] = [
         brief: "पाठक के लिए क्या देखें — फिल्म/सीरीज़/म्यूजिक की क्यूरेटेड, ईमानदार सिफारिश।" },
     ],
   },
+  // ── Olloi Content — the "Saath" cancer-support app ────────────────────────
+  // SENSITIVE MEDICAL DESK. AI writes POPULATION-LEVEL patient education only;
+  // never patient-level advice. Every article must be reviewed by a qualified
+  // oncologist before it can carry "Reviewed by Dr. X" and be published.
+  {
+    key: "cancer-care",
+    group: "olloi",
+    nameEn: "Cancer Care",
+    nameHi: "कैंसर केयर",
+    tagline: "कैंसर मरीजों, परिजनों और सर्वाइवर्स के लिए भरोसेमंद, विशेषज्ञ-आधारित जानकारी",
+    reader: "कैंसर मरीज, परिजन/देखभालकर्ता और सर्वाइवर",
+    age: "सभी उम्र",
+    cadence: "विशेषज्ञ-समीक्षित — हर लेख डॉक्टर की समीक्षा के बाद ही प्रकाशित",
+    subVerticals: [
+      "कैंसर की बुनियादी जानकारी",
+      "इलाज व साइड-इफेक्ट की सामान्य देखभाल",
+      "पोषण व मानसिक स्वास्थ्य",
+      "रोकथाम व शुरुआती पहचान",
+      "परिजन/देखभालकर्ता सहायता",
+    ],
+    structure: "पहले पाठक की भावना को स्वीकारें, फिर सरल भाषा में आबादी-स्तर की जानकारी; बीच में 'डॉक्टर से पूछने के सवाल'; अंत में एक व्यावहारिक अगला कदम व मदद-मार्ग — कोई व्यक्तिगत इलाज-निर्देश नहीं",
+    compliance: "मेडिकल डिस्क्लेमर + डॉक्टर से सलाह + रिसर्च लिंक अनिवार्य; यह डॉक्टर/इलाज का विकल्प नहीं; कोई खुराक/डोज़, दवा-रेजीमेन, रेडिएशन-फ्रैक्शन/Gy या एक्सट्रीम डाइट-नंबर नहीं; इलाज खुद शुरू/बंद/टालें/बदलें नहीं; व्यक्तिगत निदान/स्टेज/प्रोग्नोसिस या सर्वाइवल-प्रेडिक्शन नहीं; रिपोर्ट/जाँच की व्याख्या नहीं; कोई इलाज/चमत्कार/गारंटी का दावा नहीं; कोई सप्लीमेंट/जड़ी-बूटी/डाइट को कैंसर-रोधी या इम्युनिटी-बूस्टर के रूप में नहीं — 'जो कुछ भी ले रहे हैं वह ऑन्कोलॉजिस्ट/फार्मासिस्ट को दिखाएँ'; जंग/लड़ाई जैसी भाषा और दोष/गिल्ट नहीं; इमरजेंसी लक्षणों (कीमो में बुखार ≥100.4°F/38°C, बेकाबू रक्तस्राव, साँस फूलना, तेज़ दर्द, भ्रम) पर तुरंत ऑन्कोलॉजी टीम/नज़दीकी इमरजेंसी/112; संकट-विषयों पर Tele-MANAS 14416; हर क्लिनिकल दावा अधिकृत स्रोत से (भारत-विशिष्ट दावे भारतीय स्रोत से); अनिश्चित हो तो कम लिखें, गलत नहीं (जानकारी कम हो सकती है, लेकिन गलत जानकारी नहीं); हर लेख पर असली, योग्य ऑन्कोलॉजिस्ट की समीक्षा के बाद ही 'Reviewed by Dr. X'।",
+    filters: [
+      { key: "expert_explainer", label: "विशेषज्ञ जानकारी",
+        brief: "किसी एक कैंसर-विषय को आम-आदमी की भाषा में, आबादी-स्तर पर समझाएँ — 'आम तौर पर', किसी एक मरीज़ के केस पर नहीं। पहले भावना को स्वीकारें, फिर जानकारी दें। हर क्लिनिकल दावा किसी अधिकृत स्रोत से जुड़ा हो; अनिश्चित हों तो कम लिखें, संख्या न गढ़ें और ऑन्कोलॉजिस्ट के पास भेजें। अंत में 'डॉक्टर से पूछने के सवाल' और अगला कदम दें।" },
+      { key: "cancer_knowledge", label: "कैंसर जानकारी",
+        brief: "बुनियादी शिक्षा: कैंसर क्या है, प्रकार, इलाज के विकल्प (कीमो/रेडिएशन/सर्जरी — केवल सामान्य उद्देश्य), इलाज के दौरान सावधानियाँ, आम साइड-इफेक्ट और उनकी सामान्य देखभाल, पोषण (कोई एक्सट्रीम डाइट-नंबर नहीं), मानसिक स्वास्थ्य, उपशामक देखभाल, सरकारी योजनाएँ, आम सवाल-जवाब। छोटे सेक्शन, स्कैन करने लायक। पैलिएटिव केयर को 'इलाज छोड़ना' न बताएँ। हर संख्या/योजना-राशि आधिकारिक स्रोत से; अन्यथा गुणात्मक सच लिखें।" },
+      { key: "myths_vs_facts", label: "मिथक बनाम तथ्य",
+        brief: "'ट्रुथ-सैंडविच' अनिवार्य: (1) शीर्षक और पहली पंक्ति में सत्यापित तथ्य — मिथक कभी नहीं; (2) मिथक शरीर में केवल एक बार, स्पष्ट रूप से 'यह सही नहीं है' के साथ; (3) यह क्यों गलत/कहाँ से आया; (4) तथ्य दोहराएँ + क्या करें (ऑन्कोलॉजिस्ट से बात करें)। सारांश/की-पॉइंट/शेयर-टेक्स्ट में केवल तथ्य। केवल भारत में सचमुच फैले मिथक लें (चीनी ट्यूमर को भूखा नहीं मारती, बायोप्सी फैलाती नहीं, कैंसर छुआछूत नहीं, गौमूत्र/वैकल्पिक इलाज, पॉज़िटिव सोच से ठीक नहीं)। विश्वास करने वाले का मज़ाक न उड़ाएँ।" },
+      { key: "prevention_early_detection", label: "रोकथाम और शुरुआती पहचान",
+        brief: "आबादी-स्तर पर स्क्रीनिंग, तंबाकू (भारत में बड़ा जोखिम), HPV/HBV टीकाकरण, चेतावनी-संकेत — भारतीय दिशानिर्देशों पर आधारित, हमेशा 'डॉक्टर को दिखाएँ' की ओर, स्वयं-निदान कभी नहीं। पहले से निदान पाए व्यक्ति को पीछे मुड़कर दोष न दें; यह जोड़ें: 'कैंसर किसी की गलती नहीं; कई लोग जिन्होंने कभी धूम्रपान/खराब खानपान नहीं किया, फिर भी कैंसर होता है।' स्क्रीनिंग-आयु/शेड्यूल केवल तिथि-युक्त आधिकारिक स्रोत से।" },
+      { key: "caregiver_support", label: "देखभालकर्ता सहायता",
+        brief: "देखभालकर्ताओं के लिए सामान्य व्यावहारिक व भावनात्मक मार्गदर्शन — कोई व्यक्तिगत चिकित्सा-निर्देश नहीं। बर्नआउट को असली और जायज़ बताएँ, स्वार्थ नहीं; आराम, मदद माँगने और शोक की अनुमति दें। भारत में संयुक्त-परिवार दबाव, 'कर्तव्य' अपेक्षा और कलंक को नरमी से संबोधित करें, बिना परिवार को दोष दिए। ठोस सहायता-मार्ग (रेस्पाइट, सपोर्ट-ग्रुप, काउंसलिंग, हेल्पलाइन) दें। 'मज़बूत बनो' जैसे भावना-आदेश नहीं।" },
+    ],
+  },
   {
     // Freeform desk: the writer supplies their OWN topic and the full research +
     // verification pipeline generates the article. No idea generator — you type
@@ -377,6 +416,20 @@ export const MAGAZINES: Magazine[] = [
 export const MAGAZINE_BY_KEY: Record<string, Magazine> = Object.fromEntries(
   MAGAZINES.map((m) => [m.key, m])
 );
+
+/** True when a desk belongs to the Olloi Content section (sensitive medical
+ * content — e.g. the cancer-care desk). */
+export function isOlloiDesk(magKey?: string | null): boolean {
+  return !!magKey && MAGAZINE_BY_KEY[magKey]?.group === "olloi";
+}
+
+/** Mandatory patient-safety disclaimer, appended deterministically to every
+ * Olloi (cancer) article — a hard guarantee on top of the prompt's own
+ * disclaimer instruction, so the emergency + helpline routing is never dropped. */
+export const OLLOI_DISCLAIMER = {
+  hi: "यह लेख केवल सामान्य जानकारी के लिए है और आपके डॉक्टर की सलाह का विकल्प नहीं है। यह किसी एक व्यक्ति के इलाज की सिफारिश नहीं है। अपने इलाज से जुड़े किसी भी निर्णय के लिए अपने ऑन्कोलॉजिस्ट से बात करें — इलाज खुद शुरू, बंद, टालें या न बदलें। कोई भी सप्लीमेंट, जड़ी-बूटी या डाइट शुरू करने से पहले अपने डॉक्टर और फार्मासिस्ट को बताएँ। आपातकालीन लक्षण (कीमो के दौरान बुखार 100.4°F/38°C या अधिक, बेकाबू रक्तस्राव, साँस फूलना, तेज़ दर्द, भ्रम, तरल न टिक पाना) होने पर तुरंत अपनी ऑन्कोलॉजी टीम या नज़दीकी इमरजेंसी/112 से संपर्क करें। मानसिक तनाव में Tele-MANAS 14416 (1-800-891-4416) पर बात करें।",
+  en: "This article is for general information only and is not a substitute for your doctor's advice. It is not a treatment recommendation for any one person. Talk to your treating oncologist about any decisions regarding your care — do not start, stop, delay, or change any treatment based on this article. Before taking any supplement, herbal product, or diet, tell your doctor and pharmacist. For emergency symptoms — fever of 100.4°F/38°C or higher during chemotherapy, uncontrolled bleeding, breathlessness, severe pain, confusion, or inability to keep fluids down — contact your oncology team or nearest emergency service / 112 now. For emotional distress, reach Tele-MANAS 14416 (1-800-891-4416).",
+};
 
 /** Idea-generation prompt (Layer 1) — asks for a batch of fresh topic ideas
  * spread across the magazine's five sub-verticals. The generator adds the

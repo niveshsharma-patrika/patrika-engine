@@ -7,9 +7,11 @@ import { SignJWT, jwtVerify } from "jose";
 export const SESSION_COOKIE = "patrika_session";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
-// "print" is a restricted user type: access to the Content Generator only —
-// every other section is locked. (Distinct from the "print" *edition*.)
-export type Role = "admin" | "editor" | "writer" | "print";
+// "print" and "olloi" are restricted single-section user types (see
+// lib/auth/confined.ts): "print" can use only the Content Generator, "olloi"
+// only the Olloi Content section — every other page/API is locked for them.
+// ("print" the role is distinct from the "print" *edition*.)
+export type Role = "admin" | "editor" | "writer" | "print" | "olloi";
 export type Edition = "print" | "digital";
 export type Session = {
   userId: string;

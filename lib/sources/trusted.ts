@@ -68,6 +68,10 @@ const REFERENCE_DOMAINS: string[] = [
   // India — health / nutrition / food safety / ayush
   "icmr.gov.in", "mohfw.gov.in", "aiims.edu", "nin.res.in", "fssai.gov.in", "ayush.gov.in",
   "nhp.gov.in",
+  // Cancer / oncology (global + India) — Olloi cancer-care desk
+  "iarc.who.int", "cancer.gov", "cancer.org", "nccn.org", "esmo.org", "cochrane.org",
+  "uicc.org", "tmc.gov.in", "tatamemorialcentre.com", "ncdirindia.org", "ncgrid.org.in",
+  "pmjay.gov.in", "ctri.nic.in", "janaushadhi.gov.in", "nppa.gov.in",
   // Nutrition / food
   "eatright.org", "nutritionsource.hsph.harvard.edu", "usda.gov", "fao.org",
   // Education / academic / science
@@ -81,6 +85,7 @@ const REFERENCE_TLDS: string[] = [".edu", ".ac.in", ".edu.in", ".res.in"];
 // reference sources above to the trusted set.
 const EVIDENCE_DESKS = new Set<string>([
   "health-plus", "food-culture", "ai-education", "public-guide", "nari-shakti",
+  "cancer-care",
 ]);
 
 /** True for desks whose facts should come from authoritative references, not news. */

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
 import { getModelFor, getApiKey } from "@/lib/ai/provider";
 import { getEffectiveDirectives } from "@/lib/ai/directives";
-import { MAGAZINE_BY_KEY } from "@/lib/magazines";
+import { MAGAZINE_BY_KEY, isOlloiDesk } from "@/lib/magazines";
 import { pool } from "@/lib/db";
 import { searchGoogleNews, resolveArticleUrl } from "@/lib/sources/google-news";
 import { isTrustedPublisherName } from "@/lib/sources/trusted";
@@ -122,8 +122,11 @@ export async function POST(req: Request) {
   }
 
   // (B) Otherwise (or if the news fetch was empty): an OpenAI web-search digest.
+  // SKIPPED for Olloi (cancer) desks — an unfiltered open-web digest could seed
+  // unsafe idea topics; ideas come from the compliance-constrained prompt + the
+  // filter's brief instead. (The article route does the guarded research.)
   const openaiKey = await getApiKey("openai");
-  if (!currentContext && openaiKey) {
+  if (!currentContext && openaiKey && !isOlloiDesk(magKey)) {
     let query: string;
     if (filter?.key === "current") {
       query = `भारत में इस समय चर्चा में चल रहे अलग-अलग, विविध प्रमुख राजनीतिक मुद्दे — राष्ट्रीय और विभिन्न राज्यों से, अलग-अलग दलों, नीतियों, चुनावों, संसद, विवादों और शासन से जुड़े। कम से कम 8–10 भिन्न-भिन्न मुद्दे, हर एक का नाम, सही तारीख/घटनाक्रम और ठोस विवरण।`;

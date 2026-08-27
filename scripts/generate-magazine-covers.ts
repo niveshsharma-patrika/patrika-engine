@@ -47,6 +47,8 @@ const COVERS: Array<{ key: string; prompt: string }> = [
   { key: "aastha", prompt: `a traditional Indian temple at dawn with lit oil lamps (diyas) and marigold flowers in the foreground, serene devotional mood, ${STYLE}` },
   { key: "astro-guide", prompt: `a starry night sky over a calm Indian landscape with a softly silhouetted temple, a brass oil lamp and marigold on a table in the foreground, warm mystical traditional mood, ${STYLE}` },
   { key: "travel", prompt: `a traveller with a backpack looking out over a scenic Indian landscape of hills and a lake at golden hour, wanderlust mood, ${STYLE}` },
+  // ── Olloi Content ──
+  { key: "cancer-care", prompt: `a warm, hopeful and dignified moment — a caring Indian family member gently holding the hand of an older cancer patient wearing a soft headscarf, both calm and reassured, in a bright airy room with soft natural light, compassionate and supportive mood, ${STYLE}` },
 ];
 
 async function generate(prompt: string): Promise<Buffer> {

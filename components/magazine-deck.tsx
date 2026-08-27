@@ -1,0 +1,313 @@
+"use client";
+
+import { useState } from "react";
+import {
+  ArrowLeft, Lightbulb, Loader2, PenSquare,
+  ShieldAlert, Landmark, Building2, Wheat, Scale, HeartHandshake,
+  HeartPulse, GraduationCap, Trophy, UtensilsCrossed, BookOpen,
+  Globe, TrendingUp, Cpu, Leaf, Sprout, Flame, Star, Plane, Clapperboard,
+  Ribbon,
+  type LucideIcon,
+} from "lucide-react";
+
+import { MAGAZINES } from "@/lib/magazines";
+import { useLang } from "@/lib/i18n/context";
+import { Editor } from "@/app/page";
+
+type Idea = { headline: string; subVertical: string; hook: string; benefit: string };
+
+// Themed cover per magazine (gradient + icon) — a stand-in visual until real
+// artwork is added.
+const VISUALS: Record<string, { from: string; to: string; Icon: LucideIcon }> = {
+  "crime-files":     { from: "#991b1b", to: "#450a0a", Icon: ShieldAlert },
+  "politics-power":  { from: "#4338ca", to: "#1e1b4b", Icon: Landmark },
+  "city-pulse":      { from: "#0d9488", to: "#134e4a", Icon: Building2 },
+  "rural-panchayat": { from: "#16a34a", to: "#14532d", Icon: Wheat },
+  "public-guide":    { from: "#2563eb", to: "#172554", Icon: Scale },
+  "nari-shakti":     { from: "#db2777", to: "#500724", Icon: HeartHandshake },
+  "health-plus":     { from: "#059669", to: "#064e3b", Icon: HeartPulse },
+  "ai-education":    { from: "#7c3aed", to: "#2e1065", Icon: GraduationCap },
+  "game-on":         { from: "#ea580c", to: "#7c2d12", Icon: Trophy },
+  "food-culture":    { from: "#d97706", to: "#78350f", Icon: UtensilsCrossed },
+  "world":           { from: "#1e40af", to: "#172554", Icon: Globe },
+  "business":        { from: "#0891b2", to: "#164e63", Icon: TrendingUp },
+  "tech-pulse":      { from: "#4f46e5", to: "#312e81", Icon: Cpu },
+  "climate":         { from: "#0284c7", to: "#0c4a6e", Icon: Leaf },
+  "kisan":           { from: "#65a30d", to: "#3f6212", Icon: Sprout },
+  "aastha":          { from: "#f59e0b", to: "#92400e", Icon: Flame },
+  "astro-guide":     { from: "#7e22ce", to: "#3b0764", Icon: Star },
+  "travel":          { from: "#e11d48", to: "#881337", Icon: Plane },
+  "entertainment":   { from: "#c026d3", to: "#4a044e", Icon: Clapperboard },
+  "cancer-care":     { from: "#7c3aed", to: "#4c1d95", Icon: Ribbon },
+  "custom":          { from: "#475569", to: "#1e293b", Icon: PenSquare },
+};
+const FALLBACK_VISUAL = { from: "#6b7280", to: "#374151", Icon: BookOpen };
+
+type Group = "patrika" | "olloi";
+
+/**
+ * The desk deck — pick a desk, generate ideas, open the full composer. Shared by
+ * the Patrika+ section (/magazines) and the Olloi Content section (/olloi),
+ * parameterised by `group` so each shows only its own desks. Same research /
+ * verify / trusted-source pipeline for both.
+ */
+export function MagazineDeck({
+  group, titleHi, titleEn, subtitleHi, subtitleEn,
+}: {
+  group: Group; titleHi: string; titleEn: string; subtitleHi: string; subtitleEn: string;
+}) {
+  const { lang } = useLang();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string | null>(null);
+  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [loadingIdeas, setLoadingIdeas] = useState(false);
+  const [ideasErr, setIdeasErr] = useState<string | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerTitle, setComposerTitle] = useState("");
+  const [customTopic, setCustomTopic] = useState("");
+
+  const DESKS = MAGAZINES.filter((m) => (m.group ?? "patrika") === group);
+  const mag = DESKS.find((m) => m.key === selected) ?? null;
+
+  function open(key: string) {
+    setSelected(key);
+    setFilter(null);
+    setIdeas([]);
+    setIdeasErr(null);
+  }
+
+  function openComposer(seed: string) {
+    setComposerTitle(seed.trim());
+    setComposerOpen(true);
+  }
+
+  async function genIdeas() {
+    if (!mag) return;
+    setLoadingIdeas(true);
+    setIdeasErr(null);
+    try {
+      const r = await fetch("/api/magazine/ideas", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ magazine: mag.key, filter: filter ?? undefined }),
+      });
+      const d = await r.json();
+      if (!r.ok) setIdeasErr(d.error ?? "Failed");
+      else setIdeas(Array.isArray(d.ideas) ? d.ideas : []);
+    } catch {
+      setIdeasErr("Network error");
+    } finally {
+      setLoadingIdeas(false);
+    }
+  }
+
+  // ─── Desk picker ───
+  if (!mag) {
+    return (
+      <>
+        <div className="pb-4 mb-6 border-b border-[var(--border)]">
+          <h1 className="text-2xl font-medium">{lang === "hi" ? titleHi : titleEn}</h1>
+          <p className="text-[13px] text-[var(--text-3)] mt-1 max-w-2xl">
+            {lang === "hi" ? subtitleHi : subtitleEn}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+          {[...DESKS]
+            .sort((a, b) => (a.key === "custom" ? -1 : b.key === "custom" ? 1 : 0))
+            .map((m) => {
+              const v = VISUALS[m.key] ?? FALLBACK_VISUAL;
+              return (
+                <button
+                  key={m.key}
+                  onClick={() => open(m.key)}
+                  className="text-left bg-white border border-[var(--border)] rounded-lg overflow-hidden hover:border-[var(--red)] hover:shadow-sm transition-colors"
+                >
+                  <div
+                    className="h-14 flex items-center justify-center relative overflow-hidden"
+                    style={{ background: `linear-gradient(135deg, ${v.from}, ${v.to})` }}
+                  >
+                    <v.Icon size={22} strokeWidth={1.5} className="text-white/90" />
+                    {/* AI-generated cover overlays the gradient; falls back to it if absent. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/magazines/${m.key}.jpg`}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+                  <div className="p-2.5">
+                    <div className="text-[13px] font-semibold text-[var(--text)] leading-tight">{m.nameHi}</div>
+                    <div className="text-[9px] text-[var(--text-3)] uppercase tracking-wide mb-1">{m.nameEn}</div>
+                    <div className="text-[11px] text-[var(--text-2)] leading-snug line-clamp-2">{m.tagline}</div>
+                  </div>
+                </button>
+              );
+            })}
+        </div>
+      </>
+    );
+  }
+
+  // ─── Desk workspace ───
+  return (
+    <>
+      <button
+        onClick={() => setSelected(null)}
+        className="flex items-center gap-1.5 text-[13px] text-[var(--text-3)] hover:text-[var(--text)] mb-4"
+      >
+        <ArrowLeft size={14} /> {lang === "hi" ? "वापस" : "Back"}
+      </button>
+
+      <div className="pb-4 mb-5 border-b border-[var(--border)]">
+        <h1 className="text-2xl font-medium">
+          {mag.nameHi} <span className="text-[14px] text-[var(--text-3)] font-normal">· {mag.nameEn}</span>
+        </h1>
+        <p className="text-[13px] text-[var(--text-3)] mt-1">{mag.tagline} · {mag.reader} ({mag.age})</p>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {mag.subVerticals.map((s, i) => (
+            <span key={i} className="text-[10px] bg-[var(--surface-2)] text-[var(--text-2)] px-2 py-0.5 rounded-full">
+              {s}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Desk angle filters — steer both idea generation and the article. */}
+      {mag.filters && mag.filters.length > 0 && (
+        <div className="mb-5">
+          <div className="text-[11px] text-[var(--text-3)] mb-1.5">
+            {lang === "hi" ? "एंगल चुनें (वैकल्पिक)" : "Choose an angle (optional)"}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {mag.filters.map((f) => {
+              const active = filter === f.key;
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(active ? null : f.key)}
+                  title={f.brief}
+                  className={`text-[12px] px-3 py-1.5 rounded-full border transition-colors ${
+                    active
+                      ? "border-[var(--red)] bg-[var(--red-soft)] text-[var(--text)] font-medium"
+                      : "border-[var(--border)] text-[var(--text-2)] hover:border-[var(--text-3)]"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Custom desk: type your own topic, then run the full pipeline on it. */}
+      {mag.key === "custom" && (
+        <section className="max-w-2xl">
+          <h2 className="text-[15px] font-semibold flex items-center gap-1.5 mb-1.5">
+            <PenSquare size={16} className="text-[var(--text-2)]" />
+            {lang === "hi" ? "अपना विषय लिखें" : "Write your own topic"}
+          </h2>
+          <p className="text-[12px] text-[var(--text-3)] mb-3">
+            {lang === "hi"
+              ? "जो भी विषय आप लिखवाना चाहते हैं, उसे नीचे लिखें। हमारा पूरा रिसर्च, सोर्स-वेरिफिकेशन और फैक्ट-चेक पाइपलाइन उसी पर आर्टिकल बनाएगा।"
+              : "Type any topic you want written. Our full research, source-verification and fact-check pipeline runs on it — same as every Patrika+ story."}
+          </p>
+          <textarea
+            value={customTopic}
+            onChange={(e) => setCustomTopic(e.target.value)}
+            rows={2}
+            maxLength={280}
+            placeholder={lang === "hi"
+              ? "जैसे: भारत में यूपीआई से डिजिटल पेमेंट का असर और आगे की राह"
+              : "e.g. The impact of UPI on India's cash economy and what comes next"}
+            className="w-full bg-white border border-[var(--border)] text-[14px] px-3 py-2.5 rounded-lg outline-none focus:border-[var(--red)] resize-none"
+          />
+          <button
+            onClick={() => openComposer(customTopic)}
+            disabled={!customTopic.trim()}
+            className="mt-3 bg-[var(--red)] hover:bg-[var(--red-hover)] disabled:opacity-40 text-white text-[13px] font-medium px-4 py-2 rounded flex items-center gap-1.5"
+          >
+            <PenSquare size={13} />
+            {lang === "hi" ? "आर्टिकल बनाएँ" : "Generate article"}
+          </button>
+        </section>
+      )}
+
+      {/* Ideas — generate, then pick one to open the full composer */}
+      {mag.key !== "custom" && (
+      <section>
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-[15px] font-semibold flex items-center gap-1.5">
+              <Lightbulb size={16} className="text-[var(--amber)]" /> {lang === "hi" ? "आइडिया जनरेटर" : "Ideas generator"}
+            </h2>
+            <p className="text-[12px] text-[var(--text-3)] mt-0.5 max-w-xl">
+              {lang === "hi"
+                ? "आइडिया बनाएं, फिर किसी एक पर 'आर्टिकल बनाएँ' दबाकर पूरा कंपोज़र (सभी कंट्रोल्स के साथ) खोलें।"
+                : "Generate ideas, then hit 'Generate article' on one to open the full composer — same as trending, with all the controls."}
+            </p>
+          </div>
+          <button
+            onClick={genIdeas}
+            disabled={loadingIdeas}
+            className="shrink-0 bg-[var(--text)] hover:bg-black text-white text-[13px] font-medium px-4 py-2 rounded disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {loadingIdeas && <Loader2 size={13} className="animate-spin" />}
+            {loadingIdeas
+              ? lang === "hi" ? "बना रहे…" : "Generating…"
+              : ideas.length
+                ? lang === "hi" ? "और आइडिया" : "More ideas"
+                : lang === "hi" ? "आइडिया बनाएं" : "Generate ideas"}
+          </button>
+        </div>
+
+        {ideasErr && <div className="text-[12px] text-[var(--red)] mb-3">{ideasErr}</div>}
+
+        {ideas.length === 0 && !loadingIdeas && (
+          <div className="border border-dashed border-[var(--border)] rounded-lg p-12 text-center text-[13px] text-[var(--text-3)]">
+            {lang === "hi"
+              ? "इस डेस्क के लिए नए टॉपिक-आइडिया बनाएं, फिर किसी एक से आर्टिकल लिखें।"
+              : "Generate fresh topic ideas for this desk, then write an article from one."}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {ideas.map((idea, i) => (
+            <div key={i} className="flex flex-col bg-white border border-[var(--border)] rounded-lg p-4">
+              <div className="text-[14px] font-medium text-[var(--text)] leading-snug">{idea.headline}</div>
+              <div className="text-[11px] text-[var(--text-3)] mt-1">
+                {idea.subVertical} · {idea.hook}
+              </div>
+              {idea.benefit && (
+                <div className="text-[12px] text-[var(--text-2)] mt-2 leading-snug">{idea.benefit}</div>
+              )}
+              <button
+                onClick={() => openComposer(idea.headline)}
+                className="mt-3 self-start bg-[var(--red)] hover:bg-[var(--red-hover)] text-white text-[12px] font-medium px-3 py-1.5 rounded flex items-center gap-1.5"
+              >
+                <PenSquare size={12} />
+                {lang === "hi" ? "आर्टिकल बनाएँ" : "Generate article"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+      )}
+
+      {/* The full composer — identical to the one opened from a trending story */}
+      {composerOpen && (
+        <Editor
+          trend={null}
+          title={composerTitle}
+          setTitle={setComposerTitle}
+          onClose={() => setComposerOpen(false)}
+          magazineKey={selected ?? undefined}
+          magazineFilter={filter ?? undefined}
+        />
+      )}
+    </>
+  );
+}

@@ -6,6 +6,7 @@ import "./globals.css";
 import { LangProvider } from "@/lib/i18n/context";
 import { Shell } from "@/components/shell";
 import { getSession } from "@/lib/auth/session";
+import { confinedFor } from "@/lib/auth/confined";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -43,16 +44,11 @@ export default async function RootLayout({
     redirect("/login");
   }
 
-  // "print" users may use only the Content Generator. The edge middleware
-  // enforces this on the (up-to-7-day-cached) JWT role; re-check the LIVE role
-  // here so a just-demoted user is confined on their very next request.
-  if (
-    session?.role === "print" &&
-    pathname &&
-    pathname !== "/login" &&
-    pathname !== "/locked" &&
-    !pathname.startsWith("/content-generator")
-  ) {
+  // Confined roles (print / olloi) may use only their one section. The edge
+  // middleware enforces this on the (up-to-7-day-cached) JWT role; re-check the
+  // LIVE role here so a just-demoted user is confined on their very next request.
+  const confined = confinedFor(session?.role);
+  if (confined && pathname && pathname !== "/login" && pathname !== "/locked" && !confined.isPage(pathname)) {
     redirect("/locked");
   }
 
