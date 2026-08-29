@@ -582,7 +582,12 @@ export async function POST(req: Request) {
     // Patrika+ pieces have a hard MINIMUM of 800 words (desk requirement); other
     // topics keep the requested length (default 600).
     const isPatrikaPlus = !!parsed.data.magazine?.trim();
-    const targetWords = isPatrikaPlus
+    const olloi = isOlloiDesk(parsed.data.magazine?.trim());
+    // Olloi (cancer) desks: the content team wants pieces UNDER 800 words, with
+    // an optional ~200-word short. Others: Patrika+ keeps its 800 minimum.
+    const targetWords = olloi
+      ? Math.max(150, Math.min(800, p?.wordCount ?? 650))
+      : isPatrikaPlus
       ? Math.max(800, p?.wordCount ?? 800)
       : p?.wordCount ?? 600;
     const directives = await getEffectiveDirectives();
@@ -602,10 +607,22 @@ export async function POST(req: Request) {
     // Olloi (cancer) desks: sensitive patient education. Enforce population-level
     // safety in the prompt, and note the standard disclaimer is auto-appended so
     // the model doesn't write its own (avoids a double disclaimer).
-    const olloiDesk = isOlloiDesk(magKey);
+    const olloiDesk = olloi;
+    const olloiShort = targetWords <= 300;
     const olloiBlock = olloiDesk
-      ? `\n\nCANCER-PATIENT SAFETY (STRICT) — this is population-level patient education for cancer patients, families and survivors, NOT advice for any one person. NEVER give patient-level guidance: no diagnosis, staging, prognosis or survival prediction; no drug/chemo dose or regimen, radiation Gy/fractions, or supportive-med dosing; never tell anyone to start, stop, delay, change or refuse treatment; never interpret a specific report/scan/marker; no cure/miracle/guarantee claims; never present a supplement, herb or diet as anti-cancer or immunity-boosting (only: "show everything you take to your oncologist/pharmacist"). Compassionate, plain, hopeful-but-honest language; use "often/usually/for many people", never "always/never/everyone"; NO war/battle metaphors; never blame the patient. Every clinical claim must trace to an authoritative source (India-specific claims to an Indian source: Tata Memorial, ICMR-NCDIR, AIIMS, National Cancer Grid, MoHFW; schemes to PM-JAY/official portals) — if unsure, write less, not wrong. A standard patient-safety disclaimer (with emergency symptoms + helpline) is appended AUTOMATICALLY, so do NOT write your own disclaimer, helpline or "consult your doctor" closing block.`
+      ? `\n\nCANCER-PATIENT SAFETY (STRICT) — this is population-level patient education for cancer patients, families and survivors, NOT advice for any one person. NEVER give patient-level guidance: no diagnosis, staging, prognosis or survival prediction; no drug/chemo dose or regimen, radiation Gy/fractions, or supportive-med dosing; never tell anyone to start, stop, delay, change or refuse treatment; never interpret a specific report/scan/marker; no cure/miracle/guarantee claims; never present a supplement, herb or diet as anti-cancer or immunity-boosting (only: "show everything you take to your oncologist/pharmacist").
+NO FIRM MEDICAL CLAIMS — never a guaranteed outcome or definite instruction (e.g. NOT "इससे कैंसर दोबारा नहीं होगा"). Use soft, responsible hedges: "कुछ लोगों में…", "डॉक्टर की सलाह के अनुसार…", "यह व्यक्ति की स्थिति पर depend कर सकता है…", "ऐसे symptoms दिखें तो डॉक्टर से बात करना बेहतर है…". Use "often / usually / for many people", never "always / never / everyone"; NO war/battle metaphors (जंग/लड़ाई/हारना); never blame the patient.
+VOICE — बोलचाल की, सहज हिंदी, जैसे कोई इंसान पाठक से सीधे बात कर रहा हो — polished, formulaic "AI-जैसे" वाक्य बिल्कुल नहीं। भारी, किताबी या असामान्य हिंदी शब्दों से बचें। रोज़मर्रा के आम अंग्रेज़ी शब्द वैसे ही रखें, ज़बरन हिंदी अनुवाद न करें: follow-up, scan, recurrence, exercise, stress, routine, survivor, checkup, report, side effect जैसे शब्द ठीक हैं (this OVERRIDES the "explain English terms in Hindi brackets" rule above for this desk).
+SOURCES & QUOTES — जहाँ किसी विशेषज्ञ/स्रोत का उद्धरण या आँकड़ा दें, वहाँ स्रोत का नाम और तारीख ज़रूर दें, और उद्धरण को संदर्भ के साथ रखें (सिर्फ़ उद्धरण डालकर न छोड़ें); numbered उद्धरण/बिंदु ठीक हैं। हर क्लिनिकल दावा किसी अधिकृत स्रोत से हो — भारत-विशिष्ट दावे भारतीय स्रोत से (Tata Memorial, ICMR-NCDIR, AIIMS, National Cancer Grid, MoHFW; schemes → PM-JAY/official portals). If unsure, write less, not wrong; NEVER invent a study, statistic, name, quote or date.
+FORMATTING — headings simple and conversational; a colon (:) in the title/headings is NOT required, skip it unless it truly helps; AVOID the long dash (—) entirely (use a comma or a new sentence); keep the overall formatting natural, not "AI-generated".
+IMAGE CONCEPT — describe ONE clean, realistic visual that clearly matches the story's topic, with NO text of any kind baked in (especially NO Hindi text — Hindi renders incorrectly); any exact wording is added later in design, not in the image.
+LENGTH (this desk OVERRIDES the "LONG in-depth feature / at least ${targetWords} / 5+ subheadings" rules above) — write about ${targetWords} words, ALWAYS under 800. ${olloiShort ? "This is a SHORT piece: 2–3 tight paragraphs, at most one small heading, only the core point — do NOT pad to a length or force multiple sections." : "A focused piece with a few short, conversational subheadings; do not pad to hit a number."}
+A standard patient-safety disclaimer (emergency symptoms + helpline) is appended AUTOMATICALLY, so do NOT write your own disclaimer, helpline or "consult your doctor" closing block.`
       : "";
+    // Content-team style: drop the long dash (—) from Olloi output (titles/body).
+    // Only the spaced/standalone EM dash (U+2014); en-dash ranges (10–15) are left
+    // alone. The auto-appended disclaimer is written without em-dashes.
+    const deDash = (s: string): string => (olloiDesk ? s.replace(/\s*—\s*/g, ", ").replace(/,\s*,/g, ",") : s);
     // Deterministic guarantee: append the canonical safety disclaimer to every
     // Olloi article, regardless of what the model wrote.
     const withOlloiDisclaimer = (body: string): string => {
@@ -666,8 +683,11 @@ ${magPrompt}`
     // Headline options generated from the finished article (no search needed).
     // Catchy, click-worthy Hindi-web style — NOT dry academic headlines.
     const nTitles = p?.numberOfTitles ?? 4;
+    const olloiHeadlineNote = olloiDesk
+      ? `\n\nकैंसर डेस्क के लिए ख़ास: हेडलाइन सहानुभूतिपूर्ण, शांत और भरोसेमंद हो, सनसनीखेज़/डरावनी या झूठी-उम्मीद वाली नहीं; कोई इलाज/गारंटी का दावा नहीं। शीर्षक में colon (:) ज़रूरी नहीं (ज़रूरत हो तो ही दें); लंबा डैश (—) बिल्कुल न दें।`
+      : "";
     const headlinePromptFor = (article: string): string =>
-      isHi
+      (isHi
         ? `तुम एक लोकप्रिय हिंदी न्यूज़ वेबसाइट (जैसे राजस्थान पत्रिका / अमर उजाला / दैनिक भास्कर) के हेडलाइन राइटर हो। नीचे दिए लेख के लिए ${nTitles} अलग-अलग, आकर्षक और क्लिक करने लायक हिंदी हेडलाइन लिखो — ऐसी जिन पर पाठक सच में क्लिक करें।
 
 शैली:
@@ -684,7 +704,7 @@ ${article.slice(0, 2500)}`
         : `You are a headline writer for a popular news website. Write ${nTitles} distinct, catchy, click-worthy English headlines for the article below — the kind readers actually tap. Use a question / curiosity hook OR a clear reader benefit, often in two parts (hook + payoff). Everyday punchy language; speak directly to the reader. Do NOT write dry, academic "study proves / a new study on… / positive effect of…" headlines. Stay accurate to the article — catchy, not misleading. Return them in the "titles" array.
 
 ARTICLE:
-${article.slice(0, 2500)}`;
+${article.slice(0, 2500)}`) + olloiHeadlineNote;
 
     const headlinesFrom = async (article: string): Promise<string[]> => {
       try {
@@ -1080,10 +1100,10 @@ ${finalBody}`,
           ? await Promise.all([headlinesFrom(finalBody), describeFrom(finalBody)])
           : [[topic], ""];
       return Response.json({
-        titles: titles.map(normalizeHindiTypography),
-        description: normalizeHindiTypography(description),
+        titles: titles.map((h) => deDash(normalizeHindiTypography(h))),
+        description: deDash(normalizeHindiTypography(description)),
         title: topic,
-        body: withOlloiDisclaimer(finalBody),
+        body: withOlloiDisclaimer(deDash(finalBody)),
         mode: parsed.data.mode,
         sources: sourceArticles.length,
         sourceArticles,
@@ -1148,10 +1168,10 @@ ${framing}${magazineBlock}${evidenceBlock}${olloiBlock}`;
         ? await Promise.all([headlinesFrom(fbBody), describeFrom(fbBody)])
         : [[topic], ""];
     return Response.json({
-      titles: fbTitles.map(normalizeHindiTypography),
-      description: normalizeHindiTypography(fbDescription),
+      titles: fbTitles.map((h) => deDash(normalizeHindiTypography(h))),
+      description: deDash(normalizeHindiTypography(fbDescription)),
       title: topic,
-      body: withOlloiDisclaimer(normalizeHindiTypography(fbBody)),
+      body: withOlloiDisclaimer(deDash(normalizeHindiTypography(fbBody))),
       mode: parsed.data.mode,
       sources: sourceArticles.length,
       sourceArticles,

@@ -463,7 +463,7 @@ function EnhGroup({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineFilter }: {
+export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineFilter, olloi }: {
   trend: Trend | null;
   title: string;
   setTitle: (v: string) => void;
@@ -473,6 +473,9 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
   magazineKey?: string;
   // The desk angle filter (e.g. politics: current / this-day / profile).
   magazineFilter?: string;
+  // Olloi (cancer) desk: length is Full (~650, under 800) or Short (~200), and
+  // the 800-word minimum does NOT apply.
+  olloi?: boolean;
 }) {
   const { t, lang } = useLang();
   const [body, setBody] = useState("");
@@ -498,7 +501,7 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
     if (writers.length && !writers.includes(writer)) setWriter(writers[0]);
   }
   const [numberOfTitles, setNumberOfTitles] = useState(5);
-  const [wordCount, setWordCount] = useState(800);
+  const [wordCount, setWordCount] = useState(olloi ? 650 : 800);
 
   // Output language for the generated story (default Hindi — Patrika's main language)
   const [genLang, setGenLang] = useState<"hi" | "en">("hi");
@@ -691,7 +694,7 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
       const res = await fetch("/api/drafts/image", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title: t }),
+        body: JSON.stringify({ title: t, noText: olloi }),
       });
       const json = await res.json();
       if (res.ok && json.image) setArticleImage(json.image);
@@ -931,7 +934,36 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
           )}
 
           {/* Patrika+ composer: just the target word count (minimum 800). */}
-          {magazineKey && (
+          {magazineKey && olloi && (
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">
+                {lang === "hi" ? "लंबाई" : "Length"}
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { v: 650, hi: "पूरा लेख", en: "Full", sub: "~650" },
+                  { v: 200, hi: "छोटा", en: "Short", sub: "~200" },
+                ].map((o) => {
+                  const active = o.v === 200 ? wordCount <= 300 : wordCount > 300;
+                  return (
+                    <button
+                      key={o.v}
+                      type="button"
+                      onClick={() => setWordCount(o.v)}
+                      className={`flex-1 text-[12px] px-3 py-2 rounded-lg border transition-colors ${
+                        active
+                          ? "border-[var(--purple)] bg-[var(--red-soft)] text-[var(--text)] font-medium"
+                          : "border-[var(--border)] text-[var(--text-2)] hover:border-[var(--text-3)]"
+                      }`}
+                    >
+                      {lang === "hi" ? o.hi : o.en} <span className="text-[var(--text-3)]">{o.sub}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {magazineKey && !olloi && (
             <div className="mb-3.5">
               <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">
                 {lang === "hi" ? "लक्ष्य शब्द संख्या (न्यूनतम 800)" : "Target Word Count (min 800)"}

@@ -6,7 +6,7 @@ import {
   ShieldAlert, Landmark, Building2, Wheat, Scale, HeartHandshake,
   HeartPulse, GraduationCap, Trophy, UtensilsCrossed, BookOpen,
   Globe, TrendingUp, Cpu, Leaf, Sprout, Flame, Star, Plane, Clapperboard,
-  Ribbon,
+  Ribbon, HelpCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -65,6 +65,7 @@ export function MagazineDeck({
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState("");
   const [customTopic, setCustomTopic] = useState("");
+  const [question, setQuestion] = useState("");
 
   const DESKS = MAGAZINES.filter((m) => (m.group ?? "patrika") === group);
   const mag = DESKS.find((m) => m.key === selected) ?? null;
@@ -74,6 +75,7 @@ export function MagazineDeck({
     setFilter(null);
     setIdeas([]);
     setIdeasErr(null);
+    setQuestion("");
   }
 
   function openComposer(seed: string) {
@@ -81,15 +83,16 @@ export function MagazineDeck({
     setComposerOpen(true);
   }
 
-  async function genIdeas() {
+  async function genIdeas(q?: string) {
     if (!mag) return;
+    const useQ = (q ?? question).trim();
     setLoadingIdeas(true);
     setIdeasErr(null);
     try {
       const r = await fetch("/api/magazine/ideas", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ magazine: mag.key, filter: filter ?? undefined }),
+        body: JSON.stringify({ magazine: mag.key, filter: filter ?? undefined, question: useQ || undefined }),
       });
       const d = await r.json();
       if (!r.ok) setIdeasErr(d.error ?? "Failed");
@@ -203,6 +206,50 @@ export function MagazineDeck({
         </div>
       )}
 
+      {/* Ask a question → many angled ideas (Olloi / health desks) */}
+      {mag.questionBank && mag.questionBank.length > 0 && (
+        <div className="mb-6 border border-[var(--border)] rounded-xl bg-white p-4">
+          <h2 className="text-[14px] font-semibold flex items-center gap-1.5 mb-1">
+            <HelpCircle size={15} className="text-[var(--purple)]" />
+            {lang === "hi" ? "एक सवाल पूछें → कई आइडिया" : "Ask a question → get ideas"}
+          </h2>
+          <p className="text-[11.5px] text-[var(--text-3)] mb-3">
+            {lang === "hi"
+              ? "पाठक का कोई सवाल लिखें — हम उसके इर्द-गिर्द अलग-अलग एंगल, नज़रिए और विषय निकाल देंगे।"
+              : "Type a reader question — we'll spin out multiple angles, perspectives and topics around it."}
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && question.trim()) genIdeas(); }}
+              placeholder={lang === "hi" ? "जैसे: कैंसर के इलाज के बाद क्या करें?" : "e.g. What to do after cancer treatment?"}
+              className="flex-1 bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)]"
+            />
+            <button
+              onClick={() => genIdeas()}
+              disabled={loadingIdeas || !question.trim()}
+              className="shrink-0 text-white text-[13px] font-medium px-4 py-2 rounded-lg disabled:opacity-50 flex items-center gap-1.5"
+              style={{ background: "var(--purple)" }}
+            >
+              {loadingIdeas ? <Loader2 size={13} className="animate-spin" /> : <Lightbulb size={13} />}
+              {lang === "hi" ? "आइडिया" : "Ideas"}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-2.5">
+            {mag.questionBank.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => { setQuestion(q); genIdeas(q); }}
+                className="text-[11px] text-left px-2.5 py-1 rounded-full border border-[var(--border)] text-[var(--text-2)] hover:border-[var(--purple)] hover:text-[var(--text)]"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Custom desk: type your own topic, then run the full pipeline on it. */}
       {mag.key === "custom" && (
         <section className="max-w-2xl">
@@ -251,7 +298,7 @@ export function MagazineDeck({
             </p>
           </div>
           <button
-            onClick={genIdeas}
+            onClick={() => genIdeas()}
             disabled={loadingIdeas}
             className="shrink-0 bg-[var(--text)] hover:bg-black text-white text-[13px] font-medium px-4 py-2 rounded disabled:opacity-50 flex items-center gap-1.5"
           >
@@ -306,6 +353,7 @@ export function MagazineDeck({
           onClose={() => setComposerOpen(false)}
           magazineKey={selected ?? undefined}
           magazineFilter={filter ?? undefined}
+          olloi={group === "olloi"}
         />
       )}
     </>

@@ -31,6 +31,8 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const magKey = typeof body?.magazine === "string" ? body.magazine : "";
   const filterKey = typeof body?.filter === "string" ? body.filter : "";
+  // Optional: fan a single reader question into many angled ideas (Olloi desks).
+  const question = typeof body?.question === "string" ? body.question.trim().slice(0, 300) : "";
   const mag = MAGAZINE_BY_KEY[magKey];
   if (!mag) return Response.json({ error: "Unknown magazine" }, { status: 400 });
 
@@ -198,7 +200,12 @@ export async function POST(req: Request) {
     : `\n\nवर्तमान संदर्भ (इन ताज़ा, ठोस तथ्यों पर आधारित समयोचित आइडिया बनाओ — इनमें से जो प्रासंगिक हो उसका उपयोग करो):\n${currentContext}`;
   const diversityBlock =
     "\n\nविविधता (बहुत ज़रूरी): सभी 12–15 आइडिया एक-दूसरे से साफ़ अलग हों — अलग-अलग उप-विषय, कोण, प्रारूप (कैसे-करें / व्याख्या / लिस्ट / प्रोफाइल / मिथक-सच / तुलना) और अलग पाठक-ज़रूरत पर। एक ही विषय/घटना के इर्द-गिर्द मिलते-जुलते या दोहराव वाले आइडिया बिल्कुल न दें; हर सब-वर्टिकल को कवर करें।";
-  const prompt = `${basePrompt}${filterBlock}${contextBlock}${excludeBlock}${diversityBlock}`;
+  // Question mode: fan ONE reader question into many angled ideas, explored from
+  // different reader perspectives (patient / caregiver / survivor) and angles.
+  const questionBlock = question
+    ? `\n\nपाठक का सवाल: "${question}"\nइसी एक सवाल के इर्द-गिर्द अलग-अलग, विविध स्टोरी-आइडिया बनाओ — इसे अलग-अलग पाठक-नज़रिए (मरीज़ / परिजन / survivor) और अलग-अलग पहलुओं (जैसे follow-up, routine, खान-पान, exercise, भावनात्मक wellbeing, काम पर वापसी, परिवार का साथ) से explore करो। हर आइडिया एक अलग कोण/उप-विषय पर हो; सवाल को दोहराओ मत, बल्कि उससे निकलने वाले ठोस, उपयोगी विषय दो।`
+    : "";
+  const prompt = `${basePrompt}${filterBlock}${questionBlock}${contextBlock}${excludeBlock}${diversityBlock}`;
 
   try {
     const res = await generateObject({

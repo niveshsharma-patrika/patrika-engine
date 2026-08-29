@@ -37,6 +37,9 @@ export type Magazine = {
   // political issues), these Google-News search terms fetch fresh, dated
   // headlines that seed idea generation — a live feed, fresher than open search.
   filters?: Array<{ key: string; label: string; brief: string; newsQueries?: string[] }>;
+  // Starter questions (Olloi / health desks): one-tap seeds for the
+  // question → multiple-ideas fan-out.
+  questionBank?: string[];
 };
 
 // Reusable brief for the "on this day" filter — injected with today's IST date.
@@ -394,6 +397,25 @@ export const MAGAZINES: Magazine[] = [
         brief: "आबादी-स्तर पर स्क्रीनिंग, तंबाकू (भारत में बड़ा जोखिम), HPV/HBV टीकाकरण, चेतावनी-संकेत — भारतीय दिशानिर्देशों पर आधारित, हमेशा 'डॉक्टर को दिखाएँ' की ओर, स्वयं-निदान कभी नहीं। पहले से निदान पाए व्यक्ति को पीछे मुड़कर दोष न दें; यह जोड़ें: 'कैंसर किसी की गलती नहीं; कई लोग जिन्होंने कभी धूम्रपान/खराब खानपान नहीं किया, फिर भी कैंसर होता है।' स्क्रीनिंग-आयु/शेड्यूल केवल तिथि-युक्त आधिकारिक स्रोत से।" },
       { key: "caregiver_support", label: "देखभालकर्ता सहायता",
         brief: "देखभालकर्ताओं के लिए सामान्य व्यावहारिक व भावनात्मक मार्गदर्शन — कोई व्यक्तिगत चिकित्सा-निर्देश नहीं। बर्नआउट को असली और जायज़ बताएँ, स्वार्थ नहीं; आराम, मदद माँगने और शोक की अनुमति दें। भारत में संयुक्त-परिवार दबाव, 'कर्तव्य' अपेक्षा और कलंक को नरमी से संबोधित करें, बिना परिवार को दोष दिए। ठोस सहायता-मार्ग (रेस्पाइट, सपोर्ट-ग्रुप, काउंसलिंग, हेल्पलाइन) दें। 'मज़बूत बनो' जैसे भावना-आदेश नहीं।" },
+      { key: "survivorship", label: "जीवन इलाज के बाद",
+        brief: "इलाज पूरा होने के बाद का जीवन (survivorship): follow-up कितने समय चलता है, नियमित scan/जाँच, recurrence क्या है और उसके शुरुआती संकेत, सामान्य जीवन व काम पर लौटना, खान-पान व exercise कब और कैसे, भावनात्मक wellbeing व stress, परिवार का साथ। आबादी-स्तर पर, कोई व्यक्तिगत सलाह नहीं; recurrence के डर को शांति और सहानुभूति से संभालें, डराएँ नहीं। हर बात सामान्य रखें ('कुछ लोगों में…', 'डॉक्टर की सलाह के अनुसार…') और हमेशा डॉक्टर की ओर भेजें।" },
+    ],
+    questionBank: [
+      "कैंसर का इलाज पूरा होने के बाद क्या करना चाहिए?",
+      "कैंसर के बाद follow-up कितने समय तक चलता है?",
+      "कैंसर दोबारा आने का खतरा कैसे पता चलता है?",
+      "Cancer recurrence क्या है?",
+      "कैंसर वापस आने के शुरुआती संकेत क्या हो सकते हैं?",
+      "क्या कैंसर के बाद नियमित scans जरूरी होते हैं?",
+      "कैंसर के बाद सामान्य जीवन में कैसे लौटें?",
+      "कैंसर के बाद खान-पान में क्या बदलाव करें?",
+      "कैंसर के बाद exercise कब शुरू करें?",
+      "कैंसर के बाद काम पर कब लौट सकते हैं?",
+      "कैंसर के बाद mental stress कैसे कम करें?",
+      "Cancer survivor अपनी कहानी दूसरों की मदद के लिए कैसे share कर सकता है?",
+      "कैंसर के बाद परिवार मरीज की किस तरह मदद कर सकता है?",
+      "कैंसर के इलाज के बाद किन चीजों से बचना चाहिए?",
+      "कैंसर से उबरने के बाद healthy lifestyle कैसे अपनाएं?",
     ],
   },
   {
@@ -427,8 +449,8 @@ export function isOlloiDesk(magKey?: string | null): boolean {
  * Olloi (cancer) article — a hard guarantee on top of the prompt's own
  * disclaimer instruction, so the emergency + helpline routing is never dropped. */
 export const OLLOI_DISCLAIMER = {
-  hi: "यह लेख केवल सामान्य जानकारी के लिए है और आपके डॉक्टर की सलाह का विकल्प नहीं है। यह किसी एक व्यक्ति के इलाज की सिफारिश नहीं है। अपने इलाज से जुड़े किसी भी निर्णय के लिए अपने ऑन्कोलॉजिस्ट से बात करें — इलाज खुद शुरू, बंद, टालें या न बदलें। कोई भी सप्लीमेंट, जड़ी-बूटी या डाइट शुरू करने से पहले अपने डॉक्टर और फार्मासिस्ट को बताएँ। आपातकालीन लक्षण (कीमो के दौरान बुखार 100.4°F/38°C या अधिक, बेकाबू रक्तस्राव, साँस फूलना, तेज़ दर्द, भ्रम, तरल न टिक पाना) होने पर तुरंत अपनी ऑन्कोलॉजी टीम या नज़दीकी इमरजेंसी/112 से संपर्क करें। मानसिक तनाव में Tele-MANAS 14416 (1-800-891-4416) पर बात करें।",
-  en: "This article is for general information only and is not a substitute for your doctor's advice. It is not a treatment recommendation for any one person. Talk to your treating oncologist about any decisions regarding your care — do not start, stop, delay, or change any treatment based on this article. Before taking any supplement, herbal product, or diet, tell your doctor and pharmacist. For emergency symptoms — fever of 100.4°F/38°C or higher during chemotherapy, uncontrolled bleeding, breathlessness, severe pain, confusion, or inability to keep fluids down — contact your oncology team or nearest emergency service / 112 now. For emotional distress, reach Tele-MANAS 14416 (1-800-891-4416).",
+  hi: "यह लेख केवल सामान्य जानकारी के लिए है और आपके डॉक्टर की सलाह का विकल्प नहीं है। यह किसी एक व्यक्ति के इलाज की सिफारिश नहीं है। अपने इलाज से जुड़े किसी भी निर्णय के लिए अपने ऑन्कोलॉजिस्ट से बात करें। इलाज खुद शुरू, बंद, टालें या न बदलें। कोई भी सप्लीमेंट, जड़ी-बूटी या डाइट शुरू करने से पहले अपने डॉक्टर और फार्मासिस्ट को बताएँ। आपातकालीन लक्षण (कीमो के दौरान बुखार 100.4°F/38°C या अधिक, बेकाबू रक्तस्राव, साँस फूलना, तेज़ दर्द, भ्रम, तरल न टिक पाना) होने पर तुरंत अपनी ऑन्कोलॉजी टीम या नज़दीकी इमरजेंसी/112 से संपर्क करें। मानसिक तनाव में Tele-MANAS 14416 (1-800-891-4416) पर बात करें।",
+  en: "This article is for general information only and is not a substitute for your doctor's advice. It is not a treatment recommendation for any one person. Talk to your treating oncologist about any decisions regarding your care. Do not start, stop, delay, or change any treatment based on this article. Before taking any supplement, herbal product, or diet, tell your doctor and pharmacist. For emergency symptoms (fever of 100.4°F/38°C or higher during chemotherapy, uncontrolled bleeding, breathlessness, severe pain, confusion, or inability to keep fluids down), contact your oncology team or nearest emergency service / 112 now. For emotional distress, reach Tele-MANAS 14416 (1-800-891-4416).",
 };
 
 /** Idea-generation prompt (Layer 1) — asks for a batch of fresh topic ideas

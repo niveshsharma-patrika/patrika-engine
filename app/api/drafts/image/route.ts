@@ -24,8 +24,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = (await req.json().catch(() => null)) as { title?: string } | null;
+  const body = (await req.json().catch(() => null)) as { title?: string; noText?: boolean } | null;
   const title = typeof body?.title === "string" ? body.title.trim().slice(0, 300) : "";
+  // Olloi (cancer) images: generate a clean visual with NO baked-in text — Hindi
+  // text renders incorrectly, so any wording is added later in design.
+  const noText = body?.noText === true;
   if (!title) {
     return Response.json({ error: "A headline is needed to generate an image." }, { status: 400 });
   }
@@ -52,7 +55,15 @@ export async function POST(req: Request) {
   }
 
   const model = process.env.IMAGE_MODEL ?? "gpt-image-1";
-  const prompt = [
+  const prompt = (noText
+    ? [
+        `Create a premium, ultra-realistic editorial FEATURE IMAGE / thumbnail, 3:2 landscape, for an Indian health-support article. Warm, calm, dignified and hopeful mood; authentic Indian context.`,
+        `ARTICLE TOPIC: "${title}"`,
+        `The image must clearly and directly match this topic with a strong, relevant real-world subject (people, hands, everyday objects, a calm care setting) — not abstract.`,
+        `STYLE: photorealistic, soft natural light, shallow depth of field, clean composition with negative space, premium magazine look, gentle and reassuring — NOT clinical, scary or graphic.`,
+        `ABSOLUTELY NO TEXT of any kind baked into the image — no words, letters, numbers, headline, caption, watermark, logo, borders or gibberish (especially NO Hindi / Devanagari text, which renders incorrectly). A clean visual ONLY; any wording is added later in design.`,
+      ]
+    : [
     `Create a premium, ultra-realistic Hindi news FEATURE IMAGE / thumbnail, 3:2 landscape, in the clean editorial style of top Indian digital news portals (Patrika, Aaj Tak, TV9, ABP). High-CTR, mobile-friendly and instantly understandable.`,
     `ARTICLE TOPIC: "${title}"`,
     `LAYOUT — split composition:`,
@@ -62,7 +73,7 @@ export async function POST(req: Request) {
     `STYLE: photorealistic, bright natural light, slight warm grading, premium magazine look, clean white/cream background with a subtle gradient, soft depth of field, realistic shadows and reflections, DSLR / 8K detail, cinematic lighting, high dynamic range, balanced composition. Use ONLY visuals directly related to the topic (e.g. documents, bills, calculator, currency, healthy food, medical icons, government symbols, technology, charts, magnifying glass, light effects). Strong negative space, no clutter.`,
     `Accent colours: blue, red, green for health topics, yellow for emphasis, pink only for women's topics.`,
     `Do NOT add any logos, watermark, branding, borders, stock-photo look, extra paragraphs of text or gibberish letters — ONLY the short Hindi headline.`,
-  ].join("\n");
+  ]).join("\n");
 
   try {
     const res = await fetch("https://api.openai.com/v1/images/generations", {
