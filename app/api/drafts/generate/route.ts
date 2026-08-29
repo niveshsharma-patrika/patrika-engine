@@ -627,11 +627,14 @@ A standard patient-safety disclaimer (emergency symptoms + helpline) is appended
     // Olloi article, regardless of what the model wrote.
     const withOlloiDisclaimer = (body: string): string => {
       if (!olloiDesk) return body;
-      // Strip any trailing disclaimer / helpline block the model wrote despite
-      // the instruction, so the canonical one is never duplicated.
-      const sig = /(डिस्क्लेमर|अस्वीकरण|यह लेख केवल सामान्य जानकारी|डॉक्टर की सलाह का विकल्प|ऑन्कोलॉजिस्ट से|Tele-?MANAS|टेली-?मानस|हेल्पलाइन|disclaimer|not a substitute|consult your (doctor|oncologist))/i;
+      // Strip a trailing disclaimer / helpline block the model wrote despite the
+      // instruction, so the canonical one isn't duplicated. Match ONLY an
+      // unambiguous disclaimer block — NOT a bare "अपने ऑन्कोलॉजिस्ट से बात करें"
+      // line, which is a legitimate article ending the desk asks for — and at
+      // most one trailing paragraph.
+      const sig = /(डिस्क्लेमर|अस्वीकरण|यह लेख केवल सामान्य जानकारी|डॉक्टर की सलाह का विकल्प|Tele-?MANAS|टेली-?मानस|14416|1-?800-?891-?4416|disclaimer|not a substitute for your doctor)/i;
       const paras = body.trimEnd().split(/\n{2,}/);
-      while (paras.length > 1 && sig.test(paras[paras.length - 1])) paras.pop();
+      if (paras.length > 1 && sig.test(paras[paras.length - 1])) paras.pop();
       return paras.join("\n\n").trimEnd() + "\n\n" + (isHi ? OLLOI_DISCLAIMER.hi : OLLOI_DISCLAIMER.en);
     };
     const magPrompt = magKey ? directives.magazineContent?.[magKey] : undefined;
