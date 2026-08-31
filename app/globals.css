@@ -72,3 +72,43 @@ body {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── Global type scale-up (bigger, more readable UI) ────────────────────────
+   The UI sizes text with hardcoded text-[Npx] utilities across many files.
+   Rather than edit every call site, bump each size once here. These rules are
+   UNLAYERED, so they win over Tailwind's layered utilities and apply app-wide.
+   Roughly +1.5px on body sizes, tapering up for headings. */
+.text-\[9px\]     { font-size: 10.5px; }
+.text-\[9\.5px\]  { font-size: 11px; }
+.text-\[10px\]    { font-size: 11.5px; }
+.text-\[10\.5px\] { font-size: 12px; }
+.text-\[11px\]    { font-size: 12.5px; }
+.text-\[11\.5px\] { font-size: 13px; }
+.text-\[12px\]    { font-size: 13.5px; }
+.text-\[12\.5px\] { font-size: 14px; }
+.text-\[13px\]    { font-size: 14.5px; }
+.text-\[13\.5px\] { font-size: 15px; }
+.text-\[14px\]    { font-size: 15.5px; }
+.text-\[14\.5px\] { font-size: 16px; }
+.text-\[15px\]    { font-size: 16.5px; }
+.text-\[16px\]    { font-size: 17.5px; }
+.text-\[17px\]    { font-size: 18.5px; }
+.text-\[18px\]    { font-size: 20px; }
+.text-\[20px\]    { font-size: 22px; }
+.text-\[21px\]    { font-size: 23px; }
+.text-\[22px\]    { font-size: 24px; }
+.text-\[24px\]    { font-size: 26px; }
+.text-\[26px\]    { font-size: 28px; }
+.text-\[28px\]    { font-size: 31px; }
+.text-\[40px\]    { font-size: 44px; }
+
+/* Tailwind preset sizes used in a few places */
+.text-xs   { font-size: 0.82rem; }   /* ~12 → ~13 */
+.text-sm   { font-size: 0.95rem; }   /* 14 → ~15 */
+.text-base { font-size: 1.06rem; }   /* 16 → ~17 */
+.text-lg   { font-size: 1.2rem; }    /* 18 → ~19 */
+.text-xl   { font-size: 1.35rem; }
+.text-2xl  { font-size: 1.65rem; }   /* 24 → ~26 */
+
+/* A little more breathing room so the denser rows read comfortably. */
+input, textarea, select, button { line-height: 1.4; }
