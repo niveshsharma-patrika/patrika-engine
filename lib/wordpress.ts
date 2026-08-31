@@ -4,7 +4,7 @@ import { getSecret } from "@/lib/twitter/secrets";
  * "Save to WordPress draft" for Patrika+ content.
  *
  * The engine POSTs a generated article to the Patrika WordPress plugin's REST
- * endpoint, authenticated with a per-site API key sent as X-Patrika-Plus-API-Key.
+ * endpoint, authenticated with a per-site API key sent as X-Kairos-API-Key.
  * Both the key and the endpoint are stored AES-GCM encrypted in
  * integration_secrets (entered in Admin) — never in code or the browser. The
  * POST always runs server-side so the key never reaches the client.
@@ -115,7 +115,7 @@ export async function postToWordPress(
   try {
     const res = await fetch(cfg.endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Patrika-Plus-API-Key": cfg.apiKey },
+      headers: { "Content-Type": "application/json", "X-Kairos-API-Key": cfg.apiKey },
       body: JSON.stringify(post),
       signal: AbortSignal.timeout(30_000),
     });
@@ -129,7 +129,7 @@ export async function postToWordPress(
           : res.status === 401 || res.status === 403
           ? "WordPress rejected the API key — check it in Admin."
           : res.status === 404
-          ? "WordPress route not found (404) — check the Endpoint URL in Admin, and that the Patrika-Plus plugin is active on that site."
+          ? "WordPress route not found (404) — check the Endpoint URL in Admin (it should end in /wp-json/kairos/v1/posts) and that the plugin is active on that site."
           : `WordPress returned ${res.status}.`;
       return { ok: false, status: res.status, data, error };
     }

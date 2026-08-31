@@ -88,7 +88,7 @@ export function IntegrationKeys() {
       <Group
         title="WordPress (Patrika+)"
         tag="Save to WordPress"
-        help={<>Save Patrika+ articles to WordPress as drafts. Paste the <b>API key</b> from the WordPress plugin&rsquo;s settings page (sent as the <code className="font-mono text-[11px]">X-Patrika-Plus-API-Key</code> header) and the <b>endpoint URL</b> (ends in <code className="font-mono text-[11px]">/wp-json/patrika-plus/v1/posts</code>).</>}
+        help={<>Save Patrika+ articles to WordPress as drafts. Paste the <b>API key</b> from the WordPress plugin&rsquo;s settings page (sent as the <code className="font-mono text-[11px]">X-Kairos-API-Key</code> header) and the <b>endpoint URL</b> (ends in <code className="font-mono text-[11px]">/wp-json/kairos/v1/posts</code>).</>}
       >
         <Row label="API key" k="wordpress_api_key" v={v} set={set} ok={status?.wordpress_api_key} />
         <Row label="Endpoint URL" k="wordpress_endpoint" v={v} set={set} ok={status?.wordpress_endpoint} mono />
