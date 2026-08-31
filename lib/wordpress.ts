@@ -118,11 +118,13 @@ export async function englishSlug(title: string): Promise<string> {
       const { text } = await generateText({
         model: resolved.model,
         temperature: 0.2,
-        prompt: `Turn this Hindi news headline into a short English URL slug.
+        prompt: `Turn this Hindi news headline into a short, SEO-friendly English URL slug.
 Rules:
-- 3 to 8 words capturing the key subject of the headline.
-- English words only. Translate the meaning; transliterate proper names of people and places to Latin script.
-- Lowercase, plain words separated by single spaces. No punctuation, quotes, or commentary.
+- Translate the MEANING into real English words. Do NOT romanize / transliterate Hindi words.
+  Example: "भारत की विदेश नीति" -> "india foreign policy" (NOT "bharat ki videsh niti").
+- Keep proper names of people and places, written in Latin script (india, modi, china, uttar-pradesh).
+- 3 to 8 words capturing the key subject; drop filler words like "the".
+- Lowercase, plain English words separated by single spaces. No punctuation, quotes, or commentary.
 - Output ONLY the slug words, nothing else.
 
 Headline: ${clean}`,
