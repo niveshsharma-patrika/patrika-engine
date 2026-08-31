@@ -1,3 +1,6 @@
+import { generateText } from "ai";
+
+import { getModelFor } from "@/lib/ai/provider";
 import { getSecret } from "@/lib/twitter/secrets";
 
 /**
@@ -82,7 +85,8 @@ export function bodyToHtml(body: string): string {
   return out.join("\n");
 }
 
-/** WordPress-safe slug from a title (keeps Devanagari; WP URL-encodes it). */
+/** Lowercase, hyphen-separated slug. Keeps any letters/numbers it is given
+ *  (so an English string stays English; a Devanagari string stays Devanagari). */
 export function slugify(title: string): string {
   return title
     .toLowerCase()
@@ -90,6 +94,62 @@ export function slugify(title: string): string {
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
+}
+
+/**
+ * Build an ENGLISH URL slug from an article title.
+ *
+ * English/ASCII titles slugify directly. A Hindi (or any non-ASCII) title is
+ * first translated to a short English slug by the AI model, so the public
+ * WordPress URL reads as English rather than percent-encoded Devanagari.
+ * Falls back to a direct slug of the title if the model is unavailable or
+ * returns nothing usable — the draft still saves, just with a non-English slug.
+ */
+export async function englishSlug(title: string): Promise<string> {
+  const clean = title.trim();
+  if (!clean) return "";
+
+  // Already plain ASCII (English headline) — no translation needed.
+  if (!/[^\p{ASCII}]/u.test(clean)) return slugify(clean);
+
+  const resolved = await getModelFor("headline");
+  if (resolved) {
+    try {
+      const { text } = await generateText({
+        model: resolved.model,
+        temperature: 0.2,
+        prompt: `Turn this Hindi news headline into a short English URL slug.
+Rules:
+- 3 to 8 words capturing the key subject of the headline.
+- English words only. Translate the meaning; transliterate proper names of people and places to Latin script.
+- Lowercase, plain words separated by single spaces. No punctuation, quotes, or commentary.
+- Output ONLY the slug words, nothing else.
+
+Headline: ${clean}`,
+      });
+      // Pick the most slug-like line. Rank each usable line: a "slug:"-labelled
+      // line (2) beats a "bare" line with no sentence punctuation (1), which
+      // beats a sentence/interjection like "Sure!" or "Hope this helps!" (0).
+      // Ties go to the later line, since any preamble precedes the answer.
+      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const stripLabel = (l: string) => l.replace(/^.*?\bslug\b\s*[:\-]?\s*/i, "");
+      const toSlug = (l: string) => slugify(stripLabel(l).replace(/[^\x00-\x7F]+/g, " "));
+      let best = "";
+      let bestRank = -1;
+      for (const l of lines) {
+        if (!toSlug(l)) continue; // no usable words on this line
+        const rank = /\bslug\b\s*[:\-]/i.test(l) ? 2 : /[.!?]$/.test(l) ? 0 : 1;
+        if (rank >= bestRank) { best = l; bestRank = rank; }
+      }
+      const en = toSlug(best);
+      if (en && /[a-z0-9]/.test(en)) return en;
+    } catch {
+      /* fall through to the direct-slug fallback */
+    }
+  }
+
+  // Fallback: slug straight from the title (WordPress URL-encodes Devanagari).
+  return slugify(clean);
 }
 
 export type WpConfig = { apiKey: string; endpoint: string };

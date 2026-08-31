@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/session";
-import { bodyToHtml, slugify, postToWordPress } from "@/lib/wordpress";
+import { bodyToHtml, englishSlug, postToWordPress } from "@/lib/wordpress";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
@@ -23,7 +23,9 @@ export async function POST(req: Request) {
   }
 
   const content = bodyToHtml(article);
-  const slug = (slugIn || slugify(title)).slice(0, 100);
+  // Always an English slug: English titles slug directly, Hindi titles are
+  // translated to English first (see englishSlug).
+  const slug = (slugIn || (await englishSlug(title))).slice(0, 100);
 
   const result = await postToWordPress({
     title,
