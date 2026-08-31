@@ -178,14 +178,14 @@ export function MagazineDeck({
         </div>
       </div>
 
-      {/* Desk angle filters — steer both idea generation and the article. */}
-      {mag.filters && mag.filters.length > 0 && (
+      {/* Desk angle filters + the universal Explainer (trending) filter. */}
+      {mag.key !== "custom" && (
         <div className="mb-5">
           <div className="text-[11px] text-[var(--text-3)] mb-1.5">
             {lang === "hi" ? "एंगल चुनें (वैकल्पिक)" : "Choose an angle (optional)"}
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {mag.filters.map((f) => {
+            {(mag.filters ?? []).map((f) => {
               const active = filter === f.key;
               return (
                 <button
@@ -202,6 +202,19 @@ export function MagazineDeck({
                 </button>
               );
             })}
+            {group !== "olloi" && (
+              <button
+                onClick={() => setFilter(filter === "explainer" ? null : "explainer")}
+                title={lang === "hi" ? "इंटरनेट पर अभी ट्रेंडिंग विषयों के एक्सप्लेनर आइडिया" : "Explainer ideas from what's trending on the internet now"}
+                className={`text-[12px] px-3 py-1.5 rounded-full border transition-colors ${
+                  filter === "explainer"
+                    ? "border-[var(--purple)] bg-[var(--red-soft)] text-[var(--text)] font-medium"
+                    : "border-dashed border-[var(--border)] text-[var(--text-2)] hover:border-[var(--purple)]"
+                }`}
+              >
+                {lang === "hi" ? "🔥 एक्सप्लेनर (ट्रेंडिंग)" : "🔥 Explainer (trending)"}
+              </button>
+            )}
           </div>
         </div>
       )}

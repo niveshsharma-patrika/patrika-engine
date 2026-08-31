@@ -37,6 +37,10 @@ export async function POST(req: Request) {
   if (!mag) return Response.json({ error: "Unknown magazine" }, { status: 400 });
 
   const filter = mag.filters?.find((f) => f.key === filterKey);
+  // Universal "Explainer (trending)" filter — present on every desk in the UI.
+  // Research what's trending on the internet in this desk's domain and produce
+  // simple explainer ideas. Not a per-desk filter object, so handle it here.
+  const isExplainer = filterKey === "explainer";
 
   const model = await getModelFor("drafting");
   if (!model) return Response.json({ error: "No drafting model configured." }, { status: 503 });
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
   // OR the whole DESK is news-oriented (mag.newsQueries — business, world, kisan,
   // tech, climate). Real, dated headlines from the last few days across themes.
   const newsQueries = filter?.newsQueries ?? mag.newsQueries;
-  if (newsQueries?.length) {
+  if (newsQueries?.length && !isExplainer) {
     try {
       const batches = await Promise.all(
         newsQueries.map((q) => searchGoogleNews(q, "hi", 8))
@@ -130,7 +134,9 @@ export async function POST(req: Request) {
   const openaiKey = await getApiKey("openai");
   if (!currentContext && openaiKey && !isOlloiDesk(magKey)) {
     let query: string;
-    if (filter?.key === "current") {
+    if (isExplainer) {
+      query = `अभी इंटरनेट पर और भारत में "${mag.nameHi}" (${mag.subVerticals.join(", ")}) के क्षेत्र से जुड़े सबसे ज़्यादा ट्रेंडिंग, चर्चित और सर्च किए जा रहे विषय/सवाल कौन-से हैं — 8–10 अलग-अलग, हर एक का नाम और यह कि अभी क्यों चर्चा में है (सही, हालिया, ठोस विवरण के साथ)।`;
+    } else if (filter?.key === "current") {
       query = `भारत में इस समय चर्चा में चल रहे अलग-अलग, विविध प्रमुख राजनीतिक मुद्दे — राष्ट्रीय और विभिन्न राज्यों से, अलग-अलग दलों, नीतियों, चुनावों, संसद, विवादों और शासन से जुड़े। कम से कम 8–10 भिन्न-भिन्न मुद्दे, हर एक का नाम, सही तारीख/घटनाक्रम और ठोस विवरण।`;
     } else if (filter?.key === "this-day") {
       query = `आज ${istToday} — "इतिहास में आज" — इस तारीख से जुड़ी भारतीय राजनीति, सत्ता और शासन की उल्लेखनीय ऐतिहासिक घटनाएँ (सही वर्ष व सत्यापित विवरण के साथ; कई अलग-अलग घटनाएँ)।`;
@@ -169,8 +175,13 @@ export async function POST(req: Request) {
   const usedKeys = new Set<string>();
   let usedList: string[] = [];
   try {
+    // Exclude BOTH ideas turned into articles (used_ideas) AND every idea already
+    // surfaced by the generator (generated_ideas) — so a topic never repeats.
     const r = await pool.query(
-      `SELECT headline, headline_key FROM used_ideas WHERE magazine = $1 ORDER BY created_at DESC LIMIT 400`,
+      `SELECT headline, headline_key, created_at FROM used_ideas WHERE magazine = $1
+       UNION ALL
+       SELECT headline, headline_key, created_at FROM generated_ideas WHERE magazine = $1
+       ORDER BY created_at DESC LIMIT 600`,
       [magKey]
     );
     for (const row of r.rows as { headline: string; headline_key: string }[]) {
@@ -181,7 +192,7 @@ export async function POST(req: Request) {
       .map((row) => row.headline)
       .filter(Boolean);
   } catch {
-    /* table not migrated yet / DB error — proceed without exclusion */
+    /* tables not migrated yet / DB error — proceed without exclusion */
   }
   const excludeBlock = usedList.length
     ? `\n\nये विषय पहले ही आर्टिकल में इस्तेमाल हो चुके हैं — इनमें से कोई भी, और इनसे मिलता-जुलता विषय, दोबारा मत दो। हर आइडिया इनसे अलग और नया हो:\n${usedList
@@ -205,7 +216,14 @@ export async function POST(req: Request) {
   const questionBlock = question
     ? `\n\nपाठक का सवाल: "${question}"\nइसी एक सवाल के इर्द-गिर्द अलग-अलग, विविध स्टोरी-आइडिया बनाओ — इसे अलग-अलग पाठक-नज़रिए (मरीज़ / परिजन / survivor) और अलग-अलग पहलुओं (जैसे follow-up, routine, खान-पान, exercise, भावनात्मक wellbeing, काम पर वापसी, परिवार का साथ) से explore करो। हर आइडिया एक अलग कोण/उप-विषय पर हो; सवाल को दोहराओ मत, बल्कि उससे निकलने वाले ठोस, उपयोगी विषय दो।`
     : "";
-  const prompt = `${basePrompt}${filterBlock}${questionBlock}${contextBlock}${excludeBlock}${diversityBlock}`;
+  const explainerBlock = isExplainer
+    ? `\n\nएंगल: एक्सप्लेनर (ट्रेंडिंग)। इस डेस्क के क्षेत्र से जुड़े, अभी इंटरनेट पर ट्रेंड कर रहे/चर्चित विषयों पर 'एक्सप्लेनर' आइडिया दो — हर आइडिया एक ट्रेंडिंग विषय को सरल भाषा में समझाए: "यह क्या है, अभी क्यों चर्चा में है, और आम पाठक पर इसका क्या असर/मतलब है"। सनसनीखेज़ नहीं; उपयोगी, स्पष्ट और समयोचित।`
+    : "";
+  // Quality bar (content-team): ideas must be genuinely interesting AND
+  // researchable, not generic.
+  const qualityBlock =
+    "\n\nगुणवत्ता (ज़रूरी): हर आइडिया दिलचस्प, ताज़ा और 'हटकर' हो — घिसा-पिटा या सामान्य नहीं। ऐसा ठोस, शोध-योग्य कोण दो जिस पर पूरा आर्टिकल असली शोध, आंकड़ों/उदाहरणों और हालिया घटनाक्रम के साथ लिखा जा सके। हुक जिज्ञासा जगाए और benefit साफ़ बताए कि पाठक को क्या मिलेगा। सतही/क्लिकबेट नहीं।";
+  const prompt = `${basePrompt}${filterBlock}${explainerBlock}${questionBlock}${contextBlock}${excludeBlock}${diversityBlock}${qualityBlock}`;
 
   try {
     const res = await generateObject({
@@ -230,13 +248,31 @@ export async function POST(req: Request) {
     // Drop any idea that (despite the prompt) still matches an already-used one.
     const norm = (h: string) => h.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 120);
     const ideas = res.object.ideas
-      .filter((i) => !usedKeys.has(norm(i.headline)))
+      // Key on norm(nz(...)) — the SAME normalization the stored headline_key
+      // uses — so nuqta/chandrabindu headlines actually match and dedup works.
+      .filter((i) => !usedKeys.has(norm(nz(i.headline))))
       .map((i) => ({
         headline: nz(i.headline),
         subVertical: nz(i.subVertical),
         hook: nz(i.hook),
         benefit: nz(i.benefit),
       }));
+    // Record every surfaced idea so it never repeats for this desk. Fire-and-
+    // forget; a missing table just means no dedup until the migration runs.
+    if (ideas.length) {
+      const vals: unknown[] = [];
+      const rows = ideas.map((i, k) => {
+        vals.push(magKey, filterKey || null, i.headline.slice(0, 300), norm(i.headline), session.userId ?? null);
+        const b = k * 5;
+        return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5})`;
+      });
+      void pool
+        .query(
+          `INSERT INTO generated_ideas (magazine, filter, headline, headline_key, user_id) VALUES ${rows.join(", ")}`,
+          vals
+        )
+        .catch(() => {});
+    }
     return Response.json({ ideas, researched: Boolean(currentContext) });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Generation failed.";

@@ -79,6 +79,7 @@ export const MAGAZINES: Magazine[] = [
     age: "22–60",
     cadence: "सप्ताह में 3 स्टोरी + महीने में 1 डेटा एनालिसिस",
     subVerticals: ["चर्चित सीट की सामाजिक बनावट", "नेता के गृह क्षेत्र की हकीकत", "बदलता राजनीतिक रुख", "पुराने राजनीतिक गढ़", "वादे बनाम जमीन"],
+    newsQueries: ["भारत राजनीति आज", "संसद सत्र", "भारत चुनाव", "सरकार नीति फैसला", "विपक्ष सरकार", "विधानसभा राजनीति", "मुख्यमंत्री", "राष्ट्रीय राजनीति ताज़ा"],
     filters: [
       { key: "current", label: "वर्तमान राजनीतिक मुद्दे",
         brief: "अभी चर्चा में चल रहे किसी एक ताज़ा राजनीतिक मुद्दे/घटनाक्रम पर केंद्रित रहो — हालिया और पूरी तरह सत्यापित तथ्यों के साथ। राष्ट्रीय और अलग-अलग राज्यों दोनों के मुद्दे लो — सिर्फ़ राजस्थान नहीं, देशभर की राजनीति। आइडिया बनाते समय हर बार अलग-अलग, विविध मुद्दे दो — एक ही मुद्दे/दल/घटना के इर्द-गिर्द दोहराव नहीं; अलग-अलग राज्य, दल, नीति, चुनाव, विवाद, संसद व शासन के मुद्दे कवर करो। घटनाओं का क्रम, तारीख और स्थान सटीक व सत्यापित रखो — अनिश्चित हो तो सामान्य रखो, गलत विवरण मत गढ़ो।",
@@ -182,6 +183,7 @@ export const MAGAZINES: Magazine[] = [
     cadence: "सप्ताह में 3 स्टोरी + इवेंट-आधारित कवरेज",
     subVerticals: ["चैंपियंस क्लब", "खेल का गणित", "इंटरव्यू", "लोकल स्पोर्ट्स ग्राउंड", "एथलीट फिटनेस व डाइट"],
     structure: "संघर्ष/प्रोफाइल या एनालिसिस पॉइंट्स / एक्सपर्ट/कोच का नजरिया / पाठक के लिए सीख",
+    newsQueries: ["क्रिकेट मैच", "भारत क्रिकेट", "आईपीएल", "फुटबॉल", "ओलंपिक भारत", "बैडमिंटन टेनिस", "कबड्डी हॉकी", "खेल रिकॉर्ड जीत आज", "एथलीट भारत", "खेल नतीजा"],
     compliance: "आंकड़े/रिकॉर्ड सत्यापित; अफवाह नहीं; खिलाड़ियों की गरिमा बनाए रखें।",
   },
   {
@@ -452,6 +454,17 @@ export const OLLOI_DISCLAIMER = {
   hi: "यह लेख केवल सामान्य जानकारी के लिए है और आपके डॉक्टर की सलाह का विकल्प नहीं है। यह किसी एक व्यक्ति के इलाज की सिफारिश नहीं है। अपने इलाज से जुड़े किसी भी निर्णय के लिए अपने ऑन्कोलॉजिस्ट से बात करें। इलाज खुद शुरू, बंद, टालें या न बदलें। कोई भी सप्लीमेंट, जड़ी-बूटी या डाइट शुरू करने से पहले अपने डॉक्टर और फार्मासिस्ट को बताएँ। आपातकालीन लक्षण (कीमो के दौरान बुखार 100.4°F/38°C या अधिक, बेकाबू रक्तस्राव, साँस फूलना, तेज़ दर्द, भ्रम, तरल न टिक पाना) होने पर तुरंत अपनी ऑन्कोलॉजी टीम या नज़दीकी इमरजेंसी/112 से संपर्क करें। मानसिक तनाव में Tele-MANAS 14416 (1-800-891-4416) पर बात करें।",
   en: "This article is for general information only and is not a substitute for your doctor's advice. It is not a treatment recommendation for any one person. Talk to your treating oncologist about any decisions regarding your care. Do not start, stop, delay, or change any treatment based on this article. Before taking any supplement, herbal product, or diet, tell your doctor and pharmacist. For emergency symptoms (fever of 100.4°F/38°C or higher during chemotherapy, uncontrolled bleeding, breathlessness, severe pain, confusion, or inability to keep fluids down), contact your oncology team or nearest emergency service / 112 now. For emotional distress, reach Tele-MANAS 14416 (1-800-891-4416).",
 };
+
+/** Deterministically guarantee an Olloi article ends with the canonical safety
+ * disclaimer: strip at most one trailing model-written disclaimer/helpline block
+ * (so a partial one can't survive), then always append the canonical one. Shared
+ * by the generate + refine routes so they can never drift. */
+export function ensureOlloiDisclaimer(body: string, isHi: boolean): string {
+  const sig = /(डिस्क्लेमर|अस्वीकरण|यह लेख केवल सामान्य जानकारी|डॉक्टर की सलाह का विकल्प|Tele-?MANAS|टेली-?मानस|14416|1-?800-?891-?4416|disclaimer|not a substitute for your doctor)/i;
+  const paras = body.trimEnd().split(/\n{2,}/);
+  if (paras.length > 1 && sig.test(paras[paras.length - 1])) paras.pop();
+  return paras.join("\n\n").trimEnd() + "\n\n" + (isHi ? OLLOI_DISCLAIMER.hi : OLLOI_DISCLAIMER.en);
+}
 
 /** Idea-generation prompt (Layer 1) — asks for a batch of fresh topic ideas
  * spread across the magazine's five sub-verticals. The generator adds the

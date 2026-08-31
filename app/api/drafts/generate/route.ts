@@ -12,7 +12,7 @@ import { enrichFromUrl, decodeEntities } from "@/lib/enrich/json-ld";
 import { normalizeHindiTypography } from "@/lib/text/hindi";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
-import { MAGAZINE_BY_KEY, isOlloiDesk, OLLOI_DISCLAIMER } from "@/lib/magazines";
+import { MAGAZINE_BY_KEY, isOlloiDesk, ensureOlloiDisclaimer } from "@/lib/magazines";
 
 // Web-search-grounded drafting (write-on-a-topic) does live research — and now
 // a conditional second "expand" pass — so give it generous room before the
@@ -625,18 +625,8 @@ A standard patient-safety disclaimer (emergency symptoms + helpline) is appended
     const deDash = (s: string): string => (olloiDesk ? s.replace(/\s*—\s*/g, ", ").replace(/,\s*,/g, ",") : s);
     // Deterministic guarantee: append the canonical safety disclaimer to every
     // Olloi article, regardless of what the model wrote.
-    const withOlloiDisclaimer = (body: string): string => {
-      if (!olloiDesk) return body;
-      // Strip a trailing disclaimer / helpline block the model wrote despite the
-      // instruction, so the canonical one isn't duplicated. Match ONLY an
-      // unambiguous disclaimer block — NOT a bare "अपने ऑन्कोलॉजिस्ट से बात करें"
-      // line, which is a legitimate article ending the desk asks for — and at
-      // most one trailing paragraph.
-      const sig = /(डिस्क्लेमर|अस्वीकरण|यह लेख केवल सामान्य जानकारी|डॉक्टर की सलाह का विकल्प|Tele-?MANAS|टेली-?मानस|14416|1-?800-?891-?4416|disclaimer|not a substitute for your doctor)/i;
-      const paras = body.trimEnd().split(/\n{2,}/);
-      if (paras.length > 1 && sig.test(paras[paras.length - 1])) paras.pop();
-      return paras.join("\n\n").trimEnd() + "\n\n" + (isHi ? OLLOI_DISCLAIMER.hi : OLLOI_DISCLAIMER.en);
-    };
+    const withOlloiDisclaimer = (body: string): string =>
+      olloiDesk ? ensureOlloiDisclaimer(body, isHi) : body;
     const magPrompt = magKey ? directives.magazineContent?.[magKey] : undefined;
 
     // Remember this idea as "used" so the idea generator never surfaces the same
@@ -968,6 +958,7 @@ STEP 3 — WRITE:
 • CORRECT HINDI: grammatically correct, with accurate spelling and matras/vowel-signs — e.g. "चलो" not "चलों", "जैमर" not "जामर" — and natural, well-formed sentences (सही वाक्य-बनावट).
 • INTERNAL CONSISTENCY: keep numbers, frequencies and dosages consistent and non-contradictory. If different studies used different protocols (e.g. 10 min 3×/week vs 10 min 2×/day), attribute each figure clearly to its own study, and give the reader ONE clear, coherent recommendation — never blend conflicting frequencies into confusing advice.
 • FACTUAL INTEGRITY: every named person, quote, statistic, and proper noun (a scheme / report / law / place name) in the article must be REAL and traceable to your research — never invented, never a placeholder name. Get official names EXACTLY right (e.g. a government scheme's official title); if you are not sure of the exact official name, use the wording your sources actually use and don't guess a title. Do not present a number as precise ("7% राजस्व घाटा", "76,633 करोड़") unless a source gives it — otherwise keep it general. Report the CURRENT status of every event (a bill's actual outcome, who holds a post NOW), never a stale "was announced / introduced" framing.
+• NO REPETITION — never state the same fact, statistic, name or point more than once. Each paragraph must add NEW information; do NOT restate in a later paragraph what an earlier one already said (a common failure to avoid). If you catch yourself repeating a point, cut it and add something new instead.
 • SILENT — never show your working. If you cannot confirm a specific (a figure, a dated quote, an event's status), simply DROP it and write the sentence as the plain general truth — do NOT keep the specific with a caveat and do NOT tell the reader you did this. NEVER write meta-lines like "इसकी पुष्टि नहीं मिली", "सामान्य रूप में प्रस्तुत किया गया है", "नाम/उद्धरण उपलब्ध नहीं हैं" or "सभी तथ्य की पुष्टि की गई है". The reader sees only a clean, confident article.
 • SPECIFICS COME FROM THE SOURCES — this is the safety rule. Every specific number, amount, statistic, name, date, quote and named event MUST come from the SOURCE REPORTING below (or, if you search, only from reporting on THIS SAME story). Do NOT import an unrelated figure/study/expert from elsewhere or from memory, and NEVER invent one. If the sources don't give a specific, don't state one — say it in general terms. You MAY and SHOULD add general explanatory context (what a term/policy/process is, how it works) and reasoned analysis of the news's EFFECTS and implications — that is analysis, not new facts — but it must not smuggle in invented specifics.
 • LENGTH: this is a LONG in-depth feature of AT LEAST ${targetWords} words — a hard MINIMUM, not a hint. That is roughly ${Math.round(targetWords / 85)}+ solid paragraphs across your 5+ sections. Write in real depth: if you feel finished before ${targetWords} words, the topic is under-developed — add another section, more examples, more practical detail, more context. Do NOT summarise, do NOT stop early, and never pad with filler or repetition. Count as you go and keep going until you clearly pass ${targetWords} words.
@@ -1038,6 +1029,8 @@ Then rewrite so that:
 - Proper nouns are corrected to their official / correct form; stale statuses are updated to the current one.
 - Wrong or outdated dates / sequences / statuses are fixed; anything you cannot confirm is DROPPED and the sentence rewritten as the plain general truth — never kept with a hedge.
 - Everything you CAN verify stays — do NOT strip a fact merely because you did not personally re-find it; only remove things that are clearly fabricated, contradicted or outdated. Add any missing key real fact you find while checking.${expandNote}
+- REMOVE REPETITION — do not let the same fact, statistic, quote or point appear more than once. If the draft restates an earlier point in a later paragraph, keep it in the single strongest place and CUT the repeats; every paragraph must add NEW information, not re-say what an earlier one already said.
+- CONTRADICTIONS — if your search results contradict any claim in the draft (a wrong figure, a wrong outcome, a misattributed cause), fix it to the verified reality; when sources disagree, prefer official / authoritative ones and state the well-supported version.
 - SILENT OUTPUT: never tell the reader about your checking. Do NOT write any preface (no "नीचे प्रस्तुत है… संशोधित/तथ्यपरक फीचर", no "सभी तथ्य/आंकड़े की पुष्टि की गई है"), no confidence notes ("इसकी पुष्टि नहीं मिली", "सामान्य रूप में प्रस्तुत किया गया है", "नाम/उद्धरण उपलब्ध नहीं हैं"), and no word-count / sources line. The output is ONLY the clean, confident finished article.
 - Preserve the voice, structure, flowing-prose style and SIMPLE everyday language. Do NOT introduce any NEW unverified claim. Do NOT name news outlets.
 - STRUCTURE: the final article must keep (or, if missing, gain) AT LEAST 5 short plain-text subheadings and at least ${targetWords} words; keep any data table the draft has (and add a simple one only if comparable data genuinely calls for it). ${langLine}${evidenceBlock}${olloiBlock}${sourceGrounding}

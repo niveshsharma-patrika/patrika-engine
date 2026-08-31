@@ -505,6 +505,28 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
 
   // Output language for the generated story (default Hindi — Patrika's main language)
   const [genLang, setGenLang] = useState<"hi" | "en">("hi");
+  const [refineInstruction, setRefineInstruction] = useState("");
+  const [refining, setRefining] = useState(false);
+
+  // Targeted refine: apply an editor instruction to the generated article,
+  // changing only the relevant parts. (Route enforces no fabrication + keeps the
+  // Olloi safety disclaimer.)
+  async function handleRefine() {
+    const instruction = refineInstruction.trim();
+    if (!instruction || !body.trim() || refining) return;
+    setRefining(true);
+    try {
+      const res = await fetch("/api/drafts/refine", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ body, instruction, lang: genLang, magazine: magazineKey ?? undefined }),
+      });
+      const json = await res.json();
+      if (res.ok && json.body) { setBody(json.body); setRefineInstruction(""); }
+    } finally {
+      setRefining(false);
+    }
+  }
 
   // Draft persistence
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -1118,6 +1140,34 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
                 </div>
               )}
             </div>
+
+            {/* Refine / update the generated story with a targeted instruction. */}
+            {hasGenerated && !generating && (
+              <div className="mt-3 bg-white border border-[var(--border)] rounded-xl p-3">
+                <div className="text-[11px] font-medium text-[var(--text-2)] mb-1.5">
+                  {lang === "hi" ? "स्टोरी सुधारें / अपडेट करें" : "Refine / update the story"}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={refineInstruction}
+                    onChange={(e) => setRefineInstruction(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && refineInstruction.trim()) handleRefine(); }}
+                    disabled={refining}
+                    placeholder={lang === "hi" ? "जैसे: इसे छोटा करो / भाषा और सरल करो / X पर एक हिस्सा जोड़ो" : "e.g. make it shorter / simpler language / add a section on X"}
+                    className="flex-1 bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--purple)]"
+                  />
+                  <button
+                    onClick={handleRefine}
+                    disabled={refining || !refineInstruction.trim()}
+                    className="shrink-0 text-white text-[13px] font-medium px-4 py-2 rounded-lg disabled:opacity-50 flex items-center gap-1.5"
+                    style={{ background: "var(--purple)" }}
+                  >
+                    {refining ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                    {lang === "hi" ? "सुधारें" : "Refine"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             </section>
 
