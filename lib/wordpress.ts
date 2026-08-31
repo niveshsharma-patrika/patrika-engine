@@ -128,6 +128,8 @@ export async function postToWordPress(
           ? "WordPress rate limit reached — wait a minute and try again."
           : res.status === 401 || res.status === 403
           ? "WordPress rejected the API key — check it in Admin."
+          : res.status === 404
+          ? "WordPress route not found (404) — check the Endpoint URL in Admin, and that the Patrika-Plus plugin is active on that site."
           : `WordPress returned ${res.status}.`;
       return { ok: false, status: res.status, data, error };
     }
