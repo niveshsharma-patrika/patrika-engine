@@ -507,6 +507,7 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
   const [genLang, setGenLang] = useState<"hi" | "en">("hi");
   const [refineInstruction, setRefineInstruction] = useState("");
   const [refining, setRefining] = useState(false);
+  const [refineMsg, setRefineMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [wpSaving, setWpSaving] = useState(false);
   const [wpMsg, setWpMsg] = useState<{ ok: boolean; text: string; link?: string | null } | null>(null);
 
@@ -517,14 +518,35 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
     const instruction = refineInstruction.trim();
     if (!instruction || !body.trim() || refining) return;
     setRefining(true);
+    setRefineMsg(null);
     try {
       const res = await fetch("/api/drafts/refine", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ body, instruction, lang: genLang, magazine: magazineKey ?? undefined }),
       });
-      const json = await res.json();
-      if (res.ok && json.body) { setBody(json.body); setRefineInstruction(""); }
+      const json = (await res.json().catch(() => ({}))) as { body?: string; error?: string };
+      if (res.ok && typeof json.body === "string" && json.body.trim()) {
+        const changed = json.body.trim() !== body.trim();
+        setBody(json.body);
+        setRefineInstruction("");
+        setRefineMsg({
+          ok: true,
+          text: changed
+            ? (lang === "hi" ? "स्टोरी अपडेट हो गई" : "Story updated")
+            : (lang === "hi" ? "कोई बदलाव ज़रूरी नहीं था" : "No changes were needed"),
+        });
+      } else {
+        setRefineMsg({
+          ok: false,
+          text: json.error ?? (lang === "hi" ? `विफल (${res.status})` : `Failed (${res.status})`),
+        });
+      }
+    } catch (e) {
+      setRefineMsg({
+        ok: false,
+        text: e instanceof Error ? e.message : (lang === "hi" ? "नेटवर्क त्रुटि" : "Network error"),
+      });
     } finally {
       setRefining(false);
     }
@@ -1212,6 +1234,11 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
                     {lang === "hi" ? "सुधारें" : "Refine"}
                   </button>
                 </div>
+                {refineMsg && (
+                  <div className={`mt-1.5 text-[11px] ${refineMsg.ok ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+                    {refineMsg.text}
+                  </div>
+                )}
               </div>
             )}
 
