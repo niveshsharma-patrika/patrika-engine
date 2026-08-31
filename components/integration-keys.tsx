@@ -85,6 +85,15 @@ export function IntegrationKeys() {
         <Row label="Your IG business account id" k="meta_ig_user_id" v={v} set={set} ok={status?.meta_ig_user_id} mono />
       </Group>
 
+      <Group
+        title="WordPress (Patrika+)"
+        tag="Save to WordPress"
+        help={<>Save Patrika+ articles to WordPress as drafts. Paste the <b>API key</b> from the WordPress plugin&rsquo;s settings page (sent as the <code className="font-mono text-[11px]">X-Patrika-Plus-API-Key</code> header) and the <b>endpoint URL</b> (ends in <code className="font-mono text-[11px]">/wp-json/patrika-plus/v1/posts</code>).</>}
+      >
+        <Row label="API key" k="wordpress_api_key" v={v} set={set} ok={status?.wordpress_api_key} />
+        <Row label="Endpoint URL" k="wordpress_endpoint" v={v} set={set} ok={status?.wordpress_endpoint} mono />
+      </Group>
+
       <div className="flex items-center gap-3 pt-1">
         <button onClick={save} disabled={saving}
           className="bg-[var(--text)] hover:bg-black text-white text-[13px] font-medium px-3.5 py-1.5 rounded disabled:opacity-50 flex items-center gap-1.5">

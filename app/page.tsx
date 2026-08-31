@@ -507,6 +507,8 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
   const [genLang, setGenLang] = useState<"hi" | "en">("hi");
   const [refineInstruction, setRefineInstruction] = useState("");
   const [refining, setRefining] = useState(false);
+  const [wpSaving, setWpSaving] = useState(false);
+  const [wpMsg, setWpMsg] = useState<{ ok: boolean; text: string; link?: string | null } | null>(null);
 
   // Targeted refine: apply an editor instruction to the generated article,
   // changing only the relevant parts. (Route enforces no fabrication + keeps the
@@ -525,6 +527,27 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
       if (res.ok && json.body) { setBody(json.body); setRefineInstruction(""); }
     } finally {
       setRefining(false);
+    }
+  }
+
+  // Save the finished Patrika+ article to WordPress as a draft (server proxies
+  // the request with the stored API key; body is converted to HTML server-side).
+  async function handleWpDraft() {
+    if (!body.trim() || wpSaving) return;
+    setWpSaving(true); setWpMsg(null);
+    try {
+      const res = await fetch("/api/wordpress/draft", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, body, short_description: description }),
+      });
+      const json = await res.json();
+      if (!res.ok) setWpMsg({ ok: false, text: json.error ?? `Failed (${res.status})` });
+      else setWpMsg({ ok: true, text: lang === "hi" ? "WordPress ड्राफ्ट में सेव हो गया" : "Saved to WordPress draft", link: json.link });
+    } catch {
+      setWpMsg({ ok: false, text: lang === "hi" ? "नेटवर्क त्रुटि" : "Network error" });
+    } finally {
+      setWpSaving(false);
     }
   }
 
@@ -772,6 +795,29 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
           </div>
         </div>
         <div className="justify-self-end flex gap-2 items-center">
+          {magazineKey && !olloi && hasGenerated && (
+            <>
+              {wpMsg && (
+                <span className={`text-[11.5px] ${wpMsg.ok ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+                  {wpMsg.ok ? "✓ " : "⚠ "}{wpMsg.text}
+                  {wpMsg.link && (
+                    <a href={wpMsg.link} target="_blank" rel="noopener noreferrer" className="underline ml-1">
+                      {lang === "hi" ? "देखें" : "view"}
+                    </a>
+                  )}
+                </span>
+              )}
+              <button
+                onClick={handleWpDraft}
+                disabled={wpSaving || !body.trim()}
+                title={lang === "hi" ? "इस लेख को WordPress में ड्राफ्ट के रूप में सेव करें" : "Save this article to WordPress as a draft"}
+                className="bg-white border border-[var(--border)] hover:bg-[var(--surface-2)] disabled:opacity-50 text-[var(--text-2)] hover:text-[var(--text)] text-[13px] px-4 py-2 rounded font-medium flex items-center gap-1.5"
+              >
+                {wpSaving && <Loader2 size={13} className="animate-spin" />}
+                {wpSaving ? (lang === "hi" ? "भेज रहे…" : "Sending…") : (lang === "hi" ? "WordPress ड्राफ्ट" : "WordPress draft")}
+              </button>
+            </>
+          )}
           <button
             onClick={() => handleSave("in_progress")}
             disabled={saveState === "saving" || saveState === "submitting" || !title.trim()}

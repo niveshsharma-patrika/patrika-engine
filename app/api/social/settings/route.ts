@@ -5,6 +5,7 @@ import { hasSecret, setSecret, X_AUTH_TOKEN } from "@/lib/twitter/secrets";
 import {
   YT_API_KEY, META_TOKEN, META_IG_USER_ID, REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET,
 } from "@/lib/social/types";
+import { WP_API_KEY, WP_ENDPOINT } from "@/lib/wordpress";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,8 @@ const KEYS = {
   x_auth_token: X_AUTH_TOKEN,
   reddit_client_id: REDDIT_CLIENT_ID,
   reddit_client_secret: REDDIT_CLIENT_SECRET,
+  wordpress_api_key: WP_API_KEY,
+  wordpress_endpoint: WP_ENDPOINT,
 } as const;
 
 const Body = z.object({
@@ -36,13 +39,16 @@ const Body = z.object({
   x_auth_token: z.string().min(10).max(500).optional(),
   reddit_client_id: z.string().min(4).max(100).optional(),
   reddit_client_secret: z.string().min(4).max(100).optional(),
+  wordpress_api_key: z.string().min(8).max(500).optional(),
+  wordpress_endpoint: z.string().url().max(500).optional(),
 });
 
 export async function GET() {
   if (!(await requireAdmin())) return Response.json({ error: "Forbidden" }, { status: 403 });
-  const [yt, meta, ig, x, rid, rsec] = await Promise.all([
+  const [yt, meta, ig, x, rid, rsec, wpk, wpe] = await Promise.all([
     hasSecret(YT_API_KEY), hasSecret(META_TOKEN), hasSecret(META_IG_USER_ID),
     hasSecret(X_AUTH_TOKEN), hasSecret(REDDIT_CLIENT_ID), hasSecret(REDDIT_CLIENT_SECRET),
+    hasSecret(WP_API_KEY), hasSecret(WP_ENDPOINT),
   ]);
   return Response.json({
     youtube_api_key: yt.set,
@@ -51,6 +57,8 @@ export async function GET() {
     x_auth_token: x.set,
     reddit_client_id: rid.set,
     reddit_client_secret: rsec.set,
+    wordpress_api_key: wpk.set,
+    wordpress_endpoint: wpe.set,
   });
 }
 
