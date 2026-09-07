@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { hashPassword } from "@/lib/auth/password";
+import { parseAuthorId } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,16 @@ export async function PATCH(
   if (typeof body?.isActive === "boolean") update.isActive = body.isActive;
   if (typeof body?.password === "string" && body.password.length >= 6) {
     update.passwordHash = await hashPassword(body.password);
+  }
+  if (body && Object.prototype.hasOwnProperty.call(body, "authorId")) {
+    const p = parseAuthorId(body.authorId);
+    if (!p.ok) {
+      return Response.json(
+        { error: "WordPress author id must be a positive whole number (or blank to clear)." },
+        { status: 400 }
+      );
+    }
+    update.authorId = p.value;
   }
 
   // Lockout guard: an admin can't demote, switch to Print (loses admin nav),

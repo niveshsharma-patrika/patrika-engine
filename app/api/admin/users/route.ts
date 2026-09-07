@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { hashPassword } from "@/lib/auth/password";
+import { parseAuthorId } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export async function GET() {
       role: schema.profiles.role,
       edition: schema.profiles.edition,
       desk: schema.profiles.desk,
+      authorId: schema.profiles.authorId,
       isActive: schema.profiles.isActive,
       createdAt: schema.profiles.createdAt,
     })
@@ -47,10 +49,17 @@ export async function POST(req: Request) {
   const edition = body?.edition === "print" ? "print" : "digital";
   const password = (body?.password ?? "").toString();
   const desk = body?.desk ? body.desk.toString().trim() : null;
+  const authorIdParsed = parseAuthorId(body?.authorId);
 
   if (!email || !fullName || password.length < 6) {
     return Response.json(
       { error: "Name, email, and a password (min 6 characters) are required." },
+      { status: 400 }
+    );
+  }
+  if (!authorIdParsed.ok) {
+    return Response.json(
+      { error: "WordPress author id must be a positive whole number (or left blank)." },
       { status: 400 }
     );
   }
@@ -66,7 +75,7 @@ export async function POST(req: Request) {
   const passwordHash = await hashPassword(password);
   const [user] = await db
     .insert(schema.profiles)
-    .values({ email, fullName, role, edition, desk, passwordHash, isActive: true })
+    .values({ email, fullName, role, edition, desk, authorId: authorIdParsed.value, passwordHash, isActive: true })
     .returning({
       id: schema.profiles.id,
       email: schema.profiles.email,

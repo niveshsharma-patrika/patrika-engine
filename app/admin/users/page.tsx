@@ -9,6 +9,7 @@ type User = {
   role: string;
   edition: string;
   desk: string | null;
+  authorId: number | null;
   isActive: boolean;
   createdAt: string | null;
 };
@@ -37,6 +38,7 @@ export default function UsersPage() {
   const [role, setRole] = useState("writer");
   const [edition, setEdition] = useState("digital");
   const [password, setPassword] = useState("");
+  const [authorId, setAuthorId] = useState("");
   const [adding, setAdding] = useState(false);
 
   async function load() {
@@ -63,7 +65,7 @@ export default function UsersPage() {
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, email, role, edition, password }),
+        body: JSON.stringify({ fullName, email, role, edition, password, authorId }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -74,6 +76,7 @@ export default function UsersPage() {
         setRole("writer");
         setEdition("digital");
         setPassword("");
+        setAuthorId("");
         await load();
       }
     } finally {
@@ -137,7 +140,7 @@ export default function UsersPage() {
       {/* Add user */}
       <form
         onSubmit={addUser}
-        className="bg-white border border-[var(--border)] rounded-xl p-4 mb-6 grid grid-cols-1 sm:grid-cols-6 gap-3 items-end"
+        className="bg-white border border-[var(--border)] rounded-xl p-4 mb-6 grid grid-cols-1 sm:grid-cols-7 gap-3 items-end"
       >
         <div className="sm:col-span-1">
           <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">Full name</label>
@@ -172,6 +175,10 @@ export default function UsersPage() {
           <input className={input} type="text" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
         </div>
         <div className="sm:col-span-1">
+          <label className="block text-[11px] font-medium text-[var(--text-2)] mb-1">WP author ID</label>
+          <input className={input} type="number" min={1} value={authorId} onChange={(e) => setAuthorId(e.target.value)} placeholder="optional" />
+        </div>
+        <div className="sm:col-span-1">
           <button
             type="submit"
             disabled={adding}
@@ -181,7 +188,7 @@ export default function UsersPage() {
             {adding ? "Adding…" : "Add user"}
           </button>
         </div>
-        {err && <div className="sm:col-span-6 text-[12px] text-red-600">{err}</div>}
+        {err && <div className="sm:col-span-7 text-[12px] text-red-600">{err}</div>}
       </form>
 
       {/* User list */}
@@ -196,6 +203,7 @@ export default function UsersPage() {
                 <th className="text-left font-medium px-4 py-2.5">Email</th>
                 <th className="text-left font-medium px-4 py-2.5">Role</th>
                 <th className="text-left font-medium px-4 py-2.5">Edition</th>
+                <th className="text-left font-medium px-4 py-2.5">WP author ID</th>
                 <th className="text-left font-medium px-4 py-2.5">Status</th>
                 {isAdmin && <th className="text-right font-medium px-4 py-2.5">Actions</th>}
               </tr>
@@ -233,6 +241,30 @@ export default function UsersPage() {
                       </select>
                     ) : (
                       <span className="text-[12px] text-[var(--text-2)]">{EDITION_LABEL[u.edition] ?? u.edition}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {isAdmin ? (
+                      <input
+                        type="number"
+                        min={1}
+                        defaultValue={u.authorId ?? ""}
+                        placeholder="—"
+                        onBlur={(e) => {
+                          const raw = e.target.value.trim();
+                          const next = raw === "" ? null : Number(raw);
+                          if (next === (u.authorId ?? null)) return; // unchanged
+                          if (raw !== "" && (!Number.isInteger(next) || (next as number) <= 0)) {
+                            alert("WP author ID must be a positive whole number.");
+                            e.target.value = u.authorId != null ? String(u.authorId) : "";
+                            return;
+                          }
+                          patch(u.id, { authorId: next });
+                        }}
+                        className="w-24 bg-transparent border border-[var(--border)] rounded-md px-2 py-1 text-[12px]"
+                      />
+                    ) : (
+                      <span className="text-[12px] text-[var(--text-2)]">{u.authorId ?? "—"}</span>
                     )}
                   </td>
                   <td className="px-4 py-2.5">

@@ -1,3 +1,4 @@
+import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { bodyToHtml, englishSlug, postToWordPress } from "@/lib/wordpress";
 
@@ -27,11 +28,26 @@ export async function POST(req: Request) {
   // translated to English first (see englishSlug).
   const slug = (slugIn || (await englishSlug(title))).slice(0, 100);
 
+  // The WordPress author = the signed-in user who saves the article. Attach
+  // their stored WordPress author id (if set) so the post carries their byline.
+  let authorId: number | undefined;
+  try {
+    const { rows } = await pool.query(
+      "SELECT author_id FROM profiles WHERE id = $1 LIMIT 1",
+      [session.userId]
+    );
+    const a = rows[0]?.author_id;
+    if (typeof a === "number" && Number.isInteger(a) && a > 0) authorId = a;
+  } catch {
+    /* author id is optional — proceed without it */
+  }
+
   const result = await postToWordPress({
     title,
     content,
     short_description: short || undefined,
     slug: slug || undefined,
+    author_id: authorId,
   });
   if (!result.ok) {
     return Response.json({ error: result.error, detail: result.data }, { status: result.status });

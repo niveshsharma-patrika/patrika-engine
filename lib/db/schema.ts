@@ -169,6 +169,9 @@ export const profiles = pgTable("profiles", {
 	role: text().default('writer').notNull(),
 	edition: text().default('digital').notNull(),
 	desk: text(),
+	// WordPress author id — sent as `author_id` when this user's Patrika+ article
+	// is saved to WordPress, so it is attributed to their byline on patrika.com.
+	authorId: integer("author_id"),
 	telegramHandle: text("telegram_handle"),
 	telegramChatId: text("telegram_chat_id"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),

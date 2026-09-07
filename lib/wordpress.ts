@@ -164,7 +164,14 @@ export async function getWpConfig(): Promise<WpConfig | null> {
   return { apiKey, endpoint };
 }
 
-export type WpPost = { title: string; content: string; short_description?: string; slug?: string };
+export type WpPost = {
+  title: string;
+  content: string;
+  short_description?: string;
+  slug?: string;
+  /** WordPress author id — the post is attributed to this author's byline. */
+  author_id?: number;
+};
 
 /** POST one post to the WordPress plugin. Returns the plugin's response. */
 export async function postToWordPress(
