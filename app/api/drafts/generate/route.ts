@@ -10,6 +10,7 @@ import { searchGoogleNews, resolveArticleUrl, type TopicHit } from "@/lib/source
 import { isTrustedUrl, isTrustedPublisherName, isEvidenceDesk } from "@/lib/sources/trusted";
 import { enrichFromUrl, decodeEntities } from "@/lib/enrich/json-ld";
 import { normalizeHindiTypography } from "@/lib/text/hindi";
+import { stripCitations } from "@/lib/text/citations";
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { MAGAZINE_BY_KEY, isOlloiDesk, ensureOlloiDisclaimer } from "@/lib/magazines";
@@ -452,24 +453,6 @@ Rules:
  * (e.g. "([hindustantimes.com](https://…?utm_source=openai))" or 【…】). The
  * article body should be clean prose; sources are surfaced separately.
  */
-function stripCitations(text: string): string {
-  return text
-    // Markdown links: KEEP the informative link text (facts/dates live there) —
-    // drop only pure domain/citation labels and the URL itself.
-    .replace(/\(?\s*\[([^\]]*)\]\(https?:\/\/[^)\s]+\)\s*\)?/g, (_m, label: string) => {
-      const l = label.trim();
-      return /^[\w-]+(\.[\w-]+)+$/.test(l) ? "" : l; // domain-only → drop; text → keep
-    })
-    .replace(/\(\s*https?:\/\/[^)\s]+\s*\)/g, "") // (url)
-    .replace(/https?:\/\/[^\s)]+/g, "") // bare urls
-    .replace(/【[^】]*】/g, "") // 【…】 citation markers
-    .replace(/\[\s*\]|\(\s*\)/g, "") // leftover empty [] ()
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/[ \t]+([।.,;:!?])/g, "$1")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 /**
  * Remove a leading META-PREFACE the model sometimes prepends despite being told
  * not to — a short opening blurb that talks ABOUT the article and its
@@ -616,7 +599,7 @@ VOICE — बोलचाल की, सहज हिंदी, जैसे क
 SOURCES & QUOTES — जहाँ किसी विशेषज्ञ/स्रोत का उद्धरण या आँकड़ा दें, वहाँ स्रोत का नाम और तारीख ज़रूर दें, और उद्धरण को संदर्भ के साथ रखें (सिर्फ़ उद्धरण डालकर न छोड़ें); numbered उद्धरण/बिंदु ठीक हैं। हर क्लिनिकल दावा किसी अधिकृत स्रोत से हो — भारत-विशिष्ट दावे भारतीय स्रोत से (Tata Memorial, ICMR-NCDIR, AIIMS, National Cancer Grid, MoHFW; schemes → PM-JAY/official portals). If unsure, write less, not wrong; NEVER invent a study, statistic, name, quote or date.
 FORMATTING — headings simple and conversational; a colon (:) in the title/headings is NOT required, skip it unless it truly helps; AVOID the long dash (—) entirely (use a comma or a new sentence); keep the overall formatting natural, not "AI-generated".
 IMAGE CONCEPT — describe ONE clean, realistic visual that clearly matches the story's topic, with NO text of any kind baked in (especially NO Hindi text — Hindi renders incorrectly); any exact wording is added later in design, not in the image.
-LENGTH (this desk OVERRIDES the "LONG in-depth feature / at least ${targetWords} / 5+ subheadings" rules above) — write about ${targetWords} words, ALWAYS under 800. ${olloiShort ? "This is a SHORT piece: 2–3 tight paragraphs, at most one small heading, only the core point — do NOT pad to a length or force multiple sections." : "A focused piece with a few short, conversational subheadings; do not pad to hit a number."}
+LENGTH (this desk OVERRIDES the general length/subheading guidance above) — write about ${targetWords} words, ALWAYS under 800. ${olloiShort ? "This is a SHORT piece: 2–3 tight paragraphs, at most one small heading, only the core point — do NOT pad to a length or force multiple sections." : "A focused piece with a few short, conversational subheadings; do not pad to hit a number."}
 A standard patient-safety disclaimer (emergency symptoms + helpline) is appended AUTOMATICALLY, so do NOT write your own disclaimer, helpline or "consult your doctor" closing block.`
       : "";
     // Content-team style: drop the long dash (—) from Olloi output (titles/body).
@@ -633,7 +616,10 @@ A standard patient-safety disclaimer (emergency symptoms + helpline) is appended
     // topic again for this desk. Fire-and-forget; never blocks generation. Skip
     // the custom desk (freeform topics have no idea list to dedupe).
     if (magKey && magKey !== "custom" && topic) {
-      const headlineKey = topic.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 120);
+      // Normalize with nz() FIRST so this key matches the ideas route's
+      // norm(nz(headline)) — otherwise nuqta/chandrabindu topics never match and
+      // an idea already turned into an article can resurface.
+      const headlineKey = normalizeHindiTypography(topic).toLowerCase().replace(/\s+/g, " ").trim().slice(0, 120);
       void pool
         .query(
           `INSERT INTO used_ideas (magazine, filter, headline, headline_key) VALUES ($1, $2, $3, $4)`,
@@ -945,6 +931,7 @@ Match the treatment to the topic. Most Patrika+ lifestyle / health / finance top
 STEP 2 — RESEARCH for that form:
 • NEWS: latest status, exact figures/dates/names, official specifics, reactions, what's next.
 • EXPLAINER: the substance a reader actually needs — how it works, the practical steps and options, expert-recommended best practices, real benefits with evidence, precautions and common mistakes, relatable examples.
+• RESEARCH WIDELY — gather a BROAD set of DISTINCT, verifiable facts, figures, examples, dates and expert points from MULTIPLE sources before you write (aim for a dozen-plus distinct real facts, not one source restated). The article must be filled with SUBSTANCE, not length: thin research forces padding, which is forbidden. More distinct, corroborated facts = a better article.
 • EVIDENCE — REAL OR NOTHING. When your research gives you a REAL, verifiable study / institution / expert / official figure, name it precisely (name + year + the exact finding: sample size, percentage, figure) and weave it in. But NEVER invent one to sound authoritative: do NOT fabricate an expert, a person, a quote, a study, an institution or a statistic. A made-up "कृषि विशेषज्ञ डॉ. राजेश वर्मा ने कहा…" or "एक अध्ययन के अनुसार 7%…" with no real source is a SERIOUS error — worse than having no quote at all. If you do not have a real, named source for a point, either state it as plain general guidance with NO fake attribution, or leave it out. Also avoid the vague "एक अध्ययन में पाया गया / a study found" with no name. Accuracy beats specificity: prefer fewer real facts over more invented ones. Do not attach a fake expert name or a made-up number to generic advice.
 • CHRONOLOGY & SEQUENCE — when the story involves a series of events (a movement, controversy, campaign, protest, timeline), verify the ORDER, DATES and PLACES of each event from the sources and cross-check them. Do NOT guess or assume which happened FIRST/second, the exact date, or the location — a wrong "पहला प्रदर्शन X में हुआ" or a wrong date is a serious error. If the exact date/order/place cannot be confirmed, keep it general rather than asserting a wrong specific.
 • LATEST STATUS / OUTCOME — this is critical: for EVERY event, bill, policy, appointment, contest, case or claim you mention, research and report its CURRENT status, not the point at which it was announced. Actively search for what happened NEXT: was the bill passed, defeated, withdrawn or stalled? did the leader win, lose, resign or get appointed — and who holds the post NOW? was the scheme launched, delayed or scrapped? A story frozen at its announcement is a factual error: "a bill was introduced" is worthless (even harmful) if it has since been defeated. Search terms like "[topic] latest / result / outcome / passed or defeated / new [post]" and lead with what is true TODAY (${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}). If you cannot confirm the current status, do not assert an outdated one — describe it in general terms.
@@ -958,11 +945,11 @@ STEP 3 — WRITE:
 • CORRECT HINDI: grammatically correct, with accurate spelling and matras/vowel-signs — e.g. "चलो" not "चलों", "जैमर" not "जामर" — and natural, well-formed sentences (सही वाक्य-बनावट).
 • INTERNAL CONSISTENCY: keep numbers, frequencies and dosages consistent and non-contradictory. If different studies used different protocols (e.g. 10 min 3×/week vs 10 min 2×/day), attribute each figure clearly to its own study, and give the reader ONE clear, coherent recommendation — never blend conflicting frequencies into confusing advice.
 • FACTUAL INTEGRITY: every named person, quote, statistic, and proper noun (a scheme / report / law / place name) in the article must be REAL and traceable to your research — never invented, never a placeholder name. Get official names EXACTLY right (e.g. a government scheme's official title); if you are not sure of the exact official name, use the wording your sources actually use and don't guess a title. Do not present a number as precise ("7% राजस्व घाटा", "76,633 करोड़") unless a source gives it — otherwise keep it general. Report the CURRENT status of every event (a bill's actual outcome, who holds a post NOW), never a stale "was announced / introduced" framing.
-• NO REPETITION — never state the same fact, statistic, name or point more than once. Each paragraph must add NEW information; do NOT restate in a later paragraph what an earlier one already said (a common failure to avoid). If you catch yourself repeating a point, cut it and add something new instead.
+• NO REPETITION / FACT DENSITY (CRITICAL) — never state the same fact, statistic, name or point more than once. Every paragraph MUST introduce at least one NEW concrete fact, figure, example, name or step not stated earlier; if a paragraph would only restate or re-explain something an earlier one already covered, DELETE it rather than keep it. Real fact-density matters far more than length — do NOT fill space by re-saying, elaborating the obvious, or padding. If you catch yourself repeating, cut it and add a genuinely new, sourced point instead.
 • SILENT — never show your working. If you cannot confirm a specific (a figure, a dated quote, an event's status), simply DROP it and write the sentence as the plain general truth — do NOT keep the specific with a caveat and do NOT tell the reader you did this. NEVER write meta-lines like "इसकी पुष्टि नहीं मिली", "सामान्य रूप में प्रस्तुत किया गया है", "नाम/उद्धरण उपलब्ध नहीं हैं" or "सभी तथ्य की पुष्टि की गई है". The reader sees only a clean, confident article.
 • SPECIFICS COME FROM THE SOURCES — this is the safety rule. Every specific number, amount, statistic, name, date, quote and named event MUST come from the SOURCE REPORTING below (or, if you search, only from reporting on THIS SAME story). Do NOT import an unrelated figure/study/expert from elsewhere or from memory, and NEVER invent one. If the sources don't give a specific, don't state one — say it in general terms. You MAY and SHOULD add general explanatory context (what a term/policy/process is, how it works) and reasoned analysis of the news's EFFECTS and implications — that is analysis, not new facts — but it must not smuggle in invented specifics.
-• LENGTH: this is a LONG in-depth feature of AT LEAST ${targetWords} words — a hard MINIMUM, not a hint. That is roughly ${Math.round(targetWords / 85)}+ solid paragraphs across your 5+ sections. Write in real depth: if you feel finished before ${targetWords} words, the topic is under-developed — add another section, more examples, more practical detail, more context. Do NOT summarise, do NOT stop early, and never pad with filler or repetition. Count as you go and keep going until you clearly pass ${targetWords} words.
-• STRUCTURE — the article MUST be organized under AT LEAST 5 short, descriptive subheadings, each on its OWN line as plain text (a question or short phrase; no #, no **, no bold). Each subheading has 2–4 sentence paragraphs under it.
+• LENGTH & DEPTH: aim for a substantial, in-depth feature of roughly ${targetWords} words — but this is a TARGET, never a reason to pad. Length must be earned with NEW, verified facts, examples, data and context; NEVER pad, restate, or stretch a thin topic to hit a number. A tight ${Math.round(targetWords * 0.7)}-word piece where every paragraph adds something new is FAR better than a padded ${targetWords}. If you have genuinely covered everything your research supports, STOP — do not keep writing to reach a count. The right response to "not enough to say" is to RESEARCH MORE real facts (STEP 2), never to repeat.
+• STRUCTURE — organize the article under a few short, descriptive subheadings (typically 3–6, as many as the content genuinely needs — never add empty or padded sections just to reach a count), each on its OWN line as plain text (a question or short phrase; no #, no **, no bold). Each subheading has 2–4 sentence paragraphs under it.
 • TABLE — if the topic involves comparable DATA (figures side by side, options, before/after, a schedule, pros & cons, a plan by day/step), present that data as a simple Markdown table (| … | … |) where it genuinely helps the reader. NOT required — include one only when the content actually calls for it, never forced.
 • Open with a SHORT, engaging INTRO paragraph (2–3 sentences) that hooks the reader and sets up the topic — the first SUBHEADING comes AFTER this intro, never before it. Do NOT open with a subheading, and do NOT start with a preface like "यहाँ प्रस्तुत है…", "प्रस्तुत है…", "इस लेख में…", "Here is…" or any line that describes this as a feature/article.
 • FLOWING PARAGRAPHS are the default — weave facts, evidence and expert views INTO the prose, attributed. A bulleted/numbered list ONLY for a genuine step-by-step how-to or ONE short "key points" summary (at most one or two lists in the whole piece); NEVER render ordinary explanation, research or context as bullets.
@@ -1003,7 +990,7 @@ ${framing}${magazineBlock}${evidenceBlock}${olloiBlock}`;
       // check. Time-gated: skipped when the request is already close to the 200s
       // cutoff, so it can't cost us the whole draft (the prompt-level guards
       // above are the fallback in that rare case).
-      const short = wc(finalBody) < targetWords * 0.9;
+      const short = wc(finalBody) < targetWords * 0.6;
       let verified = false;
       // Gate at 90s elapsed: this pass can take ~40–65s and must still leave
       // room for the (cheap) headline pass before the 200s cutoff. The whole
@@ -1011,8 +998,8 @@ ${framing}${magazineBlock}${evidenceBlock}${olloiBlock}`;
       if (elapsed() < 90_000) {
         try {
           const expandNote = short
-            ? `\n- LENGTH (IMPORTANT): the draft is only about ${wc(finalBody)} words but MUST be at least ${targetWords}. Expand it to at least ${targetWords} words by ADDING 2–3 more substantial sections/paragraphs of real, VERIFIED depth (more examples, practical detail, context, expert-backed points) — never filler or repetition. Do not return anything shorter than ${targetWords} words.`
-            : `\n- Keep the length at least ${targetWords} words; do not pad. If removing fabricated material makes it shorter, add real verified depth back so it still reaches ${targetWords}.`;
+            ? `\n- DEPTH (only if real): the draft is fairly short (~${wc(finalBody)} words, aim is ~${targetWords}). If — and ONLY if — your fact-check surfaces MORE real, verified facts, examples or context, weave them in for genuine depth. Do NOT pad, restate or add filler to reach any number; a shorter piece where every paragraph adds something new is correct. Never repeat a point to make it longer.`
+            : `\n- Do NOT pad or stretch the article to any word count. Density over length: keep it exactly as long as the real, verified material supports and no longer — cut, don't add, if a paragraph only restates.`;
           const verifyRes = await generateText({
             model: openai.responses(process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o"),
             prompt: `You are a rigorous fact-checker AND copy-editor for Patrika. Below is a draft article. Using web search AND the SOURCE REPORTING provided, VERIFY every check-worthy specific and return a CORRECTED, publish-ready version.
@@ -1029,11 +1016,11 @@ Then rewrite so that:
 - Proper nouns are corrected to their official / correct form; stale statuses are updated to the current one.
 - Wrong or outdated dates / sequences / statuses are fixed; anything you cannot confirm is DROPPED and the sentence rewritten as the plain general truth — never kept with a hedge.
 - Everything you CAN verify stays — do NOT strip a fact merely because you did not personally re-find it; only remove things that are clearly fabricated, contradicted or outdated. Add any missing key real fact you find while checking.${expandNote}
-- REMOVE REPETITION — do not let the same fact, statistic, quote or point appear more than once. If the draft restates an earlier point in a later paragraph, keep it in the single strongest place and CUT the repeats; every paragraph must add NEW information, not re-say what an earlier one already said.
+- REMOVE REPETITION / ENFORCE FACT DENSITY — do not let the same fact, statistic, quote or point appear more than once. If the draft restates an earlier point in a later paragraph, keep it in the single strongest place and CUT the repeats. Cut any paragraph that only restates or re-explains an earlier point without adding a new, concrete fact; every paragraph that stays must add NEW information.
 - CONTRADICTIONS — if your search results contradict any claim in the draft (a wrong figure, a wrong outcome, a misattributed cause), fix it to the verified reality; when sources disagree, prefer official / authoritative ones and state the well-supported version.
 - SILENT OUTPUT: never tell the reader about your checking. Do NOT write any preface (no "नीचे प्रस्तुत है… संशोधित/तथ्यपरक फीचर", no "सभी तथ्य/आंकड़े की पुष्टि की गई है"), no confidence notes ("इसकी पुष्टि नहीं मिली", "सामान्य रूप में प्रस्तुत किया गया है", "नाम/उद्धरण उपलब्ध नहीं हैं"), and no word-count / sources line. The output is ONLY the clean, confident finished article.
 - Preserve the voice, structure, flowing-prose style and SIMPLE everyday language. Do NOT introduce any NEW unverified claim. Do NOT name news outlets.
-- STRUCTURE: the final article must keep (or, if missing, gain) AT LEAST 5 short plain-text subheadings and at least ${targetWords} words; keep any data table the draft has (and add a simple one only if comparable data genuinely calls for it). ${langLine}${evidenceBlock}${olloiBlock}${sourceGrounding}
+- STRUCTURE: the final article keeps its short plain-text subheadings (a few, as the content needs) and a natural length driven by real substance — do NOT pad to a word count. Keep any data table the draft has (and add a simple one only if comparable data genuinely calls for it). ${langLine}${evidenceBlock}${olloiBlock}${sourceGrounding}
 
 Return ONLY the corrected article — nothing else.
 
@@ -1130,8 +1117,9 @@ TOPIC: ${topic}${sourceGrounding}
 ${sourcesBlock}${langLine}
 • FIRST pick the right form (SILENTLY — never state which form you chose, no "यह गाइड है/समाचार नहीं" line): if this is a NEWS development, write a news article (lead with the latest); if it's an EXPLAINER / how-to / evergreen wellness–finance–lifestyle topic, write a PRACTICAL EXPLAINER (what it is, why it matters, how to do it, precautions, tips) — NO dateline, NOT a roundup of recent schemes. Most Patrika+ topics are explainers, not news.
 • SIMPLE, everyday language for the common reader — avoid hard/bookish/technical words (e.g. not "परिसंचरण" → "खून का दौरा"); explain any needed term in plain words. Keep numbers and frequencies consistent, not contradictory.
-• LENGTH: at least ${targetWords} words — a MINIMUM; do not finish before it. If short, add real depth (more sections, examples) rather than stopping early.
-• Write a FLOWING FEATURE in paragraphs, organized under AT LEAST 5 short, descriptive subheadings (each on its own line, plain text — no #, no **) with 2–4 sentence paragraphs under each. Open DIRECTLY with the lede — NEVER with a preface like "यहाँ प्रस्तुत है…" / "Here is…". Use a bulleted/numbered list ONLY for a genuine step-by-step; if the topic has comparable DATA, present it as a simple Markdown table (only when it genuinely helps — not forced). Never turn ordinary explanation into bullets. Close with a forward-looking conclusion paragraph.
+• LENGTH & DEPTH: aim for roughly ${targetWords} words, but this is a TARGET, not a floor to pad to. Earn the length with NEW facts, examples and context — NEVER repeat, restate or pad. A tight ${Math.round(targetWords * 0.7)}-word piece where every paragraph adds something new beats a padded ${targetWords}; if you've covered everything you can support, STOP.
+• NO REPETITION: each paragraph must add a NEW concrete fact, example or step — never re-say or re-explain an earlier point. Cut any paragraph that only restates.
+• Write a FLOWING FEATURE in paragraphs, organized under a few short, descriptive subheadings (typically 3–6, as the content needs — no empty/padded sections; each on its own line, plain text — no #, no **) with 2–4 sentence paragraphs under each. Open DIRECTLY with the lede — NEVER with a preface like "यहाँ प्रस्तुत है…" / "Here is…". Use a bulleted/numbered list ONLY for a genuine step-by-step; if the topic has comparable DATA, present it as a simple Markdown table (only when it genuinely helps — not forced). Never turn ordinary explanation into bullets. Close with a forward-looking conclusion paragraph.
 ${sourcesRule}
 • Do NOT invent specific figures, names or dates beyond what's given/established — keep unverified specifics general rather than fabricating.
 • NEVER fabricate a named expert, person, quote, study or statistic to sound authoritative (no made-up "डॉ. राजेश वर्मा ने कहा…", no "एक अध्ययन के अनुसार 7%…"). If you lack a real named source, give plain unattributed guidance or omit it. Get official proper nouns (scheme / report / law names) exactly right, or use the wording you are sure of.

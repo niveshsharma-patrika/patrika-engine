@@ -27,6 +27,13 @@ const TRUSTED_DOMAINS: string[] = [
   "nationalheraldindia.com", "theweek.in", "frontline.thehindu.com",
   // TV / other national
   "cnbctv18.com", "republicworld.com", "timesnownews.com", "wionews.com", "mid-day.com",
+  // Tech specialists (Tech Pulse desk) — vetted, established tech outlets.
+  "gadgets360.com", "91mobiles.com", "digit.in", "gsmarena.com", "smartprix.com",
+  "beebom.com", "gizbot.com", "techradar.com", "theverge.com", "techcrunch.com",
+  "engadget.com", "androidauthority.com", "mysmartprice.com", "gadgetsnow.com",
+  // Sports specialists (Game On desk).
+  "cricbuzz.com", "espncricinfo.com", "sportstar.thehindu.com", "insidesport.in",
+  "sportskeeda.com", "khelnow.com", "olympics.com", "bcci.tv", "thebridge.in",
   // Wires / official
   "ptinews.com", "aninews.in", "uniindia.com", "prsindia.org",
   // World (for the world desk)
@@ -51,6 +58,13 @@ const TRUSTED_NAME_KEYWORDS: string[] = [
   "republic world", "republic bharat", "times now", "reuters", "associated press", "ap news",
   "al jazeera", "the guardian", "dd news", "doordarshan", "kisan tak", "bharat express",
   "oneindia", "financial express", "lallantop", "gaon connection", "national herald",
+  // Tech specialists (distinctive names only, to avoid false matches).
+  "gadgets 360", "gadgets360", "91mobiles", "gsmarena", "smartprix", "beebom", "gizbot",
+  "techradar", "the verge", "techcrunch", "engadget", "android authority", "mysmartprice",
+  "gadgets now",
+  // Sports specialists.
+  "cricbuzz", "espncricinfo", "espn cricinfo", "sportstar", "insidesport", "inside sport",
+  "sportskeeda", "khelnow", "khel now", "bcci",
 ];
 
 // ── Authoritative reference / evidence sources (evergreen desks) ──────────
