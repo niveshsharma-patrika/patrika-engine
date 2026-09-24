@@ -6,6 +6,7 @@ import {
   YT_API_KEY, META_TOKEN, META_IG_USER_ID, REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET,
 } from "@/lib/social/types";
 import { WP_API_KEY, WP_ENDPOINT } from "@/lib/wordpress";
+import { HOROSCOPE_WP_API_KEY, HOROSCOPE_WP_ENDPOINT } from "@/lib/horoscope/wordpress";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,8 @@ const KEYS = {
   reddit_client_secret: REDDIT_CLIENT_SECRET,
   wordpress_api_key: WP_API_KEY,
   wordpress_endpoint: WP_ENDPOINT,
+  horoscope_wp_api_key: HOROSCOPE_WP_API_KEY,
+  horoscope_wp_endpoint: HOROSCOPE_WP_ENDPOINT,
 } as const;
 
 const Body = z.object({
@@ -41,14 +44,17 @@ const Body = z.object({
   reddit_client_secret: z.string().min(4).max(100).optional(),
   wordpress_api_key: z.string().min(8).max(500).optional(),
   wordpress_endpoint: z.string().url().max(500).optional(),
+  horoscope_wp_api_key: z.string().min(8).max(500).optional(),
+  horoscope_wp_endpoint: z.string().url().max(500).optional(),
 });
 
 export async function GET() {
   if (!(await requireAdmin())) return Response.json({ error: "Forbidden" }, { status: 403 });
-  const [yt, meta, ig, x, rid, rsec, wpk, wpe] = await Promise.all([
+  const [yt, meta, ig, x, rid, rsec, wpk, wpe, hwpk, hwpe] = await Promise.all([
     hasSecret(YT_API_KEY), hasSecret(META_TOKEN), hasSecret(META_IG_USER_ID),
     hasSecret(X_AUTH_TOKEN), hasSecret(REDDIT_CLIENT_ID), hasSecret(REDDIT_CLIENT_SECRET),
     hasSecret(WP_API_KEY), hasSecret(WP_ENDPOINT),
+    hasSecret(HOROSCOPE_WP_API_KEY), hasSecret(HOROSCOPE_WP_ENDPOINT),
   ]);
   return Response.json({
     youtube_api_key: yt.set,
@@ -59,6 +65,8 @@ export async function GET() {
     reddit_client_secret: rsec.set,
     wordpress_api_key: wpk.set,
     wordpress_endpoint: wpe.set,
+    horoscope_wp_api_key: hwpk.set,
+    horoscope_wp_endpoint: hwpe.set,
   });
 }
 

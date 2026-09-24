@@ -24,6 +24,7 @@ import {
   AtSign,
   Wand2,
   Ribbon,
+  Moon,
   Lock,
   LogOut,
 } from "lucide-react";
@@ -50,6 +51,7 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: E
   { href: "/magazines",         icon: <BookOpen size={16} />,      key: "navMagazines",   editions: ["digital"] },
   { href: "/content-generator", icon: <Wand2 size={16} />,         key: "navContentGenerator", editions: ["digital"] },
   { href: "/olloi",             icon: <Ribbon size={16} />,        key: "navOlloi",       editions: ["digital"] },
+  { href: "/horoscope",         icon: <Moon size={16} />,          key: "navHoroscope",   editions: ["digital"] },
   { href: "/twitter",           icon: <AtSign size={16} />,        key: "navTwitter",     editions: ["digital"], roles: ["admin", "editor"] },
   { href: "/social",            icon: <TrendingUp size={16} />,    key: "navSocial",      editions: ["digital"], roles: ["admin", "editor"] },
   { href: "/feedback",          icon: <MessageSquare size={16} />, key: "navFeedback",    editions: ["digital", "print"] },

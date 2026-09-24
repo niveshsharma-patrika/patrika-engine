@@ -94,6 +94,15 @@ export function IntegrationKeys() {
         <Row label="Endpoint URL" k="wordpress_endpoint" v={v} set={set} ok={status?.wordpress_endpoint} mono />
       </Group>
 
+      <Group
+        title="Horoscope → WordPress"
+        tag="Rashifal · auto-publish"
+        help={<>Separate token for auto-publishing the daily rashifal — the nightly cron pushes it here automatically as soon as it&rsquo;s generated. Paste the <b>API key</b> and the <b>endpoint URL</b> your horoscope plugin expects.</>}
+      >
+        <Row label="API key" k="horoscope_wp_api_key" v={v} set={set} ok={status?.horoscope_wp_api_key} />
+        <Row label="Endpoint URL" k="horoscope_wp_endpoint" v={v} set={set} ok={status?.horoscope_wp_endpoint} mono />
+      </Group>
+
       <div className="flex items-center gap-3 pt-1">
         <button onClick={save} disabled={saving}
           className="bg-[var(--text)] hover:bg-black text-white text-[13px] font-medium px-3.5 py-1.5 rounded disabled:opacity-50 flex items-center gap-1.5">

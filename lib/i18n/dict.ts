@@ -25,6 +25,7 @@ export const DICT = {
   navMagazines:       { en: "Patrika+ Special Content", hi: "पत्रिका+ विशेष कंटेंट" },
   navContentGenerator: { en: "Content Generator", hi: "कंटेंट जनरेटर" },
   navOlloi:            { en: "Olloi Content",    hi: "Olloi कंटेंट" },
+  navHoroscope:        { en: "Horoscopes",       hi: "राशिफल" },
   navTwitter:         { en: "Twitter",        hi: "ट्विटर" },
   navSocial:          { en: "Social Center",  hi: "सोशल सेंटर" },
   navFeedback:        { en: "Feedback",       hi: "फ़ीडबैक" },
