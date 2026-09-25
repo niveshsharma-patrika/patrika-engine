@@ -141,7 +141,10 @@ export async function runHoroscope(
     : after.some((r) => r.wp_status === "failed") ? "failed"
     : after.some((r) => r.wp_status === "skipped") ? "skipped"
     : "pending";
-  return { forDate, generated, pushed: wpStatus === "pushed", wpStatus, count: after.length };
+  // Surface a sample failure (incl. the WordPress response body) so a bad push
+  // is diagnosable from the cron response, not just the DB.
+  const sampleErr = after.find((r) => r.wp_status === "failed" && r.wp_error)?.wp_error ?? undefined;
+  return { forDate, generated, pushed: wpStatus === "pushed", wpStatus, count: after.length, error: sampleErr };
 }
 
 /**
