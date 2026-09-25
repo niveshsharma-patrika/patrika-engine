@@ -13,35 +13,40 @@ export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const date = new URL(req.url).searchParams.get("date") || istDate();
+  const url = new URL(req.url);
+  const date = url.searchParams.get("date") || istDate();
+  const lang = url.searchParams.get("lang") === "en" ? "en" : "hi";
   if (!isDate(date)) return Response.json({ error: "Bad date" }, { status: 400 });
 
-  const rows = await getEntriesForDate(date);
-  const entries = rows.map((r) => ({
-    sign: r.sign,
-    nameHi: SIGN_BY_KEY[r.sign]?.hi ?? r.sign,
-    nameEn: SIGN_BY_KEY[r.sign]?.en ?? r.sign,
-    forecast: r.forecast,
-    shubhRang: r.shubh_rang,
-    shubhAnk: r.shubh_ank,
-    shubhSamay: r.shubh_samay,
-    colorCode: r.lucky_color_code,
-    mood: r.mood,
-    solution: r.solution,
-    zodiacContent: r.zodiac_content,
-    luckyLetters: SIGN_BY_KEY[r.sign]?.luckyLetters ?? "",
-  }));
+  const rows = await getEntriesForDate(date); // all languages
+  const entries = rows
+    .filter((r) => r.lang === lang)
+    .map((r) => ({
+      sign: r.sign,
+      nameHi: SIGN_BY_KEY[r.sign]?.hi ?? r.sign,
+      nameEn: SIGN_BY_KEY[r.sign]?.en ?? r.sign,
+      forecast: r.forecast,
+      shubhRang: r.shubh_rang,
+      shubhAnk: r.shubh_ank,
+      shubhSamay: r.shubh_samay,
+      colorCode: r.lucky_color_code,
+      mood: r.mood,
+      solution: r.solution,
+      zodiacContent: r.zodiac_content,
+      luckyLetters: (lang === "en" ? SIGN_BY_KEY[r.sign]?.luckyLettersEn : SIGN_BY_KEY[r.sign]?.luckyLetters) ?? "",
+    }));
+  // Push status aggregated across BOTH languages (a day is "pushed" only when
+  // every hi + en post is live).
   const wpStatus =
     rows.length === 0 ? "none"
     : rows.every((r) => r.wp_status === "pushed") ? "pushed"
     : rows.some((r) => r.wp_status === "failed") ? "failed"
     : rows.every((r) => r.wp_status === "skipped") ? "skipped"
     : "pending";
-  // wp_error can contain the WordPress endpoint (a stored secret) — admins only.
   const wpError = session.role === "admin" ? (rows.find((r) => r.wp_error)?.wp_error ?? null) : null;
   const updatedAt = rows.map((r) => r.updated_at).filter(Boolean).sort().pop() ?? null;
 
-  return Response.json({ date, today: istDate(), count: rows.length, wpStatus, wpError, updatedAt, entries });
+  return Response.json({ date, today: istDate(), lang, count: entries.length, wpStatus, wpError, updatedAt, entries });
 }
 
 /** POST /api/horoscope — admin only. { action: "regenerate" | "repush", date? }.

@@ -3,25 +3,23 @@ import { SIGN_BY_KEY, signSlug } from "./signs";
 import type { HoroscopeEntry } from "./generate";
 
 /**
- * Auto-push the day's rashifal to WordPress — one post per sign, published live.
- * SEPARATE from the Patrika+ "Save to WordPress draft" flow (lib/wordpress.ts):
- * its own endpoint (patrika/v2/post-astrology), its own X-API-Key token, and it
- * fires automatically from the nightly cron the moment each sign is generated.
+ * Auto-push the day's rashifal to WordPress — one post per sign PER LANGUAGE
+ * (Hindi + English), published live. SEPARATE from the Patrika+ "Save to
+ * WordPress draft" flow (lib/wordpress.ts): its own endpoint
+ * (patrika/v2/post-astrology), its own X-API-Key token, fired automatically
+ * from the nightly cron the moment each sign is generated.
  *
  * The token is read from the HOROSCOPE_WP_API_KEY env var (or the Admin secret
- * of the same name); the endpoint + language default here and are overridable.
+ * of the same name); the endpoint defaults here and is overridable.
  */
 export const HOROSCOPE_WP_API_KEY = "horoscope_wp_api_key";
 export const HOROSCOPE_WP_ENDPOINT = "horoscope_wp_endpoint";
 
 const DEFAULT_ENDPOINT = "https://zimbea-develop.go-vip.net/wp-json/patrika/v2/post-astrology";
 const HEADER = "X-API-Key";
-const LANG = process.env.HOROSCOPE_LANG || "hi";
 
 export type HoroscopeWpConfig = { apiKey: string; endpoint: string };
 
-/** Token from env (developer pastes it in .env) or the Admin secret; endpoint
- *  from the Admin secret / env, else the known astrology endpoint. */
 export async function getHoroscopeWpConfig(): Promise<HoroscopeWpConfig | null> {
   const [apiKeySecret, endpointSecret] = await Promise.all([
     getSecret(HOROSCOPE_WP_API_KEY),
@@ -33,30 +31,37 @@ export async function getHoroscopeWpConfig(): Promise<HoroscopeWpConfig | null> 
   return { apiKey, endpoint };
 }
 
-function titleDate(forDate: string): string {
-  return new Date(`${forDate}T00:00:00+05:30`).toLocaleDateString("hi-IN", {
+function titleDate(forDate: string, lang: string): string {
+  return new Date(`${forDate}T00:00:00+05:30`).toLocaleDateString(lang === "en" ? "en-IN" : "hi-IN", {
     timeZone: "Asia/Kolkata", day: "numeric", month: "long", year: "numeric",
   });
 }
 
-/** The exact per-sign payload the patrika/v2/post-astrology endpoint expects. */
-export function buildSignPayload(forDate: string, entry: HoroscopeEntry, lang: string = LANG): unknown {
+/** The exact per-sign, per-language payload the post-astrology endpoint expects. */
+export function buildSignPayload(forDate: string, entry: HoroscopeEntry): unknown {
   const s = SIGN_BY_KEY[entry.sign];
-  const nameHi = s?.hi ?? entry.sign;
+  const en = entry.lang === "en";
+  const signName = en ? (s?.en ?? entry.sign) : (s?.hi ?? entry.sign);
+  const title = en
+    ? `${signName} Horoscope ${titleDate(forDate, "en")}`
+    : `${signName} राशिफल ${titleDate(forDate, "hi")}`;
+  const q = en
+    ? { color: `What is today's lucky colour for ${signName}?`, num: `What is today's lucky number for ${signName}?`, time: `What is the auspicious time today for ${signName}?` }
+    : { color: `आज ${signName} राशि का शुभ रंग क्या है?`, num: `आज ${signName} राशि का शुभ अंक क्या है?`, time: `आज ${signName} राशि के लिए शुभ समय क्या है?` };
   return {
     type: "rashifal",
     category: signSlug(entry.sign),
     date: forDate,
-    lang,
+    lang: entry.lang,
     status: "publish",
-    title: `${nameHi} राशिफल ${titleDate(forDate)}`,
+    title,
     content: "",
     rashifal_tab: {
       today_tab: {
         rashifal_content: entry.forecast,
-        rashifal_zodiac_title: nameHi,
+        rashifal_zodiac_title: signName,
         rashifal_zodiac_content: entry.zodiacContent,
-        rashifal_lucky_letters: s?.luckyLetters ?? "",
+        rashifal_lucky_letters: en ? (s?.luckyLettersEn ?? "") : (s?.luckyLetters ?? ""),
         rashifal_lucky_color_code: entry.luckyColorCode,
         rashifal_lucky_color_name: entry.luckyColor,
         rashifal_lucky_number: entry.luckyNumber,
@@ -70,18 +75,18 @@ export function buildSignPayload(forDate: string, entry: HoroscopeEntry, lang: s
       yearly_tab: { rashifal_content: "" },
     },
     faqs: [
-      { question: `आज ${nameHi} राशि का शुभ रंग क्या है?`, answer: entry.luckyColor },
-      { question: `आज ${nameHi} राशि का शुभ अंक क्या है?`, answer: entry.luckyNumber },
-      { question: `आज ${nameHi} राशि के लिए शुभ समय क्या है?`, answer: entry.luckyTime },
+      { question: q.color, answer: entry.luckyColor },
+      { question: q.num, answer: entry.luckyNumber },
+      { question: q.time, answer: entry.luckyTime },
     ],
   };
 }
 
 export type HoroscopePushResult = { ok: boolean; status: number; postId?: string | null; error?: string };
 
-/** POST one sign's rashifal. Retries a couple of times on transient failure. */
-export async function pushSign(cfg: HoroscopeWpConfig, forDate: string, entry: HoroscopeEntry, lang: string = LANG): Promise<HoroscopePushResult> {
-  const body = JSON.stringify(buildSignPayload(forDate, entry, lang));
+/** POST one sign's rashifal (in its language). Retries on transient failure. */
+export async function pushSign(cfg: HoroscopeWpConfig, forDate: string, entry: HoroscopeEntry): Promise<HoroscopePushResult> {
+  const body = JSON.stringify(buildSignPayload(forDate, entry));
   let last: HoroscopePushResult = { ok: false, status: 0, error: "not attempted" };
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
@@ -89,7 +94,7 @@ export async function pushSign(cfg: HoroscopeWpConfig, forDate: string, entry: H
         method: "POST",
         headers: { "Content-Type": "application/json", [HEADER]: cfg.apiKey },
         body,
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(20_000),
       });
       const text = await res.text();
       let data: unknown;

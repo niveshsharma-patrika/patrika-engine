@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Moon, Loader2, RefreshCw, Send, Sparkles } from "lucide-react";
 
 type Entry = {
@@ -8,8 +8,9 @@ type Entry = {
   forecast: string; shubhRang: string; shubhAnk: string; shubhSamay: string;
   colorCode: string; mood: string; solution: string; zodiacContent: string; luckyLetters: string;
 };
+type Lang = "hi" | "en";
 type Data = {
-  date: string; today: string; count: number;
+  date: string; today: string; lang: Lang; count: number;
   wpStatus: "none" | "pushed" | "failed" | "skipped" | "pending";
   wpError: string | null; updatedAt: string | null; entries: Entry[];
 };
@@ -35,27 +36,37 @@ const WP_BADGE: Record<Data["wpStatus"], { label: string; cls: string }> = {
 
 export function HoroscopeView({ isAdmin }: { isAdmin: boolean }) {
   const [date, setDate] = useState<string>("");
+  const [lang, setLang] = useState<Lang>("hi");
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<null | "regenerate" | "repush">(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Refs so load() can stay a stable callback while still defaulting to the
+  // currently-shown date/language.
+  const langRef = useRef<Lang>("hi");
+  const dateRef = useRef<string>("");
 
-  const load = useCallback(async (d?: string) => {
+  const load = useCallback(async (d?: string, l?: Lang) => {
     setLoading(true);
+    const useLang = l ?? langRef.current;
     try {
-      const q = d ? `?date=${d}` : "";
-      const r = await fetch(`/api/horoscope${q}`, { cache: "no-store" });
+      const params = new URLSearchParams({ lang: useLang });
+      if (d) params.set("date", d);
+      const r = await fetch(`/api/horoscope?${params.toString()}`, { cache: "no-store" });
       const j = (await r.json().catch(() => null)) as Data | { error?: string } | null;
       // Guard against error-shaped bodies (e.g. a 401 after the session expires)
       // so the grid never maps over a missing `entries`.
       if (!r.ok || !j || !Array.isArray((j as Data).entries)) {
         setData(null);
-        if (d) setDate(d);
+        if (d) { setDate(d); dateRef.current = d; }
+        setLang(useLang); langRef.current = useLang;
         setMsg({ ok: false, text: (j as { error?: string })?.error ?? "लोड नहीं हो सका।" });
         return;
       }
-      setData(j as Data);
-      setDate((j as Data).date);
+      const dd = j as Data;
+      setData(dd);
+      setDate(dd.date); dateRef.current = dd.date;
+      setLang(useLang); langRef.current = useLang;
     } catch {
       setData(null);
       setMsg({ ok: false, text: "लोड नहीं हो सका।" });
@@ -104,7 +115,7 @@ export function HoroscopeView({ isAdmin }: { isAdmin: boolean }) {
         <h1 className="text-[20px] font-semibold text-[var(--text)]">राशिफल <span className="text-[var(--text-3)] font-normal">Horoscopes</span></h1>
       </div>
       <p className="text-[13px] text-[var(--text-3)] mb-4">
-        हर रात 12 बजे अगले दिन का राशिफल अपने-आप बनता है और WordPress पर प्रकाशित हो जाता है।
+        हर रात 12 बजे अगले दिन का राशिफल (हिंदी और अंग्रेज़ी, दोनों) अपने-आप बनता है और WordPress पर अलग-अलग प्रकाशित हो जाता है।
       </p>
 
       {/* Date + status bar */}
@@ -121,6 +132,14 @@ export function HoroscopeView({ isAdmin }: { isAdmin: boolean }) {
             <button onClick={() => load()} disabled={loading}
               className="ml-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] hover:bg-[var(--surface-2)] disabled:opacity-50">आज</button>
           )}
+        </div>
+        <div className="flex items-center rounded-lg border border-[var(--border)] overflow-hidden text-[12px]">
+          <button onClick={() => load(date, "hi")} disabled={loading}
+            className={`px-2.5 py-1.5 ${lang === "hi" ? "text-white" : "hover:bg-[var(--surface-2)]"}`}
+            style={lang === "hi" ? { background: "var(--purple)" } : undefined}>हिं</button>
+          <button onClick={() => load(date, "en")} disabled={loading}
+            className={`px-2.5 py-1.5 border-l border-[var(--border)] ${lang === "en" ? "text-white" : "hover:bg-[var(--surface-2)]"}`}
+            style={lang === "en" ? { background: "var(--purple)" } : undefined}>EN</button>
         </div>
         <span className={`text-[12px] px-2.5 py-1 rounded-full ${badge.cls}`}>{badge.label}</span>
         {data?.updatedAt && (
