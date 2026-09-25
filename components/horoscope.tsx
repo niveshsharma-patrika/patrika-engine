@@ -6,6 +6,7 @@ import { Moon, Loader2, RefreshCw, Send, Sparkles } from "lucide-react";
 type Entry = {
   sign: string; nameHi: string; nameEn: string;
   forecast: string; shubhRang: string; shubhAnk: string; shubhSamay: string;
+  colorCode: string; mood: string; solution: string; zodiacContent: string; luckyLetters: string;
 };
 type Data = {
   date: string; today: string; count: number;
@@ -165,13 +166,21 @@ export function HoroscopeView({ isAdmin }: { isAdmin: boolean }) {
               <div className="flex items-baseline gap-2 mb-2">
                 <h3 className="text-[15px] font-semibold text-[var(--text)]">{e.nameHi}</h3>
                 <span className="text-[11px] text-[var(--text-3)]">{e.nameEn}</span>
+                {e.mood && <span className="ml-auto text-[11px] text-[var(--purple)] bg-[color-mix(in_srgb,var(--purple)_8%,white)] rounded-full px-2 py-0.5">{e.mood}</span>}
               </div>
-              <p className="text-[13px] text-[var(--text-2)] leading-relaxed mb-3">{e.forecast}</p>
+              <p className="text-[13px] text-[var(--text-2)] leading-relaxed mb-2">{e.forecast}</p>
+              {e.zodiacContent && <p className="text-[12px] text-[var(--text-3)] leading-relaxed mb-2.5">{e.zodiacContent}</p>}
               <div className="flex flex-wrap gap-1.5">
-                <Chip label="शुभ रंग" value={e.shubhRang} />
+                <Chip label="शुभ रंग" value={e.shubhRang} swatch={e.colorCode} />
                 <Chip label="शुभ अंक" value={e.shubhAnk} />
                 <Chip label="शुभ समय" value={e.shubhSamay} />
+                {e.luckyLetters && <Chip label="शुभ अक्षर" value={e.luckyLetters} />}
               </div>
+              {e.solution && (
+                <div className="mt-2.5 text-[12px] text-[var(--text-2)]">
+                  <span className="text-[var(--text-3)]">उपाय: </span>{e.solution}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -180,9 +189,10 @@ export function HoroscopeView({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-function Chip({ label, value }: { label: string; value: string }) {
+function Chip({ label, value, swatch }: { label: string; value: string; swatch?: string }) {
   return (
     <span className="inline-flex items-center gap-1 text-[11px] bg-[var(--surface-2)] border border-[var(--border)] rounded-full px-2 py-0.5">
+      {swatch && <span className="w-2.5 h-2.5 rounded-full border border-[var(--border)] shrink-0" style={{ background: swatch }} />}
       <span className="text-[var(--text-3)]">{label}</span>
       <span className="font-medium text-[var(--text)]">{value}</span>
     </span>

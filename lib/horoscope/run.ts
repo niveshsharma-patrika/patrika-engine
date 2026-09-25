@@ -1,7 +1,7 @@
 import { pool } from "@/lib/db";
 
 import { generateHoroscopes, type HoroscopeEntry } from "./generate";
-import { pushHoroscopes } from "./wordpress";
+import { getHoroscopeWpConfig, pushSign } from "./wordpress";
 import { SIGNS } from "./signs";
 
 export type HoroscopeRow = {
@@ -10,6 +10,10 @@ export type HoroscopeRow = {
   shubh_rang: string;
   shubh_ank: string;
   shubh_samay: string;
+  zodiac_content: string;
+  lucky_color_code: string;
+  mood: string;
+  solution: string;
   wp_status: string;
   wp_post_id: string | null;
   wp_error: string | null;
@@ -23,11 +27,13 @@ export function istDate(d = new Date()): string {
   }).format(d);
 }
 
+const SELECT_COLS =
+  "sign, forecast, shubh_rang, shubh_ank, shubh_samay, zodiac_content, lucky_color_code, mood, solution, wp_status, wp_post_id, wp_error, updated_at";
+
 /** The 12 rows for a date, in canonical sign order (or fewer if not generated). */
 export async function getEntriesForDate(forDate: string): Promise<HoroscopeRow[]> {
   const { rows } = await pool.query<HoroscopeRow>(
-    `SELECT sign, forecast, shubh_rang, shubh_ank, shubh_samay, wp_status, wp_post_id, wp_error, updated_at
-       FROM horoscopes WHERE for_date = $1`,
+    `SELECT ${SELECT_COLS} FROM horoscopes WHERE for_date = $1`,
     [forDate]
   );
   const bySign = new Map(rows.map((r) => [r.sign, r]));
@@ -37,30 +43,35 @@ export async function getEntriesForDate(forDate: string): Promise<HoroscopeRow[]
 async function saveEntries(forDate: string, entries: HoroscopeEntry[]): Promise<void> {
   const vals: unknown[] = [];
   const tuples = entries.map((e, i) => {
-    const b = i * 6;
-    vals.push(forDate, e.sign, e.forecast, e.shubhRang, e.shubhAnk, e.shubhSamay);
-    return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6})`;
+    const b = i * 10;
+    vals.push(forDate, e.sign, e.forecast, e.luckyColor, e.luckyNumber, e.luckyTime, e.zodiacContent, e.luckyColorCode, e.mood, e.solution);
+    return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},$${b + 10})`;
   });
   await pool.query(
-    `INSERT INTO horoscopes (for_date, sign, forecast, shubh_rang, shubh_ank, shubh_samay)
+    `INSERT INTO horoscopes
+       (for_date, sign, forecast, shubh_rang, shubh_ank, shubh_samay, zodiac_content, lucky_color_code, mood, solution)
      VALUES ${tuples.join(",")}
      ON CONFLICT (for_date, sign) DO UPDATE SET
        forecast = EXCLUDED.forecast, shubh_rang = EXCLUDED.shubh_rang,
        shubh_ank = EXCLUDED.shubh_ank, shubh_samay = EXCLUDED.shubh_samay,
+       zodiac_content = EXCLUDED.zodiac_content, lucky_color_code = EXCLUDED.lucky_color_code,
+       mood = EXCLUDED.mood, solution = EXCLUDED.solution,
        wp_status = 'pending', wp_post_id = NULL, wp_error = NULL, updated_at = now()`,
     vals
   );
 }
 
-async function markPush(forDate: string, status: string, postId: string | null, error: string | null): Promise<void> {
+async function markSign(forDate: string, sign: string, status: string, postId: string | null, error: string | null): Promise<void> {
   await pool.query(
-    `UPDATE horoscopes SET wp_status = $2, wp_post_id = $3, wp_error = $4, updated_at = now() WHERE for_date = $1`,
-    [forDate, status, postId, error]
+    `UPDATE horoscopes SET wp_status = $3, wp_post_id = $4, wp_error = $5, updated_at = now() WHERE for_date = $1 AND sign = $2`,
+    [forDate, sign, status, postId, error]
   );
 }
 
 const rowToEntry = (r: HoroscopeRow): HoroscopeEntry => ({
-  sign: r.sign, forecast: r.forecast, shubhRang: r.shubh_rang, shubhAnk: r.shubh_ank, shubhSamay: r.shubh_samay,
+  sign: r.sign, forecast: r.forecast, zodiacContent: r.zodiac_content,
+  luckyColor: r.shubh_rang, luckyColorCode: r.lucky_color_code,
+  luckyNumber: r.shubh_ank, luckyTime: r.shubh_samay, mood: r.mood, solution: r.solution,
 });
 
 export type RunSummary = {
@@ -73,12 +84,12 @@ export type RunSummary = {
 };
 
 /**
- * Ensure the day's horoscope exists and is pushed to WordPress.
- *  • default (cron): generate only if missing, then push only if not already
- *    pushed — so a retry pass re-pushes a failed/unconfigured day WITHOUT
- *    regenerating the content.
- *  • regenerate: always regenerate + re-push (admin "regenerate now").
- *  • repushOnly: never generate; just (re)push what's stored (admin "re-push").
+ * Ensure the day's horoscope exists and every sign is pushed to WordPress.
+ *  • default (cron): generate only if missing, then push only the signs not yet
+ *    pushed — so a retry/catch-up re-pushes failed/unconfigured signs WITHOUT
+ *    regenerating content.
+ *  • regenerate: always regenerate + push all 12 (admin "regenerate now").
+ *  • repushOnly: never generate; (re)push the signs that aren't pushed yet.
  */
 export async function runHoroscope(
   forDate: string,
@@ -99,31 +110,44 @@ export async function runHoroscope(
     generated = true;
   } else {
     entries = existing.map(rowToEntry);
-    if (existing.every((r) => r.wp_status === "pushed")) {
-      return { forDate, generated: false, pushed: true, wpStatus: "pushed", count: 12 };
-    }
   }
 
-  // Auto-push the moment it's ready.
-  const push = await pushHoroscopes(forDate, entries);
-  if (push.ok) {
-    await markPush(forDate, "pushed", push.postId ?? null, null);
-    return { forDate, generated, pushed: true, wpStatus: "pushed", count: entries.length };
+  // Auto-push, one post per sign. If WordPress isn't configured, mark the not-yet
+  // -pushed signs 'skipped' (awaiting config) so the catch-up pass sends them
+  // once the token is set. Content is saved + visible regardless.
+  const cfg = await getHoroscopeWpConfig();
+  if (!cfg) {
+    await pool.query(
+      `UPDATE horoscopes SET wp_status = 'skipped', wp_error = 'WordPress not configured', updated_at = now()
+        WHERE for_date = $1 AND wp_status <> 'pushed'`,
+      [forDate]
+    );
+    return { forDate, generated, pushed: false, wpStatus: "skipped", count: entries.length, error: "WordPress not configured" };
   }
-  // WordPress not configured yet (token not entered) — mark 'skipped' (awaiting
-  // config) rather than 'failed', so a catch-up pass pushes it once the token is
-  // set. A real HTTP error (incl. a genuine WP 503) is a 'failed'. Content is
-  // still saved + visible either way.
-  const status = push.notConfigured ? "skipped" : "failed";
-  await markPush(forDate, status, null, push.error ?? "push failed");
-  return { forDate, generated, pushed: false, wpStatus: status, count: entries.length, error: push.error };
+
+  const pushedSigns = new Set(generated ? [] : existing.filter((r) => r.wp_status === "pushed").map((r) => r.sign));
+  const toPush = entries.filter((e) => !pushedSigns.has(e.sign));
+  await Promise.all(
+    toPush.map(async (e) => {
+      const res = await pushSign(cfg, forDate, e);
+      await markSign(forDate, e.sign, res.ok ? "pushed" : "failed", res.ok ? (res.postId ?? null) : null, res.ok ? null : (res.error ?? "push failed"));
+    })
+  );
+
+  const after = await getEntriesForDate(forDate);
+  const wpStatus =
+    after.length === 0 ? "missing"
+    : after.every((r) => r.wp_status === "pushed") ? "pushed"
+    : after.some((r) => r.wp_status === "failed") ? "failed"
+    : after.some((r) => r.wp_status === "skipped") ? "skipped"
+    : "pending";
+  return { forDate, generated, pushed: wpStatus === "pushed", wpStatus, count: after.length };
 }
 
 /**
- * Re-push recent days that generated but never reached WordPress (failed or
- * skipped-because-unconfigured). Lets the whole backlog auto-publish the first
- * night AFTER the WordPress token is finally entered, instead of only new days.
- * Content is never regenerated — this only re-pushes what's already stored.
+ * Re-push recent days that generated but never fully reached WordPress (failed
+ * or skipped-because-unconfigured). Lets the whole backlog auto-publish the
+ * first night AFTER the WordPress token is entered. Never regenerates content.
  */
 export async function catchUpPushes(withinDays = 7, limit = 10): Promise<RunSummary[]> {
   const { rows } = await pool.query<{ for_date: string }>(

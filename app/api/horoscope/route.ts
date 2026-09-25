@@ -25,6 +25,11 @@ export async function GET(req: Request) {
     shubhRang: r.shubh_rang,
     shubhAnk: r.shubh_ank,
     shubhSamay: r.shubh_samay,
+    colorCode: r.lucky_color_code,
+    mood: r.mood,
+    solution: r.solution,
+    zodiacContent: r.zodiac_content,
+    luckyLetters: SIGN_BY_KEY[r.sign]?.luckyLetters ?? "",
   }));
   const wpStatus =
     rows.length === 0 ? "none"
