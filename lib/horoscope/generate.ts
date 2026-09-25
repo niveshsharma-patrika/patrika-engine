@@ -66,21 +66,18 @@ export async function generateHoroscopes(forDate: string): Promise<HoroscopeEntr
     maxRetries: 2,
     abortSignal: AbortSignal.timeout(90_000),
     schema: z.object({
-      signs: z
-        .array(
-          z.object({
-            sign: z.string().describe("The sign's English name, e.g. Aries, Taurus"),
-            forecast: z.string(),
-            zodiac_content: z.string(),
-            lucky_color: z.string(),
-            lucky_color_code: z.string().optional(),
-            lucky_number: z.string(),
-            lucky_time: z.string(),
-            mood: z.string(),
-            solution: z.string(),
-          })
-        )
-        .length(12),
+      signs: z.array(
+        z.object({
+          sign: z.string().describe("The sign's English name, e.g. Aries, Taurus"),
+          forecast: z.string(),
+          zodiac_content: z.string(),
+          lucky_color: z.string(),
+          lucky_number: z.string(),
+          lucky_time: z.string(),
+          mood: z.string(),
+          solution: z.string(),
+        })
+      ),
     }),
     prompt: `तुम राजस्थान पत्रिका के अनुभवी ज्योतिष लेखक हो। ${dateHi} के लिए सभी 12 राशियों का दैनिक राशिफल तैयार करो।
 
@@ -91,11 +88,10 @@ export async function generateHoroscopes(forDate: string): Promise<HoroscopeEntr
 2. forecast — आज का सामान्य राशिफल, सरल बोलचाल की हिंदी में, लगभग 45–80 शब्द। सकारात्मक पर व्यावहारिक; काम/करियर, सेहत, रिश्ते, धन में से जो स्वाभाविक हो उसे छूते हुए। कोई पक्का/डरावना दावा नहीं; "संभावना है", "ध्यान रखें" जैसी सहज भाषा।
 3. zodiac_content — इस राशि वालों के लिए आज की खास सलाह/संकेत, 20–40 शब्द।
 4. lucky_color — शुभ रंग (एक रंग का हिंदी नाम, जैसे "हरा", "पीला", "लाल")।
-5. lucky_color_code — उस रंग का hex कोड (जैसे "#43a047"); अनिश्चित हो तो खाली छोड़ दो।
-6. lucky_number — शुभ अंक (एक या दो अंक, जैसे "7" या "3, 9")।
-7. lucky_time — शुभ समय / मुहूर्त, दिन का कोई एक स्वाभाविक समय-खंड (जैसे "सुबह 10:00 – 11:30" या "शाम 6:00 – 7:00")। दिन के किसी भी समय का हो सकता है।
-8. mood — आज का मूड, एक-दो शब्द में (जैसे "उत्साहित", "शांत", "आत्मविश्वास से भरा")।
-9. solution — आज का सरल उपाय/समाधान, एक पंक्ति में (जैसे "हनुमान चालीसा का पाठ करें", "जरूरतमंद को भोजन कराएँ")।
+5. lucky_number — शुभ अंक (एक या दो अंक, जैसे "7" या "3, 9")।
+6. lucky_time — शुभ समय / मुहूर्त, दिन का कोई एक स्वाभाविक समय-खंड (जैसे "सुबह 10:00 – 11:30" या "शाम 6:00 – 7:00")। दिन के किसी भी समय का हो सकता है।
+7. mood — आज का मूड, एक-दो शब्द में (जैसे "उत्साहित", "शांत", "आत्मविश्वास से भरा")।
+8. solution — आज का सरल उपाय/समाधान, एक पंक्ति में (जैसे "हनुमान चालीसा का पाठ करें", "जरूरतमंद को भोजन कराएँ")।
 
 नियम:
 - ठीक 12 प्रविष्टियाँ, हर राशि के लिए एक, कोई दोहराव नहीं।
@@ -113,7 +109,7 @@ export async function generateHoroscopes(forDate: string): Promise<HoroscopeEntr
       forecast: nz((r.forecast ?? "").trim()),
       zodiacContent: nz((r.zodiac_content ?? "").trim()),
       luckyColor,
-      luckyColorCode: colorHex(luckyColor, r.lucky_color_code),
+      luckyColorCode: colorHex(luckyColor),
       luckyNumber: nz((r.lucky_number ?? "").trim()),
       luckyTime: nz((r.lucky_time ?? "").trim()),
       mood: nz((r.mood ?? "").trim()),
