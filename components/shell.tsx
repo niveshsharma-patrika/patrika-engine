@@ -25,6 +25,7 @@ import {
   Wand2,
   Ribbon,
   Moon,
+  Zap,
   Lock,
   LogOut,
 } from "lucide-react";
@@ -49,6 +50,7 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: E
   { href: "/style",             icon: <Type size={16} />,          key: "navStyle",       editions: ["digital"], roles: ["admin"] },
   { href: "/directives",        icon: <SlidersHorizontal size={16} />, key: "navDirectives", editions: ["digital"], roles: ["admin"] },
   { href: "/magazines",         icon: <BookOpen size={16} />,      key: "navMagazines",   editions: ["digital"] },
+  { href: "/quick-bytes",       icon: <Zap size={16} />,           key: "navQuickBytes",  editions: ["digital"] },
   { href: "/content-generator", icon: <Wand2 size={16} />,         key: "navContentGenerator", editions: ["digital"] },
   { href: "/olloi",             icon: <Ribbon size={16} />,        key: "navOlloi",       editions: ["digital"] },
   { href: "/horoscope",         icon: <Moon size={16} />,          key: "navHoroscope",   editions: ["digital"] },

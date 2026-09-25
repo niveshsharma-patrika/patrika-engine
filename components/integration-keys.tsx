@@ -103,6 +103,15 @@ export function IntegrationKeys() {
         <Row label="Endpoint URL" k="horoscope_wp_endpoint" v={v} set={set} ok={status?.horoscope_wp_endpoint} mono />
       </Group>
 
+      <Group
+        title="Quick Bytes → WordPress"
+        tag="Swipe stories"
+        help={<>Publish Quick Bytes (glanceable swipe stories) to WordPress. Paste the <b>API key</b> and <b>endpoint URL</b> for the Quick Bytes endpoint when available.</>}
+      >
+        <Row label="API key" k="quickbytes_wp_api_key" v={v} set={set} ok={status?.quickbytes_wp_api_key} />
+        <Row label="Endpoint URL" k="quickbytes_wp_endpoint" v={v} set={set} ok={status?.quickbytes_wp_endpoint} mono />
+      </Group>
+
       <div className="flex items-center gap-3 pt-1">
         <button onClick={save} disabled={saving}
           className="bg-[var(--text)] hover:bg-black text-white text-[13px] font-medium px-3.5 py-1.5 rounded disabled:opacity-50 flex items-center gap-1.5">

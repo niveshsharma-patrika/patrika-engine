@@ -7,6 +7,7 @@ import {
 } from "@/lib/social/types";
 import { WP_API_KEY, WP_ENDPOINT } from "@/lib/wordpress";
 import { HOROSCOPE_WP_API_KEY, HOROSCOPE_WP_ENDPOINT } from "@/lib/horoscope/wordpress";
+import { QUICKBYTES_WP_API_KEY, QUICKBYTES_WP_ENDPOINT } from "@/lib/quick-bytes/wordpress";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,8 @@ const KEYS = {
   wordpress_endpoint: WP_ENDPOINT,
   horoscope_wp_api_key: HOROSCOPE_WP_API_KEY,
   horoscope_wp_endpoint: HOROSCOPE_WP_ENDPOINT,
+  quickbytes_wp_api_key: QUICKBYTES_WP_API_KEY,
+  quickbytes_wp_endpoint: QUICKBYTES_WP_ENDPOINT,
 } as const;
 
 const Body = z.object({
@@ -46,15 +49,18 @@ const Body = z.object({
   wordpress_endpoint: z.string().url().max(500).optional(),
   horoscope_wp_api_key: z.string().min(8).max(500).optional(),
   horoscope_wp_endpoint: z.string().url().max(500).optional(),
+  quickbytes_wp_api_key: z.string().min(8).max(500).optional(),
+  quickbytes_wp_endpoint: z.string().url().max(500).optional(),
 });
 
 export async function GET() {
   if (!(await requireAdmin())) return Response.json({ error: "Forbidden" }, { status: 403 });
-  const [yt, meta, ig, x, rid, rsec, wpk, wpe, hwpk, hwpe] = await Promise.all([
+  const [yt, meta, ig, x, rid, rsec, wpk, wpe, hwpk, hwpe, qwpk, qwpe] = await Promise.all([
     hasSecret(YT_API_KEY), hasSecret(META_TOKEN), hasSecret(META_IG_USER_ID),
     hasSecret(X_AUTH_TOKEN), hasSecret(REDDIT_CLIENT_ID), hasSecret(REDDIT_CLIENT_SECRET),
     hasSecret(WP_API_KEY), hasSecret(WP_ENDPOINT),
     hasSecret(HOROSCOPE_WP_API_KEY), hasSecret(HOROSCOPE_WP_ENDPOINT),
+    hasSecret(QUICKBYTES_WP_API_KEY), hasSecret(QUICKBYTES_WP_ENDPOINT),
   ]);
   return Response.json({
     youtube_api_key: yt.set,
@@ -67,6 +73,8 @@ export async function GET() {
     wordpress_endpoint: wpe.set,
     horoscope_wp_api_key: hwpk.set,
     horoscope_wp_endpoint: hwpe.set,
+    quickbytes_wp_api_key: qwpk.set,
+    quickbytes_wp_endpoint: qwpe.set,
   });
 }
 
