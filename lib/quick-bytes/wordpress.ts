@@ -39,17 +39,15 @@ export async function getQuickBytesWpConfig(): Promise<QuickByteWpConfig | null>
 }
 
 /**
- * PLUGGABLE — build the exact JSON body the Quick Bytes endpoint expects. This
- * is a sensible placeholder; replace it with the real schema when provided.
+ * Build the JSON body the Quick Bytes endpoint expects:
+ *   { title, status, cards: [{ title, body }] }
+ * featured_image_url is omitted — Quick Bytes have no image.
  */
 export function buildQuickBytePayload(qb: QuickByte): unknown {
   return {
-    type: "quick_byte",
-    category: qb.magazine,
-    lang: "hi",
+    title: qb.headline,
     status: "publish",
-    headline: qb.headline,
-    cards: qb.cards.map((c) => ({ title: c.title, text: c.text })),
+    cards: qb.cards.map((c) => ({ title: c.title, body: c.text })),
   };
 }
 
@@ -75,9 +73,9 @@ export async function pushQuickByte(qb: QuickByte): Promise<QuickBytePushResult>
       let data: unknown;
       try { data = JSON.parse(text); } catch { data = text; }
       if (res.ok) {
-        const d = (Array.isArray(data) ? data[0] : data) as { id?: number | string; post_id?: number | string; link?: string } | null;
+        const d = (Array.isArray(data) ? data[0] : data) as { id?: number | string; post_id?: number | string; url?: string; link?: string } | null;
         const postId = d?.id ?? d?.post_id;
-        return { ok: true, status: res.status, postId: postId != null ? String(postId) : d?.link ?? null };
+        return { ok: true, status: res.status, postId: postId != null ? String(postId) : (d?.url ?? d?.link ?? null) };
       }
       last = { ok: false, status: res.status, error: `WordPress returned ${res.status}: ${String(text).slice(0, 160)}` };
       if (res.status < 500 && res.status !== 429) return last;
