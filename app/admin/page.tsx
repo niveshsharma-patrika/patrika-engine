@@ -47,7 +47,6 @@ async function loadData() {
 }
 
 const PROVIDER_ENV: Record<string, string> = {
-  anthropic: "ANTHROPIC_API_KEY",
   openai: "OPENAI_API_KEY",
   google: "GOOGLE_GENERATIVE_AI_API_KEY",
   groq: "GROQ_API_KEY",
@@ -140,7 +139,7 @@ export default async function AdminPage() {
         <div className="mb-3">
           <h2 className="text-[15px] font-medium">AI provider keys</h2>
           <p className="text-[12px] text-[var(--text-3)] mt-0.5">
-            OpenAI, Anthropic, Google, Groq. Set a key to store it encrypted in the
+            OpenAI, Google, Groq. Set a key to store it encrypted in the
             database — it overrides the environment variable and takes effect immediately.
           </p>
         </div>

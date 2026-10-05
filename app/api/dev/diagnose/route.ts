@@ -32,7 +32,6 @@ export async function GET() {
     models_err: models.error?.message,
     config: config.data,
     config_err: config.error?.message,
-    env_anthropic: process.env.ANTHROPIC_API_KEY ? "set" : "missing",
     env_google: process.env.GOOGLE_GENERATIVE_AI_API_KEY ? "set" : "missing",
   });
 }

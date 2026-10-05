@@ -1,4 +1,3 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGroq } from "@ai-sdk/groq";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -31,8 +30,9 @@ export async function getApiKey(provider: ProviderKey): Promise<string | null> {
     }
   }
 
-  const envVar = AI_PROVIDERS[provider].env_var;
-  return process.env[envVar] ?? null;
+  const meta = AI_PROVIDERS[provider];
+  if (!meta) return null; // unknown/removed provider (e.g. stale config)
+  return process.env[meta.env_var] ?? null;
 }
 
 /**
@@ -44,13 +44,6 @@ function instantiate(
   apiKey: string
 ): LanguageModel {
   switch (provider) {
-    case "anthropic":
-      // Force baseURL to override any ANTHROPIC_BASE_URL env that may be set
-      // to the unversioned root URL.
-      return createAnthropic({
-        apiKey,
-        baseURL: "https://api.anthropic.com/v1",
-      })(modelKey);
     case "openai":
       return createOpenAI({ apiKey })(modelKey);
     case "google":
@@ -150,7 +143,9 @@ export async function getModelFor(
 
   const providerKey = row.provider_key as ProviderKey | undefined;
   const modelKey = row.model_key as string | undefined;
-  if (!providerKey || !modelKey) return null;
+  // Unknown/removed provider (e.g. a stale Anthropic row) → use the env default
+  // instead of failing.
+  if (!providerKey || !modelKey || !(providerKey in AI_PROVIDERS)) return envFallback();
 
   const apiKey = await getApiKey(providerKey);
   if (!apiKey) {

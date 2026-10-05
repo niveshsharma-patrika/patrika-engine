@@ -13,10 +13,9 @@ export const dynamic = "force-dynamic";
  * empty key clears the stored key, falling back to the env var.
  * The plaintext key is never returned or logged.
  */
-const PROVIDERS = ["openai", "anthropic", "google", "groq"] as const;
+const PROVIDERS = ["openai", "google", "groq"] as const;
 const DISPLAY: Record<string, string> = {
   openai: "OpenAI",
-  anthropic: "Anthropic",
   google: "Google",
   groq: "Groq",
 };

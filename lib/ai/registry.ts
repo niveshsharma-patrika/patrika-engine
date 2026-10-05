@@ -6,16 +6,6 @@
  */
 
 export const AI_PROVIDERS = {
-  anthropic: {
-    key: "anthropic",
-    name: "Anthropic",
-    env_var: "ANTHROPIC_API_KEY",
-    models: [
-      { key: "claude-opus-4-5", name: "Claude Opus 4.5", context: 200000, input: 15, output: 75, vision: true },
-      { key: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", context: 200000, input: 3, output: 15, vision: true },
-      { key: "claude-haiku-4-5", name: "Claude Haiku 4.5", context: 200000, input: 1, output: 5, vision: true },
-    ],
-  },
   openai: {
     key: "openai",
     name: "OpenAI",
