@@ -3,10 +3,21 @@ import { generateText } from "ai";
 import { getModelFor } from "./provider";
 
 /**
- * In-memory translation cache. Keyed by English source string.
- * Resets on server restart — fine because Groq Llama 3.3 70B is fast + free.
+ * In-memory translation cache, keyed by English source string. BOUNDED: news
+ * headlines are mostly unique each refresh, so an unbounded cache grows forever
+ * and leaks memory (the ingest/ticker crons translate constantly). Cap it with
+ * FIFO eviction — a translation is cheap to recompute, memory is not.
  */
 const cache = new Map<string, string>();
+const MAX_CACHE = 2000;
+
+function cacheSet(key: string, value: string): void {
+  if (cache.size >= MAX_CACHE) {
+    const oldest = cache.keys().next().value; // insertion order = oldest first
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(key, value);
+}
 
 /**
  * Batch-translate English news headlines/snippets to Hindi (Devanagari)
@@ -59,7 +70,7 @@ ${uncached.map((u, i) => `${i + 1}. ${u.text}`).join("\n")}`;
       if (Array.isArray(arr)) {
         uncached.forEach(({ idx, text: en }, j) => {
           const hi = typeof arr[j] === "string" ? (arr[j] as string) : en;
-          cache.set(en, hi);
+          cacheSet(en, hi);
           result[idx] = hi;
         });
         return result;
