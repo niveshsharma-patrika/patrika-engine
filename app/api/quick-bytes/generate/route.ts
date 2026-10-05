@@ -7,6 +7,7 @@ import { getApiKey, getModelFor } from "@/lib/ai/provider";
 import { MAGAZINE_BY_KEY } from "@/lib/magazines";
 import { normalizeHindiTypography as nz } from "@/lib/text/hindi";
 import { stripCitations } from "@/lib/text/citations";
+import { createDraft } from "@/lib/quick-bytes/store";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 150;
@@ -90,7 +91,9 @@ ${context ? `\nताज़ा तथ्य (इन्हीं पर आधा
     if (!headline || cards.length < 3) {
       return Response.json({ error: "Could not produce a complete Quick Byte — try again." }, { status: 502 });
     }
-    return Response.json({ magazine: magKey, headline, cards, researched: Boolean(context) });
+    // Save as a draft so it can be edited + published later.
+    const id = await createDraft(magKey, headline, cards, session.userId ?? null);
+    return Response.json({ id, magazine: magKey, headline, cards, researched: Boolean(context) });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Generation failed.";
     const rateLimited = /quota|rate.?limit|exhausted|429/i.test(msg);

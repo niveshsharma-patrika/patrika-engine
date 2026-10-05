@@ -60,7 +60,7 @@ export function buildQuickBytePayload(qb: QuickByte): unknown {
   return payload;
 }
 
-export type QuickBytePushResult = { ok: boolean; status: number; postId?: string | null; error?: string; notConfigured?: boolean };
+export type QuickBytePushResult = { ok: boolean; status: number; postId?: string | null; url?: string | null; error?: string; notConfigured?: boolean };
 
 /** POST a Quick Byte. Retries on transient failure. Returns the post id/link. */
 export async function pushQuickByte(qb: QuickByte): Promise<QuickBytePushResult> {
@@ -84,7 +84,7 @@ export async function pushQuickByte(qb: QuickByte): Promise<QuickBytePushResult>
       if (res.ok) {
         const d = (Array.isArray(data) ? data[0] : data) as { id?: number | string; post_id?: number | string; url?: string; link?: string } | null;
         const postId = d?.id ?? d?.post_id;
-        return { ok: true, status: res.status, postId: postId != null ? String(postId) : (d?.url ?? d?.link ?? null) };
+        return { ok: true, status: res.status, postId: postId != null ? String(postId) : null, url: d?.url ?? d?.link ?? null };
       }
       last = { ok: false, status: res.status, error: `WordPress returned ${res.status}: ${String(text).slice(0, 160)}` };
       if (res.status < 500 && res.status !== 429) return last;
