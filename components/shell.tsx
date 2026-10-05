@@ -26,6 +26,7 @@ import {
   Ribbon,
   Moon,
   Zap,
+  Tags,
   Lock,
   LogOut,
 } from "lucide-react";
@@ -60,6 +61,7 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: E
   { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin",       editions: ["digital"], roles: ["admin"] },
   { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers",       editions: ["digital"], roles: ["admin"] },
   { href: "/admin/productivity", icon: <BarChart3 size={16} />,    key: "navProductivity", editions: ["digital"], roles: ["admin"] },
+  { href: "/admin/categories",  icon: <Tags size={16} />,          key: "navCategoryMapping", editions: ["digital"], roles: ["admin"] },
 ];
 
 const NAV_BADGES: Record<string, string | undefined> = {};

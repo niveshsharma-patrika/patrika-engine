@@ -23,7 +23,13 @@ export const QUICKBYTES_WP_ENDPOINT = "quickbytes_wp_endpoint";
 const QUICKBYTES_WP_HEADER = process.env.QUICKBYTES_WP_HEADER || "X-API-Key";
 
 export type QuickByteCard = { title: string; text: string };
-export type QuickByte = { magazine: string; headline: string; cards: QuickByteCard[] };
+export type QuickByte = {
+  magazine: string;
+  headline: string;
+  cards: QuickByteCard[];
+  category?: string; // CMS category slug (from the Category Mapping page)
+  slug?: string; // post slug
+};
 
 export type QuickByteWpConfig = { apiKey: string; endpoint: string };
 
@@ -44,11 +50,14 @@ export async function getQuickBytesWpConfig(): Promise<QuickByteWpConfig | null>
  * featured_image_url is omitted — Quick Bytes have no image.
  */
 export function buildQuickBytePayload(qb: QuickByte): unknown {
-  return {
+  const payload: Record<string, unknown> = {
     title: qb.headline,
     status: "publish",
     cards: qb.cards.map((c) => ({ title: c.title, body: c.text })),
   };
+  if (qb.category) payload.category = qb.category; // omit when the desk is unmapped
+  if (qb.slug) payload.slug = qb.slug;
+  return payload;
 }
 
 export type QuickBytePushResult = { ok: boolean; status: number; postId?: string | null; error?: string; notConfigured?: boolean };

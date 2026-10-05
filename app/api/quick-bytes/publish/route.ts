@@ -1,5 +1,7 @@
 import { getSession } from "@/lib/auth/session";
 import { pushQuickByte, type QuickByteCard } from "@/lib/quick-bytes/wordpress";
+import { getCategorySlug } from "@/lib/cms-categories";
+import { englishSlug } from "@/lib/wordpress";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -27,7 +29,12 @@ export async function POST(req: Request) {
     return Response.json({ error: "Need a headline and at least 3 cards." }, { status: 400 });
   }
 
-  const result = await pushQuickByte({ magazine, headline, cards });
+  // category ← the desk's CMS slug from the Category Mapping page (omitted if
+  // unmapped). slug ← an English post slug from the headline, same as Patrika+.
+  const category = (await getCategorySlug(magazine)) ?? undefined;
+  const slug = (await englishSlug(headline)).slice(0, 100) || undefined;
+
+  const result = await pushQuickByte({ magazine, headline, cards, category, slug });
   if (!result.ok) {
     return Response.json({ error: result.error, notConfigured: result.notConfigured ?? false }, { status: result.status });
   }
