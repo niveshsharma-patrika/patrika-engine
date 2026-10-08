@@ -14,19 +14,21 @@ type DetailItem = {
   storyType: string;
   author: string;
   pubDate: string;
+  status: "finalized" | "left_out";
+  reason: string;
   description: string;
   keyword: string;
 };
 
-/** Strip editorial-system typesetting artifacts (RTF \B toggles, <bha> markers)
- *  so the plain-text body reads cleanly. */
-function cleanBody(raw: string): string {
-  return raw
-    .replace(/<\/?[a-zA-Z]{1,8}>/g, "") // <bha> … </bha> and similar short markers
-    .replace(/\\B/g, "") // RTF bold toggles
-    .replace(/[ \t]+\n/g, "\n")
-    .trim();
-}
+/** Left-out reason code → localised label. */
+const REASONS: Record<string, { en: string; hi: string }> = {
+  "no body": { en: "no body", hi: "कोई विवरण नहीं" },
+  "one-liner / caption": { en: "one-liner / caption", hi: "एक-पंक्ति / कैप्शन" },
+  "photo / caption": { en: "photo / caption", hi: "फ़ोटो / कैप्शन" },
+  "too short": { en: "too short", hi: "बहुत छोटा" },
+  "low text": { en: "low text", hi: "कम टेक्स्ट" },
+  fragment: { en: "fragment", hi: "अधूरा" },
+};
 
 function fullTime(pubDate: string): string {
   const t = Date.parse(pubDate);
@@ -92,6 +94,13 @@ export function EditorialArticle({ id, date, start }: { id: string; date: string
         </div>
       ) : item ? (
         <article>
+          {item.status === "left_out" && (
+            <div className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--amber,#b45309)] bg-[var(--amber-soft,#fef3c7)] px-2.5 py-1 rounded mb-3">
+              {hi ? "छोड़ा गया" : "Left out"}
+              {item.reason && <span className="opacity-80">· {REASONS[item.reason] ? (hi ? REASONS[item.reason].hi : REASONS[item.reason].en) : item.reason}</span>}
+            </div>
+          )}
+
           <h1 className="text-[24px] font-semibold text-[var(--text)] leading-tight mb-3">
             {item.heading || (hi ? "(शीर्षक नहीं)" : "(untitled)")}
           </h1>
@@ -118,7 +127,7 @@ export function EditorialArticle({ id, date, start }: { id: string; date: string
           ) : null}
 
           <div className="text-[15px] text-[var(--text)] leading-relaxed whitespace-pre-wrap">
-            {cleanBody(item.description) || (hi ? "(कोई विवरण नहीं)" : "(no body)")}
+            {item.description || (hi ? "(कोई विवरण नहीं)" : "(no body)")}
           </div>
 
           {keywords.length > 0 && (

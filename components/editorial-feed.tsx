@@ -14,7 +14,21 @@ type ListItem = {
   storyType: string;
   author: string;
   pubDate: string;
+  status: "finalized" | "left_out";
+  reason: string;
   _start: number; // upstream page this item came from (for a fast detail lookup)
+};
+
+type Bucket = "finalized" | "left_out" | "all";
+
+/** Left-out reason code → localised label. */
+const REASONS: Record<string, { en: string; hi: string }> = {
+  "no body": { en: "no body", hi: "कोई विवरण नहीं" },
+  "one-liner / caption": { en: "one-liner / caption", hi: "एक-पंक्ति / कैप्शन" },
+  "photo / caption": { en: "photo / caption", hi: "फ़ोटो / कैप्शन" },
+  "too short": { en: "too short", hi: "बहुत छोटा" },
+  "low text": { en: "low text", hi: "कम टेक्स्ट" },
+  fragment: { en: "fragment", hi: "अधूरा" },
 };
 
 type PageResponse = {
@@ -43,6 +57,7 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
   const [streaming, setStreaming] = useState(false); // later pages in flight
   const [error, setError] = useState<string | null>(null);
 
+  const [bucket, setBucket] = useState<Bucket>("finalized");
   const [desk, setDesk] = useState("");
   const [storyType, setStoryType] = useState("");
   const [query, setQuery] = useState("");
@@ -58,7 +73,7 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
     setError(null);
     setLoading(true);
     setStreaming(false);
-    setDesk(""); setStoryType(""); setQuery(""); setVisible(PAGE_SIZE);
+    setBucket("finalized"); setDesk(""); setStoryType(""); setQuery(""); setVisible(PAGE_SIZE);
 
     (async () => {
       const seen = new Set<string>();
@@ -107,9 +122,19 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
     [items]
   );
 
+  const counts = useMemo(() => {
+    let finalized = 0;
+    for (const it of items) if (it.status === "finalized") finalized++;
+    return { finalized, leftOut: items.length - finalized, all: items.length };
+  }, [items]);
+
+  // Reset the display window when the result set changes.
+  useEffect(() => { setVisible(PAGE_SIZE); }, [bucket, desk, storyType, query]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const out = items.filter((it) => {
+      if (bucket !== "all" && it.status !== bucket) return false;
       if (desk && it.desk !== desk) return false;
       if (storyType && it.storyType !== storyType) return false;
       if (q) {
@@ -125,7 +150,7 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
       return nb - na;
     });
     return out;
-  }, [items, desk, storyType, query]);
+  }, [items, bucket, desk, storyType, query]);
 
   const shown = filtered.slice(0, visible);
 
@@ -143,6 +168,30 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
           ? "editorialreview.patrika.com की ख़बरें — तारीख़, डेस्क और स्टोरी टाइप से फ़िल्टर करें। किसी ख़बर पर टैप करके पूरा विवरण देखें।"
           : "News from editorialreview.patrika.com — filter by date, desk and story type. Tap any story for the full detail."}
       </p>
+
+      {/* Buckets */}
+      {!loading && !error && (
+        <div className="flex items-center gap-1 mb-3">
+          {([
+            ["finalized", hi ? "फ़ाइनल" : "Finalized", counts.finalized],
+            ["left_out", hi ? "छोड़े गए" : "Left out", counts.leftOut],
+            ["all", hi ? "सभी" : "All", counts.all],
+          ] as const).map(([key, label, n]) => (
+            <button
+              key={key}
+              onClick={() => setBucket(key)}
+              className={`text-[12.5px] font-medium px-3 py-1.5 rounded-full border transition-colors ${
+                bucket === key
+                  ? "bg-[var(--purple)] border-[var(--purple)] text-white"
+                  : "bg-white border-[var(--border)] text-[var(--text-2)] hover:border-[var(--purple)]"
+              }`}
+            >
+              {label} <span className={bucket === key ? "opacity-80" : "text-[var(--text-3)]"}>{n.toLocaleString()}</span>
+            </button>
+          ))}
+          {streaming && <Loader2 size={13} className="animate-spin text-[var(--text-3)] ml-1" />}
+        </div>
+      )}
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-2.5 mb-4">
@@ -171,9 +220,8 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
           />
         </div>
         {!loading && !error && (
-          <span className="text-[12px] text-[var(--text-3)] ml-auto flex items-center gap-1.5">
-            {filtered.length.toLocaleString()} {hi ? "ख़बरें" : "stories"}
-            {streaming && <Loader2 size={12} className="animate-spin" />}
+          <span className="text-[12px] text-[var(--text-3)] ml-auto">
+            {filtered.length.toLocaleString()} {hi ? "दिखा रहे हैं" : "showing"}
           </span>
         )}
       </div>
@@ -206,6 +254,11 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
                   </h3>
                   <div className="mt-auto flex items-center gap-1.5 flex-wrap text-[11px] text-[var(--text-3)]">
                     {it.desk && <span className="bg-[var(--surface-2)] px-1.5 py-0.5 rounded font-medium text-[var(--text-2)]">{it.desk}</span>}
+                    {it.status === "left_out" && it.reason && (
+                      <span className="bg-[var(--amber-soft,#fef3c7)] text-[var(--amber,#b45309)] px-1.5 py-0.5 rounded font-medium">
+                        {(REASONS[it.reason] ? (hi ? REASONS[it.reason].hi : REASONS[it.reason].en) : it.reason)}
+                      </span>
+                    )}
                     {it.storyType && <span>{it.storyType}</span>}
                     {it.pubDate && <span className="ml-auto">{timeLabel(it.pubDate)}</span>}
                   </div>

@@ -17,6 +17,12 @@ const MAX_PAGES = 25; // backstop against a server that ignores `start`
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const PAGE_CACHE_MAX = 48; // ≈ a handful of full days of pages
 
+// Curation thresholds (deterministic, no AI). Tune these in one place.
+const MIN_BODY = 250; // shorter cleaned bodies are "too short"
+const CAPTION_BODY = 400; // layout-caption headings need at least this much body
+const ONELINER_DELTA = 20; // body barely longer than heading = just the headline
+const GARBAGE_RATIO = 0.35; // symbol-heavy bodies are "low text"
+
 /** One item exactly as the upstream sends it (fields we rely on). */
 export type FeedItemRaw = {
   id?: string;
@@ -32,7 +38,11 @@ export type FeedItemRaw = {
   pubDate?: string | null;
 };
 
-/** Normalised item for the list (no heavy body). */
+/** Curation bucket: a cleaned, meaty story vs a thin/garbage leave-out. */
+export type FeedStatus = "finalized" | "left_out";
+
+/** Normalised item for the list (no heavy body). Heading is cleaned; `status`
+ *  + `reason` are the deterministic curation verdict. */
 export type FeedListItem = {
   id: string;
   heading: string;
@@ -41,9 +51,11 @@ export type FeedListItem = {
   storyType: string;
   author: string;
   pubDate: string;
+  status: FeedStatus;
+  reason: string; // why it was left out ("" when finalized)
 };
 
-/** Normalised item for the detail page (adds the body + keywords). */
+/** Normalised item for the detail page (adds the cleaned body + keywords). */
 export type FeedDetailItem = FeedListItem & {
   description: string;
   keyword: string;
@@ -100,20 +112,71 @@ async function fetchPageCached(date: string, start: number): Promise<FeedItemRaw
   return raw;
 }
 
-function toListItem(it: FeedItemRaw): FeedListItem {
+/** Leading newsroom layout tags on a heading (फोटो/बॉटम/लीड/बॉक्स…), possibly
+ *  repeated and followed by dash/colon/dot runs. Stripped from the heading; the
+ *  fact that one was present is a signal for the caption rule. */
+const LAYOUT_PREFIX = /^\s*(?:फोटो|फ़ोटो|बॉटम|बाॅटम|बोटम्?|लीड|बॉक्स|बाक्स|photo|lead|box|bottom)\s*[-—–.:|]+\s*/i;
+
+/** Strip editorial-system artifacts and normalise whitespace in body text. */
+function cleanText(raw: string): string {
+  return s(raw)
+    .replace(/<\/?[a-zA-Z]{1,8}>/g, "") // <bha> … </bha> and similar short markers
+    .replace(/\\B/g, "") // RTF bold toggles (literal backslash-B)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "") // control chars (keep \t \n)
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** Clean a heading to a single line and strip layout prefixes. */
+function cleanHeading(raw: string): { heading: string; hadPrefix: boolean } {
+  let h = cleanText(raw).replace(/\n+/g, " ").replace(/\s{2,}/g, " ").trim();
+  let hadPrefix = false;
+  for (let i = 0; i < 3 && LAYOUT_PREFIX.test(h); i++) {
+    h = h.replace(LAYOUT_PREFIX, "").trim();
+    hadPrefix = true;
+  }
+  h = h.replace(/^[-—–.·:|]+\s*/, "").trim(); // leftover punctuation run
+  return { heading: h, hadPrefix };
+}
+
+/** Deterministic curation verdict for a cleaned heading + body. */
+function classify(heading: string, body: string, hadPrefix: boolean): { status: FeedStatus; reason: string } {
+  if (!body) return { status: "left_out", reason: "no body" };
+  if (body.length <= heading.length + ONELINER_DELTA) return { status: "left_out", reason: "one-liner / caption" };
+  if (hadPrefix && body.length < CAPTION_BODY) return { status: "left_out", reason: "photo / caption" };
+  if (body.length < MIN_BODY) return { status: "left_out", reason: "too short" };
+  const junk = (body.match(/[^\p{L}\p{N}\s।,.?!:;'"()\-\n]/gu) || []).length;
+  if (junk / body.length > GARBAGE_RATIO) return { status: "left_out", reason: "low text" };
+  if (!/[।.?!]/.test(body)) return { status: "left_out", reason: "fragment" };
+  return { status: "finalized", reason: "" };
+}
+
+/** Full cleaned + classified item. */
+function normalize(it: FeedItemRaw): FeedDetailItem {
+  const { heading, hadPrefix } = cleanHeading(s(it.heading));
+  const description = cleanText(s(it.description));
+  const { status, reason } = classify(heading, description, hadPrefix);
   return {
     id: s(it.id),
-    heading: s(it.heading),
+    heading,
     img: proxiedImg(s(it.img)),
     desk: s(it.desk),
     storyType: s(it.story_type),
     author: s(it.author),
     pubDate: s(it.pubDate),
+    status,
+    reason,
+    description,
+    keyword: s(it.keyword),
   };
 }
 
-function toDetailItem(it: FeedItemRaw): FeedDetailItem {
-  return { ...toListItem(it), description: s(it.description), keyword: s(it.keyword) };
+function toListItem(it: FeedItemRaw): FeedListItem {
+  const { description: _d, keyword: _k, ...rest } = normalize(it);
+  void _d; void _k;
+  return rest;
 }
 
 /** One page of light list items (upstream order) plus the cursor for the next
@@ -164,10 +227,10 @@ export async function getFeedItem(
   if (startHint !== undefined && Number.isInteger(startHint) && startHint >= 0) {
     const page = await fetchPageCached(date, startHint);
     const hit = page.find((r) => s(r.id) === wanted);
-    if (hit) return toDetailItem(hit);
+    if (hit) return normalize(hit);
   }
 
   const all = await fetchAllRaw(date);
   const it = all.find((r) => s(r.id) === wanted);
-  return it ? toDetailItem(it) : null;
+  return it ? normalize(it) : null;
 }
