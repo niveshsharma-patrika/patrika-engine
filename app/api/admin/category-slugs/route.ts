@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/session";
-import { getAllCategorySlugs, setCategorySlugs, PATRIKA_PLUS_SLUG_KEY } from "@/lib/cms-categories";
+import { getAllCategorySlugs, setCategorySlugs, type DeskCategories } from "@/lib/cms-categories";
 import { MAGAZINES } from "@/lib/magazines";
 
 export const dynamic = "force-dynamic";
@@ -13,23 +13,29 @@ async function requireAdmin() {
   return session?.role === "admin" ? session : null;
 }
 
-/** GET — current desk → CMS slug mappings. Admin only. */
+/** GET — current desk → {slug, ppSlug} mappings. Admin only. */
 export async function GET() {
   if (!(await requireAdmin())) return Response.json({ error: "Forbidden" }, { status: 403 });
-  return Response.json({ slugs: await getAllCategorySlugs() });
+  return Response.json({ mappings: await getAllCategorySlugs() });
 }
 
-/** PUT — save desk → CMS slug mappings. Admin only. Body: { slugs: {desk: slug} }.
- *  Only known Patrika+ desk keys are accepted. */
+/** PUT — save desk → {slug, ppSlug} mappings. Admin only.
+ *  Body: { mappings: { desk: { slug, ppSlug } } }. Only known Patrika+ desk
+ *  keys are accepted; slug = global category, ppSlug = Patrika Plus category. */
 export async function PUT(req: Request) {
   if (!(await requireAdmin())) return Response.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json().catch(() => null);
-  const slugs = body?.slugs;
-  if (!slugs || typeof slugs !== "object") return Response.json({ error: "Invalid body" }, { status: 400 });
+  const mappings = body?.mappings;
+  if (!mappings || typeof mappings !== "object") return Response.json({ error: "Invalid body" }, { status: 400 });
 
-  const clean: Record<string, string> = {};
-  for (const [k, v] of Object.entries(slugs as Record<string, unknown>)) {
-    if ((PATRIKA_DESKS.has(k) || k === PATRIKA_PLUS_SLUG_KEY) && typeof v === "string") clean[k] = v.trim();
+  const clean: Record<string, DeskCategories> = {};
+  for (const [k, v] of Object.entries(mappings as Record<string, unknown>)) {
+    if (!PATRIKA_DESKS.has(k) || !v || typeof v !== "object") continue;
+    const o = v as { slug?: unknown; ppSlug?: unknown };
+    clean[k] = {
+      slug: typeof o.slug === "string" ? o.slug.trim() : "",
+      ppSlug: typeof o.ppSlug === "string" ? o.ppSlug.trim() : "",
+    };
   }
   if (Object.keys(clean).length === 0) return Response.json({ error: "Nothing to save" }, { status: 400 });
 

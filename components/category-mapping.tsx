@@ -7,15 +7,13 @@ import { MAGAZINES } from "@/lib/magazines";
 import { useLang } from "@/lib/i18n/context";
 
 const DESKS = MAGAZINES.filter((m) => (m.group ?? "patrika") === "patrika" && m.key !== "custom");
-// Reserved key for the single global Patrika Plus category slug (matches
-// PATRIKA_PLUS_SLUG_KEY in lib/cms-categories, kept here to avoid importing the
-// server-only module into this client component).
-const PP_KEY = "__patrika_plus__";
+
+type DeskCategories = { slug: string; ppSlug: string };
 
 export function CategoryMapping() {
   const { lang } = useLang();
   const hi = lang === "hi";
-  const [slugs, setSlugs] = useState<Record<string, string>>({});
+  const [mappings, setMappings] = useState<Record<string, DeskCategories>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -25,7 +23,7 @@ export function CategoryMapping() {
       const r = await fetch("/api/admin/category-slugs", { cache: "no-store" });
       if (r.ok) {
         const j = await r.json();
-        setSlugs(j.slugs ?? {});
+        setMappings(j.mappings ?? {});
       }
     } catch {
       /* advisory */
@@ -35,7 +33,11 @@ export function CategoryMapping() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const set = (k: string, v: string) => setSlugs((prev) => ({ ...prev, [k]: v }));
+  const set = (k: string, field: keyof DeskCategories, v: string) =>
+    setMappings((prev) => ({
+      ...prev,
+      [k]: { slug: prev[k]?.slug ?? "", ppSlug: prev[k]?.ppSlug ?? "", [field]: v },
+    }));
 
   async function save() {
     setSaving(true); setMsg(null);
@@ -43,7 +45,7 @@ export function CategoryMapping() {
       const r = await fetch("/api/admin/category-slugs", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ slugs }),
+        body: JSON.stringify({ mappings }),
       });
       const j = await r.json();
       if (!r.ok) setMsg({ ok: false, text: j.error ?? "Failed" });
@@ -55,53 +57,55 @@ export function CategoryMapping() {
     }
   }
 
+  const inputCls =
+    "w-full bg-white border border-[var(--border)] text-[13px] px-3 py-1.5 rounded outline-none focus:border-[var(--purple)] font-mono";
+
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-6 max-w-4xl">
       <div className="flex items-center gap-2.5 mb-1">
         <Tags size={20} className="text-[var(--purple)]" />
         <h1 className="text-[20px] font-semibold text-[var(--text)]">{hi ? "कैटेगरी मैपिंग" : "Category Mapping"}</h1>
       </div>
       <p className="text-[13px] text-[var(--text-3)] mb-5">
         {hi
-          ? "CMS कैटेगरी स्लग सेट करें। Quick Bytes में डेस्क का टॉपिकल स्लग category के रूप में जाता है। Patrika+ में ग्लोबल पत्रिका+ स्लग और डेस्क का टॉपिकल स्लग — दोनों category array में जाते हैं। स्लग खाली है तो वह नहीं भेजा जाता।"
-          : "Set the CMS category slugs. Quick Bytes sends the desk's topical slug as category. Patrika+ sends BOTH the global Patrika Plus slug and the desk's topical slug (as a category array). Blank slugs are not sent."}
+          ? "हर डेस्क के लिए दो WordPress कैटेगरी स्लग सेट करें। Patrika+ दोनों भेजता है — पहले पत्रिका+ कैटेगरी (जैसे satta-ki-zameen), फिर ग्लोबल कैटेगरी (जैसे politics-news)। Quick Bytes सिर्फ ग्लोबल कैटेगरी स्लग भेजता है। खाली स्लग नहीं भेजे जाते।"
+          : "Set two WordPress category slugs per desk. Patrika+ sends both — the Patrika Plus category (e.g. satta-ki-zameen) first, then the global category (e.g. politics-news). Quick Bytes sends only the global category slug. Blank slugs are not sent."}
       </p>
 
       {loading ? (
         <div className="flex items-center gap-2 text-[13px] text-[var(--text-3)] py-8"><Loader2 size={16} className="animate-spin" /> {hi ? "लोड हो रहा है…" : "Loading…"}</div>
       ) : (
         <>
-          {/* Global Patrika Plus category — sent on every Patrika+ post. */}
-          <div className="bg-white border border-[var(--border)] rounded-xl p-4 mb-4">
-            <label className="block text-[12px] font-medium text-[var(--text-2)] mb-1">
-              {hi ? "CMS पत्रिका+ कैटेगरी स्लग (ग्लोबल — हर Patrika+ पोस्ट पर भेजी जाती है)" : "CMS Patrika Plus category slug (global — sent on every Patrika+ post)"}
-            </label>
-            <input value={slugs[PP_KEY] ?? ""} onChange={(e) => set(PP_KEY, e.target.value)} placeholder={hi ? "जैसे patrika-plus" : "e.g. patrika-plus"}
-              className="w-full max-w-[280px] bg-white border border-[var(--border)] text-[13px] px-3 py-1.5 rounded outline-none focus:border-[var(--purple)] font-mono" />
-          </div>
-
-          <div className="text-[12px] font-medium text-[var(--text-2)] mb-1.5">{hi ? "डेस्क टॉपिकल कैटेगरी" : "Desk topical categories"}</div>
           <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
             <table className="w-full text-[13px]">
               <thead className="bg-[var(--surface-2)] text-[var(--text-3)] text-[11px] uppercase">
                 <tr>
-                  <th className="text-left font-medium px-4 py-2.5">{hi ? "डेस्क" : "Desk"}</th>
-                  <th className="text-left font-medium px-4 py-2.5">{hi ? "CMS कैटेगरी स्लग" : "CMS category slug"}</th>
+                  <th className="text-left font-medium px-4 py-2.5 w-[30%]">{hi ? "डेस्क" : "Desk"}</th>
+                  <th className="text-left font-medium px-4 py-2.5">{hi ? "पत्रिका+ कैटेगरी स्लग" : "Patrika Plus category slug"}</th>
+                  <th className="text-left font-medium px-4 py-2.5">{hi ? "ग्लोबल कैटेगरी स्लग" : "Global category slug"}</th>
                 </tr>
               </thead>
               <tbody>
                 {DESKS.map((m) => (
                   <tr key={m.key} className="border-t border-[var(--border)]">
-                    <td className="px-4 py-2 text-[var(--text-1)]">
+                    <td className="px-4 py-2 text-[var(--text-1)] align-middle">
                       <span className="font-medium">{hi ? m.nameHi : m.nameEn}</span>
                       <span className="text-[11px] text-[var(--text-3)] ml-2">{hi ? m.nameEn : m.nameHi}</span>
                     </td>
                     <td className="px-4 py-2">
                       <input
-                        value={slugs[m.key] ?? ""}
-                        onChange={(e) => set(m.key, e.target.value)}
-                        placeholder={hi ? "जैसे patrikaplus" : "e.g. patrikaplus"}
-                        className="w-full max-w-[280px] bg-white border border-[var(--border)] text-[13px] px-3 py-1.5 rounded outline-none focus:border-[var(--purple)] font-mono"
+                        value={mappings[m.key]?.ppSlug ?? ""}
+                        onChange={(e) => set(m.key, "ppSlug", e.target.value)}
+                        placeholder={hi ? "जैसे satta-ki-zameen" : "e.g. satta-ki-zameen"}
+                        className={inputCls}
+                      />
+                    </td>
+                    <td className="px-4 py-2">
+                      <input
+                        value={mappings[m.key]?.slug ?? ""}
+                        onChange={(e) => set(m.key, "slug", e.target.value)}
+                        placeholder={hi ? "जैसे politics-news" : "e.g. politics-news"}
+                        className={inputCls}
                       />
                     </td>
                   </tr>

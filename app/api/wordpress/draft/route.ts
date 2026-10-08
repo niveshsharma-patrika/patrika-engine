@@ -1,7 +1,7 @@
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { bodyToHtml, englishSlug, postToWordPress } from "@/lib/wordpress";
-import { getCategorySlug, getPatrikaPlusSlug } from "@/lib/cms-categories";
+import { getDeskCategories } from "@/lib/cms-categories";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
@@ -44,13 +44,12 @@ export async function POST(req: Request) {
     /* author id is optional — proceed without it */
   }
 
-  // Categories: the global Patrika Plus category + this desk's topical category
-  // (both from Admin → Category Mapping). Blanks are omitted.
-  const [ppSlug, deskSlug] = await Promise.all([
-    getPatrikaPlusSlug(),
-    magazine ? getCategorySlug(magazine) : Promise.resolve(null),
-  ]);
-  const category = [ppSlug, deskSlug].filter((s): s is string => Boolean(s));
+  // Categories: this desk's Patrika Plus category + its global category (both
+  // from Admin → Category Mapping). Patrika Plus first; blanks are omitted.
+  const { slug: globalSlug, ppSlug } = magazine
+    ? await getDeskCategories(magazine)
+    : { slug: "", ppSlug: "" };
+  const category = [ppSlug, globalSlug].filter((s) => Boolean(s));
 
   const result = await postToWordPress({
     title,
