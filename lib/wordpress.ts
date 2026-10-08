@@ -171,6 +171,8 @@ export type WpPost = {
   slug?: string;
   /** WordPress author id — the post is attributed to this author's byline. */
   author_id?: number;
+  /** WordPress category slugs — [global Patrika Plus category, desk topical category]. */
+  category?: string[];
 };
 
 /** POST one post to the WordPress plugin. Returns the plugin's response. */

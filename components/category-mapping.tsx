@@ -7,6 +7,10 @@ import { MAGAZINES } from "@/lib/magazines";
 import { useLang } from "@/lib/i18n/context";
 
 const DESKS = MAGAZINES.filter((m) => (m.group ?? "patrika") === "patrika" && m.key !== "custom");
+// Reserved key for the single global Patrika Plus category slug (matches
+// PATRIKA_PLUS_SLUG_KEY in lib/cms-categories, kept here to avoid importing the
+// server-only module into this client component).
+const PP_KEY = "__patrika_plus__";
 
 export function CategoryMapping() {
   const { lang } = useLang();
@@ -59,14 +63,24 @@ export function CategoryMapping() {
       </div>
       <p className="text-[13px] text-[var(--text-3)] mb-5">
         {hi
-          ? "हर पत्रिका+ डेस्क के लिए CMS कैटेगरी स्लग डालें। यह Quick Bytes प्रकाशित करते समय payload में category के रूप में भेजा जाता है। स्लग खाली है तो category नहीं भेजी जाती।"
-          : "Set the CMS category slug for each Patrika+ desk. It is sent as the payload's category when publishing Quick Bytes. If a slug is blank, no category is sent."}
+          ? "CMS कैटेगरी स्लग सेट करें। Quick Bytes में डेस्क का टॉपिकल स्लग category के रूप में जाता है। Patrika+ में ग्लोबल पत्रिका+ स्लग और डेस्क का टॉपिकल स्लग — दोनों category array में जाते हैं। स्लग खाली है तो वह नहीं भेजा जाता।"
+          : "Set the CMS category slugs. Quick Bytes sends the desk's topical slug as category. Patrika+ sends BOTH the global Patrika Plus slug and the desk's topical slug (as a category array). Blank slugs are not sent."}
       </p>
 
       {loading ? (
         <div className="flex items-center gap-2 text-[13px] text-[var(--text-3)] py-8"><Loader2 size={16} className="animate-spin" /> {hi ? "लोड हो रहा है…" : "Loading…"}</div>
       ) : (
         <>
+          {/* Global Patrika Plus category — sent on every Patrika+ post. */}
+          <div className="bg-white border border-[var(--border)] rounded-xl p-4 mb-4">
+            <label className="block text-[12px] font-medium text-[var(--text-2)] mb-1">
+              {hi ? "CMS पत्रिका+ कैटेगरी स्लग (ग्लोबल — हर Patrika+ पोस्ट पर भेजी जाती है)" : "CMS Patrika Plus category slug (global — sent on every Patrika+ post)"}
+            </label>
+            <input value={slugs[PP_KEY] ?? ""} onChange={(e) => set(PP_KEY, e.target.value)} placeholder={hi ? "जैसे patrika-plus" : "e.g. patrika-plus"}
+              className="w-full max-w-[280px] bg-white border border-[var(--border)] text-[13px] px-3 py-1.5 rounded outline-none focus:border-[var(--purple)] font-mono" />
+          </div>
+
+          <div className="text-[12px] font-medium text-[var(--text-2)] mb-1.5">{hi ? "डेस्क टॉपिकल कैटेगरी" : "Desk topical categories"}</div>
           <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
             <table className="w-full text-[13px]">
               <thead className="bg-[var(--surface-2)] text-[var(--text-3)] text-[11px] uppercase">

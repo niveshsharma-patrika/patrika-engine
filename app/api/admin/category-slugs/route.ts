@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/session";
-import { getAllCategorySlugs, setCategorySlugs } from "@/lib/cms-categories";
+import { getAllCategorySlugs, setCategorySlugs, PATRIKA_PLUS_SLUG_KEY } from "@/lib/cms-categories";
 import { MAGAZINES } from "@/lib/magazines";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export async function PUT(req: Request) {
 
   const clean: Record<string, string> = {};
   for (const [k, v] of Object.entries(slugs as Record<string, unknown>)) {
-    if (PATRIKA_DESKS.has(k) && typeof v === "string") clean[k] = v.trim();
+    if ((PATRIKA_DESKS.has(k) || k === PATRIKA_PLUS_SLUG_KEY) && typeof v === "string") clean[k] = v.trim();
   }
   if (Object.keys(clean).length === 0) return Response.json({ error: "Nothing to save" }, { status: 400 });
 

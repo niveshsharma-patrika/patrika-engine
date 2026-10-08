@@ -561,7 +561,7 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
       const res = await fetch("/api/wordpress/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title, body, short_description: description }),
+        body: JSON.stringify({ title, body, short_description: description, magazine: magazineKey ?? undefined }),
       });
       const json = await res.json();
       if (!res.ok) setWpMsg({ ok: false, text: json.error ?? `Failed (${res.status})` });

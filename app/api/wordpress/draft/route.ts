@@ -1,6 +1,7 @@
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { bodyToHtml, englishSlug, postToWordPress } from "@/lib/wordpress";
+import { getCategorySlug, getPatrikaPlusSlug } from "@/lib/cms-categories";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
@@ -19,6 +20,7 @@ export async function POST(req: Request) {
   const article = typeof body?.body === "string" ? body.body : "";
   const short = typeof body?.short_description === "string" ? body.short_description.trim().slice(0, 500) : "";
   const slugIn = typeof body?.slug === "string" ? body.slug.trim() : "";
+  const magazine = typeof body?.magazine === "string" ? body.magazine.trim() : "";
   if (!title || !article.trim()) {
     return Response.json({ error: "Need a title and an article body." }, { status: 400 });
   }
@@ -42,12 +44,21 @@ export async function POST(req: Request) {
     /* author id is optional — proceed without it */
   }
 
+  // Categories: the global Patrika Plus category + this desk's topical category
+  // (both from Admin → Category Mapping). Blanks are omitted.
+  const [ppSlug, deskSlug] = await Promise.all([
+    getPatrikaPlusSlug(),
+    magazine ? getCategorySlug(magazine) : Promise.resolve(null),
+  ]);
+  const category = [ppSlug, deskSlug].filter((s): s is string => Boolean(s));
+
   const result = await postToWordPress({
     title,
     content,
     short_description: short || undefined,
     slug: slug || undefined,
     author_id: authorId,
+    category: category.length ? category : undefined,
   });
   if (!result.ok) {
     return Response.json({ error: result.error, detail: result.data }, { status: result.status });
