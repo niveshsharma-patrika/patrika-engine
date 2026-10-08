@@ -12,11 +12,17 @@ export default async function EditorialArticlePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; start?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
   const { id } = await params;
-  const { date } = await searchParams;
-  return <EditorialArticle id={id} date={typeof date === "string" ? date : ""} />;
+  const { date, start } = await searchParams;
+  return (
+    <EditorialArticle
+      id={id}
+      date={typeof date === "string" ? date : ""}
+      start={typeof start === "string" ? start : ""}
+    />
+  );
 }

@@ -3,18 +3,19 @@
  *
  * The upstream returns { statusCode, status, data: { "<n>": item, ... } } for a
  * given date, paginated by `start` (note the param is spelled `lmit`). One call
- * caps at ~1000 items, a day can hold a few thousand, so we loop until a page
- * adds nothing new, de-duping by id. Responses are cached per-date in-process.
+ * caps at ~1000 items and a day can hold a few thousand.
  *
- * This feed is NOT wired to anything — it only powers the standalone viewer at
- * /editorial-feed (list + detail + filters).
+ * The viewer paginates: it asks for ONE page at a time (getFeedPage) for a fast
+ * first paint, then the client walks `nextStart` to stream the rest. Pages are
+ * cached in-process (bounded) so re-walks, the detail lookup, and repeat visits
+ * are cheap. NOT wired to anything else.
  */
 
 const FEED_BASE = "https://editorialreview.patrika.com/feed.html";
 const PAGE_LIMIT = 1000;
 const MAX_PAGES = 25; // backstop against a server that ignores `start`
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const CACHE_MAX_DATES = 16; // bound the in-process cache (one entry ≈ a few MB)
+const PAGE_CACHE_MAX = 48; // ≈ a handful of full days of pages
 
 /** One item exactly as the upstream sends it (fields we rely on). */
 export type FeedItemRaw = {
@@ -50,8 +51,8 @@ export type FeedDetailItem = FeedListItem & {
 
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-type Cached = { at: number; items: FeedItemRaw[] };
-const CACHE = new Map<string, Cached>();
+type CachedPage = { at: number; raw: FeedItemRaw[] };
+const PAGE_CACHE = new Map<string, CachedPage>();
 
 function s(v: unknown): string {
   return typeof v === "string" ? v.trim() : v == null ? "" : String(v).trim();
@@ -79,39 +80,24 @@ async function fetchPage(date: string, start: number): Promise<FeedItemRaw[]> {
   return Object.values(data as Record<string, FeedItemRaw>);
 }
 
-/** All raw items for a date, paginated + de-duped, cached in-process. */
-export async function fetchFeedForDate(date: string): Promise<FeedItemRaw[]> {
-  if (!DATE_RE.test(date)) throw new Error("Invalid date (expected YYYY-MM-DD)");
+/** One raw upstream page, cached in-process (bounded + TTL). */
+async function fetchPageCached(date: string, start: number): Promise<FeedItemRaw[]> {
+  const key = `${date}:${start}`;
+  const hit = PAGE_CACHE.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.raw;
 
-  const hit = CACHE.get(date);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.items;
-
-  const byId = new Map<string, FeedItemRaw>();
-  let start = 0;
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const batch = await fetchPage(date, start);
-    if (batch.length === 0) break;
-    const before = byId.size;
-    for (const it of batch) {
-      const id = s(it?.id);
-      if (id && !byId.has(id)) byId.set(id, it);
-    }
-    start += batch.length;
-    if (byId.size === before) break; // page added nothing new → done
-  }
-
-  const items = [...byId.values()];
+  const raw = await fetchPage(date, start);
 
   // Bound the cache: drop expired entries, then evict oldest over the cap.
   const now = Date.now();
-  for (const [k, v] of CACHE) if (now - v.at >= CACHE_TTL_MS) CACHE.delete(k);
-  while (CACHE.size >= CACHE_MAX_DATES) {
-    const oldest = CACHE.keys().next().value;
+  for (const [k, v] of PAGE_CACHE) if (now - v.at >= CACHE_TTL_MS) PAGE_CACHE.delete(k);
+  while (PAGE_CACHE.size >= PAGE_CACHE_MAX) {
+    const oldest = PAGE_CACHE.keys().next().value;
     if (oldest === undefined) break;
-    CACHE.delete(oldest);
+    PAGE_CACHE.delete(oldest);
   }
-  CACHE.set(date, { at: now, items });
-  return items;
+  PAGE_CACHE.set(key, { at: now, raw });
+  return raw;
 }
 
 function toListItem(it: FeedItemRaw): FeedListItem {
@@ -126,48 +112,62 @@ function toListItem(it: FeedItemRaw): FeedListItem {
   };
 }
 
-/** List payload for the viewer: light items (newest first) + filter facets. */
-export async function getFeedList(date: string): Promise<{
-  date: string;
-  count: number;
-  items: FeedListItem[];
-  desks: string[];
-  storyTypes: string[];
-}> {
-  const raw = await fetchFeedForDate(date);
-  const items = raw.map(toListItem).filter((i) => i.id);
-
-  // Newest first; items with a missing/unparseable pubDate sort to the bottom.
-  // (Mapping NaN → -Infinity keeps this a total order — returning 0 for NaN
-  // would be non-transitive and could mis-order the valid items too.)
-  items.sort((a, b) => {
-    const ta = Date.parse(a.pubDate);
-    const tb = Date.parse(b.pubDate);
-    const na = Number.isNaN(ta) ? -Infinity : ta;
-    const nb = Number.isNaN(tb) ? -Infinity : tb;
-    return nb - na;
-  });
-
-  const desks = [...new Set(items.map((i) => i.desk).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b)
-  );
-  const storyTypes = [...new Set(items.map((i) => i.storyType).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b)
-  );
-
-  return { date, count: items.length, items, desks, storyTypes };
+function toDetailItem(it: FeedItemRaw): FeedDetailItem {
+  return { ...toListItem(it), description: s(it.description), keyword: s(it.keyword) };
 }
 
-/** Full single item for the detail page, or null if the id isn't in that date. */
-export async function getFeedItem(date: string, id: string): Promise<FeedDetailItem | null> {
+/** One page of light list items (upstream order) plus the cursor for the next
+ *  page. `nextStart` is null once the feed is exhausted. The client de-dupes,
+ *  sorts, and builds facets across pages. */
+export async function getFeedPage(
+  date: string,
+  start: number
+): Promise<{ date: string; start: number; items: FeedListItem[]; nextStart: number | null }> {
+  if (!DATE_RE.test(date)) throw new Error("Invalid date (expected YYYY-MM-DD)");
+  const begin = Number.isInteger(start) && start >= 0 ? start : 0;
+  const raw = await fetchPageCached(date, begin);
+  const items = raw.map(toListItem).filter((i) => i.id);
+  const nextStart = raw.length > 0 ? begin + raw.length : null;
+  return { date, start: begin, items, nextStart };
+}
+
+/** Walk every page for a date (de-duped), used only by the detail fallback. */
+async function fetchAllRaw(date: string): Promise<FeedItemRaw[]> {
+  const byId = new Map<string, FeedItemRaw>();
+  let start = 0;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const batch = await fetchPageCached(date, start);
+    if (batch.length === 0) break;
+    const before = byId.size;
+    for (const it of batch) {
+      const id = s(it?.id);
+      if (id && !byId.has(id)) byId.set(id, it);
+    }
+    start += batch.length;
+    if (byId.size === before) break; // page added nothing new → done
+  }
+  return [...byId.values()];
+}
+
+/** Full single item for the detail page. `startHint` (the page the list loaded
+ *  it from) is tried first so a normal click fetches exactly one cached page;
+ *  otherwise we fall back to walking the day. Null if the id isn't found. */
+export async function getFeedItem(
+  date: string,
+  id: string,
+  startHint?: number
+): Promise<FeedDetailItem | null> {
+  if (!DATE_RE.test(date)) throw new Error("Invalid date (expected YYYY-MM-DD)");
   const wanted = s(id);
   if (!wanted) return null;
-  const raw = await fetchFeedForDate(date);
-  const it = raw.find((r) => s(r.id) === wanted);
-  if (!it) return null;
-  return {
-    ...toListItem(it),
-    description: s(it.description),
-    keyword: s(it.keyword),
-  };
+
+  if (startHint !== undefined && Number.isInteger(startHint) && startHint >= 0) {
+    const page = await fetchPageCached(date, startHint);
+    const hit = page.find((r) => s(r.id) === wanted);
+    if (hit) return toDetailItem(hit);
+  }
+
+  const all = await fetchAllRaw(date);
+  const it = all.find((r) => s(r.id) === wanted);
+  return it ? toDetailItem(it) : null;
 }

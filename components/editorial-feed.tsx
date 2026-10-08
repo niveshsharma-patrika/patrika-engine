@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Newspaper, Loader2, Search, AlertCircle, ImageOff } from "lucide-react";
 
@@ -14,17 +14,18 @@ type ListItem = {
   storyType: string;
   author: string;
   pubDate: string;
+  _start: number; // upstream page this item came from (for a fast detail lookup)
 };
 
-type FeedResponse = {
+type PageResponse = {
   date: string;
-  count: number;
-  items: ListItem[];
-  desks: string[];
-  storyTypes: string[];
+  start: number;
+  items: Omit<ListItem, "_start">[];
+  nextStart: number | null;
 };
 
-const PAGE_SIZE = 48;
+const PAGE_SIZE = 48; // client display window
+const MAX_WALK = 40; // hard stop mirroring the server's page backstop
 
 function timeLabel(pubDate: string): string {
   const t = Date.parse(pubDate);
@@ -37,8 +38,9 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
   const hi = lang === "hi";
 
   const [date, setDate] = useState(initialDate);
-  const [data, setData] = useState<FeedResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<ListItem[]>([]);
+  const [loading, setLoading] = useState(true); // first page
+  const [streaming, setStreaming] = useState(false); // later pages in flight
   const [error, setError] = useState<string | null>(null);
 
   const [desk, setDesk] = useState("");
@@ -46,33 +48,48 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE_SIZE);
 
-  // `hi` is intentionally NOT a dependency: it only localises the network-error
-  // message (handled at render via the "__net__" sentinel), so keeping it out
-  // stops a language toggle from refetching the whole feed.
-  const load = useCallback(async (d: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await fetch(`/api/editorial-feed?date=${encodeURIComponent(d)}`, { cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok) {
-        setError(j.error ?? "Failed to load");
-        setData(null);
-      } else {
-        // Reset filters + paging in the same commit as the new data so stale
-        // filters never apply to the new day for a frame.
-        setDesk(""); setStoryType(""); setQuery(""); setVisible(PAGE_SIZE);
-        setData(j as FeedResponse);
-      }
-    } catch {
-      setError("__net__");
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Each date load is a "run". Bumping the ref invalidates an in-flight walk so
+  // a slow previous day can't append its pages onto the new day.
+  const runRef = useRef(0);
 
-  useEffect(() => { load(date); }, [date, load]);
+  useEffect(() => {
+    const run = ++runRef.current;
+    setItems([]);
+    setError(null);
+    setLoading(true);
+    setStreaming(false);
+    setDesk(""); setStoryType(""); setQuery(""); setVisible(PAGE_SIZE);
+
+    (async () => {
+      const seen = new Set<string>();
+      const acc: ListItem[] = [];
+      let start: number | null = 0;
+      for (let page = 0; page < MAX_WALK && start !== null; page++) {
+        let res: PageResponse;
+        try {
+          const r = await fetch(`/api/editorial-feed?date=${encodeURIComponent(date)}&start=${start}`, { cache: "no-store" });
+          const j = await r.json();
+          if (runRef.current !== run) return; // a newer date took over
+          if (!r.ok) { setError(j.error ?? "Failed to load"); setLoading(false); setStreaming(false); return; }
+          res = j as PageResponse;
+        } catch {
+          if (runRef.current !== run) return;
+          setError("__net__"); setLoading(false); setStreaming(false); return;
+        }
+
+        let added = 0;
+        for (const it of res.items) {
+          if (it.id && !seen.has(it.id)) { seen.add(it.id); acc.push({ ...it, _start: res.start }); added++; }
+        }
+        if (page === 0) setLoading(false);
+        setItems([...acc]);
+
+        start = added > 0 ? res.nextStart : null; // stop if a page adds nothing new
+        setStreaming(start !== null);
+      }
+      if (runRef.current === run) setStreaming(false);
+    })();
+  }, [date]);
 
   // Keep the URL's ?date= in sync so returning from an article restores the day.
   useEffect(() => {
@@ -81,10 +98,18 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
     window.history.replaceState(null, "", url.toString());
   }, [date]);
 
+  const desks = useMemo(
+    () => [...new Set(items.map((i) => i.desk).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [items]
+  );
+  const storyTypes = useMemo(
+    () => [...new Set(items.map((i) => i.storyType).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [items]
+  );
+
   const filtered = useMemo(() => {
-    const items = data?.items ?? [];
     const q = query.trim().toLowerCase();
-    return items.filter((it) => {
+    const out = items.filter((it) => {
       if (desk && it.desk !== desk) return false;
       if (storyType && it.storyType !== storyType) return false;
       if (q) {
@@ -93,7 +118,14 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
       }
       return true;
     });
-  }, [data, desk, storyType, query]);
+    // Newest first; missing/unparseable pubDate sinks to the bottom (total order).
+    out.sort((a, b) => {
+      const ta = Date.parse(a.pubDate); const na = Number.isNaN(ta) ? -Infinity : ta;
+      const tb = Date.parse(b.pubDate); const nb = Number.isNaN(tb) ? -Infinity : tb;
+      return nb - na;
+    });
+    return out;
+  }, [items, desk, storyType, query]);
 
   const shown = filtered.slice(0, visible);
 
@@ -123,11 +155,11 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
         />
         <select value={desk} onChange={(e) => setDesk(e.target.value)} className={selectCls} aria-label={hi ? "डेस्क" : "Desk"}>
           <option value="">{hi ? "सभी डेस्क" : "All desks"}</option>
-          {(data?.desks ?? []).map((d) => <option key={d} value={d}>{d}</option>)}
+          {desks.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
         <select value={storyType} onChange={(e) => setStoryType(e.target.value)} className={selectCls} aria-label={hi ? "स्टोरी टाइप" : "Story type"}>
           <option value="">{hi ? "सभी स्टोरी टाइप" : "All story types"}</option>
-          {(data?.storyTypes ?? []).map((t) => <option key={t} value={t}>{t}</option>)}
+          {storyTypes.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         <div className="relative">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
@@ -138,10 +170,10 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
             className={`${selectCls} pl-8 w-[220px]`}
           />
         </div>
-        {!loading && data && (
-          <span className="text-[12px] text-[var(--text-3)] ml-auto">
+        {!loading && !error && (
+          <span className="text-[12px] text-[var(--text-3)] ml-auto flex items-center gap-1.5">
             {filtered.length.toLocaleString()} {hi ? "ख़बरें" : "stories"}
-            {filtered.length !== data.count && <> · {data.count.toLocaleString()} {hi ? "कुल" : "total"}</>}
+            {streaming && <Loader2 size={12} className="animate-spin" />}
           </span>
         )}
       </div>
@@ -164,7 +196,7 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
             {shown.map((it) => (
               <Link
                 key={it.id}
-                href={`/editorial-feed/${encodeURIComponent(it.id)}?date=${encodeURIComponent(date)}`}
+                href={`/editorial-feed/${encodeURIComponent(it.id)}?date=${encodeURIComponent(date)}&start=${it._start}`}
                 className="group bg-white border border-[var(--border)] rounded-xl overflow-hidden hover:border-[var(--purple)] hover:shadow-sm transition-colors flex flex-col"
               >
                 <FeedThumb src={it.img} alt={it.heading} />
@@ -182,7 +214,7 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
             ))}
           </div>
 
-          {visible < filtered.length && (
+          {visible < filtered.length ? (
             <div className="flex justify-center mt-6">
               <button
                 onClick={() => setVisible((v) => v + PAGE_SIZE)}
@@ -191,7 +223,11 @@ export function EditorialFeed({ initialDate }: { initialDate: string }) {
                 {hi ? "और दिखाएँ" : "Load more"} ({(filtered.length - visible).toLocaleString()})
               </button>
             </div>
-          )}
+          ) : streaming ? (
+            <div className="flex items-center gap-2 text-[12px] text-[var(--text-3)] justify-center mt-6">
+              <Loader2 size={13} className="animate-spin" /> {hi ? "और ख़बरें लोड हो रही हैं…" : "Loading more stories…"}
+            </div>
+          ) : null}
         </>
       )}
     </div>

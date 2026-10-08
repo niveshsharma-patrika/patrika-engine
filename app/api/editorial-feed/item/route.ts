@@ -14,9 +14,11 @@ export async function GET(req: Request) {
   const id = sp.get("id") ?? "";
   if (!DATE_RE.test(date)) return Response.json({ error: "Invalid date (YYYY-MM-DD)" }, { status: 400 });
   if (!id.trim()) return Response.json({ error: "Missing id" }, { status: 400 });
+  const startRaw = Number(sp.get("start"));
+  const startHint = Number.isInteger(startRaw) && startRaw >= 0 ? startRaw : undefined;
 
   try {
-    const item = await getFeedItem(date, id);
+    const item = await getFeedItem(date, id, startHint);
     if (!item) return Response.json({ error: "Not found" }, { status: 404 });
     return Response.json({ item });
   } catch (err) {

@@ -37,7 +37,7 @@ function fullTime(pubDate: string): string {
   });
 }
 
-export function EditorialArticle({ id, date }: { id: string; date: string }) {
+export function EditorialArticle({ id, date, start }: { id: string; date: string; start: string }) {
   const { lang } = useLang();
   const hi = lang === "hi";
   const router = useRouter();
@@ -54,7 +54,7 @@ export function EditorialArticle({ id, date }: { id: string; date: string }) {
       setError(null);
       try {
         const r = await fetch(
-          `/api/editorial-feed/item?date=${encodeURIComponent(date)}&id=${encodeURIComponent(id)}`,
+          `/api/editorial-feed/item?date=${encodeURIComponent(date)}&id=${encodeURIComponent(id)}${start ? `&start=${encodeURIComponent(start)}` : ""}`,
           { cache: "no-store" }
         );
         const j = await r.json();
@@ -68,7 +68,7 @@ export function EditorialArticle({ id, date }: { id: string; date: string }) {
       }
     })();
     return () => { alive = false; };
-  }, [id, date, hi]);
+  }, [id, date, start, hi]);
 
   const backHref = `/editorial-feed${date ? `?date=${encodeURIComponent(date)}` : ""}`;
   const keywords = item?.keyword ? item.keyword.split(/[,;]/).map((k) => k.trim()).filter(Boolean) : [];
