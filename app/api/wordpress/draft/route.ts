@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   // category (both from Admin → Category Mapping), plus the fixed "patrikaplus"
   // umbrella category sent on EVERY Patrika+ post. Order: desk PP, desk global,
   // umbrella; per-desk blanks are omitted, the umbrella is always included.
-  const PATRIKA_PLUS_UMBRELLA = "patrika-plus";
+  const PATRIKA_PLUS_UMBRELLA = "patrikaplus";
   const { slug: globalSlug, ppSlug } = magazine
     ? await getDeskCategories(magazine)
     : { slug: "", ppSlug: "" };
