@@ -2,6 +2,7 @@ import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { bodyToHtml, englishSlug, postToWordPress } from "@/lib/wordpress";
 import { getDeskCategories } from "@/lib/cms-categories";
+import { logWordPressPayload } from "@/lib/wordpress-log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
@@ -54,24 +55,43 @@ export async function POST(req: Request) {
     : { slug: "", ppSlug: "" };
   const category = [ppSlug, globalSlug, PATRIKA_PLUS_UMBRELLA].filter((s) => Boolean(s));
 
-  const result = await postToWordPress({
+  const post = {
     title,
     content,
     short_description: short || undefined,
     slug: slug || undefined,
     author_id: authorId,
     category: category.length ? category : undefined,
-  });
-  if (!result.ok) {
-    return Response.json({ error: result.error, detail: result.data }, { status: result.status });
-  }
+  };
+  const result = await postToWordPress(post);
+
   // Surface the created post's id / link if the plugin returned them.
   const d = result.data as { id?: number; link?: string; edit_link?: string } | Array<{ id?: number; link?: string }> | null;
   const first = Array.isArray(d) ? d[0] : d;
-  return Response.json({
-    ok: true,
-    id: first?.id ?? null,
-    link: (first as { link?: string; edit_link?: string } | null)?.link ?? (first as { edit_link?: string } | null)?.edit_link ?? null,
-    data: result.data,
+  const wpPostId = typeof first?.id === "number" ? first.id : null;
+  const wpLink =
+    (first as { link?: string; edit_link?: string } | null)?.link ??
+    (first as { edit_link?: string } | null)?.edit_link ??
+    null;
+
+  // Audit log of the exact payload sent (Admin → WordPress Payloads). Best-effort.
+  await logWordPressPayload({
+    userId: session.userId,
+    userName: session.name,
+    userEmail: session.email,
+    magazine,
+    title,
+    categories: category,
+    payload: post,
+    ok: result.ok,
+    status: result.status,
+    wpPostId,
+    wpLink,
+    error: result.ok ? null : result.error ?? null,
   });
+
+  if (!result.ok) {
+    return Response.json({ error: result.error, detail: result.data }, { status: result.status });
+  }
+  return Response.json({ ok: true, id: wpPostId, link: wpLink, data: result.data });
 }
