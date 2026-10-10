@@ -44,12 +44,15 @@ export async function POST(req: Request) {
     /* author id is optional — proceed without it */
   }
 
-  // Categories: this desk's Patrika Plus category + its global category (both
-  // from Admin → Category Mapping). Patrika Plus first; blanks are omitted.
+  // Categories (Patrika+ only): this desk's Patrika Plus category + its global
+  // category (both from Admin → Category Mapping), plus the fixed "patrikaplus"
+  // umbrella category sent on EVERY Patrika+ post. Order: desk PP, desk global,
+  // umbrella; per-desk blanks are omitted, the umbrella is always included.
+  const PATRIKA_PLUS_UMBRELLA = "patrikaplus";
   const { slug: globalSlug, ppSlug } = magazine
     ? await getDeskCategories(magazine)
     : { slug: "", ppSlug: "" };
-  const category = [ppSlug, globalSlug].filter((s) => Boolean(s));
+  const category = [ppSlug, globalSlug, PATRIKA_PLUS_UMBRELLA].filter((s) => Boolean(s));
 
   const result = await postToWordPress({
     title,
