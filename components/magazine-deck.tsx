@@ -43,6 +43,7 @@ export function MagazineDeck({
     setIdeas([]);
     setIdeasErr(null);
     setQuestion("");
+    setCustomTopic("");
   }
 
   function openComposer(seed: string) {
@@ -260,6 +261,42 @@ export function MagazineDeck({
             <PenSquare size={13} />
             {lang === "hi" ? "आर्टिकल बनाएँ" : "Generate article"}
           </button>
+        </section>
+      )}
+
+      {/* Write your own topic for THIS desk — same pipeline + this desk's
+          categories (unlike the standalone "Your Topic" desk). Patrika+ only. */}
+      {mag.key !== "custom" && group === "patrika" && (
+        <section className="mb-6 border border-[var(--border)] rounded-xl bg-white p-4 max-w-2xl">
+          <h2 className="text-[14px] font-semibold flex items-center gap-1.5 mb-1">
+            <PenSquare size={15} className="text-[var(--text-2)]" />
+            {lang === "hi" ? "अपना विषय लिखें" : "Write your own topic"}
+          </h2>
+          <p className="text-[11.5px] text-[var(--text-3)] mb-3">
+            {lang === "hi"
+              ? `इस डेस्क (${mag.nameHi}) के लिए अपना विषय लिखें — वही रिसर्च/फैक्ट-चेक पाइपलाइन चलेगी और लेख इसी डेस्क की कैटेगरी में जाएगा।`
+              : `Type your own topic for this desk (${mag.nameEn}) — same research/fact-check pipeline, and the article is filed under this desk's categories.`}
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={customTopic}
+              onChange={(e) => setCustomTopic(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && customTopic.trim()) openComposer(customTopic); }}
+              maxLength={280}
+              placeholder={lang === "hi"
+                ? "जैसे: शहर में बढ़ते ट्रैफिक जाम की असली वजह और समाधान"
+                : "e.g. The real cause of the city's rising traffic jams — and the fix"}
+              className="flex-1 bg-white border border-[var(--border)] text-[13px] px-3 py-2 rounded-lg outline-none focus:border-[var(--red)]"
+            />
+            <button
+              onClick={() => openComposer(customTopic)}
+              disabled={!customTopic.trim()}
+              className="shrink-0 bg-[var(--red)] hover:bg-[var(--red-hover)] disabled:opacity-40 text-white text-[13px] font-medium px-4 py-2 rounded-lg flex items-center gap-1.5"
+            >
+              <PenSquare size={13} />
+              {lang === "hi" ? "आर्टिकल बनाएँ" : "Generate article"}
+            </button>
+          </div>
         </section>
       )}
 
