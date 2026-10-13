@@ -52,7 +52,8 @@ export function buildSignPayload(forDate: string, entry: HoroscopeEntry): unknow
     type: "rashifal",
     category: signSlug(entry.sign),
     date: forDate,
-    lang: entry.lang,
+    // The endpoint wants the full language word ("hindi"/"english"), not hi/en.
+    lang: en ? "english" : "hindi",
     status: "publish",
     title,
     content: "",
