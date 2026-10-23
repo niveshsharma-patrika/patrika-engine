@@ -54,6 +54,15 @@ export default async function RootLayout({
     redirect("/locked");
   }
 
+  // Hard surface split by LIVE edition (both sides read getSession, so they can
+  // never disagree → no redirect loop, and an edition change applies at once).
+  // Print-edition users live only under /print/*; the print layout bounces
+  // digital users the other way.
+  const onPrintSurface = pathname === "/print" || pathname.startsWith("/print/");
+  if (session && session.edition === "print" && !confined && pathname && pathname !== "/login" && !onPrintSurface) {
+    redirect("/print");
+  }
+
   // Feature visibility (Admin → Features): the sidebar is filtered by these, and
   // a disabled / role-restricted page is blocked on direct access. Enforcement is
   // scoped to the digital surface (print edition is already constrained by the
@@ -62,7 +71,7 @@ export default async function RootLayout({
   const flags = session ? await resolveFeatureFlags() : null;
   if (session && !confined && pathname && pathname !== "/login") {
     const feature = featureForPath(pathname);
-    const safeHome = session.edition === "print" ? "/today" : "/";
+    const safeHome = session.edition === "print" ? "/print" : "/";
     if (feature && feature.href !== safeHome && !canAccessFeature(flags?.[feature.key], feature, session.role, session.edition)) {
       redirect(safeHome);
     }

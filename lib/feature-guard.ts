@@ -25,7 +25,7 @@ export async function requireFeatureAccess(): Promise<void> {
   const feature = featureForPath(pathname);
   if (!feature) return;
 
-  const safeHome = session.edition === "print" ? "/today" : "/";
+  const safeHome = session.edition === "print" ? "/print" : "/";
   if (feature.href === safeHome) return; // always-reachable landing — no loop
 
   const flags = await resolveFeatureFlags();

@@ -119,13 +119,14 @@ export function Shell({ children, edition, role, flags }: { children: React.Reac
     if (confined || !flags) return;
     const f = featureForPath(pathname);
     if (!f) return;
-    const home = edition === "print" ? "/today" : "/";
+    const home = edition === "print" ? "/print" : "/";
     if (f.href === home) return;
     if (!canAccessFeature(flags[f.key], f, role, edition)) router.replace(home);
   }, [pathname, flags, role, edition, confined, router]);
 
-  // Standalone pages render with no masthead / sidebar chrome: the login page.
-  if (pathname === "/login") {
+  // Standalone surfaces render with no digital chrome: the login page, and the
+  // dedicated print desk (which supplies its own shell via app/print/layout).
+  if (pathname === "/login" || pathname === "/print" || pathname.startsWith("/print/")) {
     return <>{children}</>;
   }
 
