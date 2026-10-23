@@ -1,3 +1,4 @@
+import { requireFeatureAccess } from "@/lib/feature-guard";
 import { SourceTable, type SourceRow } from "@/components/source-table";
 import { SocialSources } from "@/components/social-sources";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -46,6 +47,7 @@ async function loadSignalCounts(
 }
 
 export default async function SourcesPage() {
+  await requireFeatureAccess();
   const sources = await loadSources();
   const counts = await loadSignalCounts(sources.map((s) => s.id));
 

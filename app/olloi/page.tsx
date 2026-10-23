@@ -1,9 +1,11 @@
+import { requireFeatureAccess } from "@/lib/feature-guard";
 import { MagazineDeck } from "@/components/magazine-deck";
 
 /** Olloi Content — health/support content for the Saath community app. Same
  * research → verify → trusted-source pipeline as Patrika+, tuned for sensitive
  * medical topics (first desk: Cancer Care). */
-export default function OlloiPage() {
+export default async function OlloiPage() {
+  await requireFeatureAccess();
   return (
     <MagazineDeck
       group="olloi"

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth/session";
+import { requireFeatureAccess } from "@/lib/feature-guard";
 import { EditorialArticle } from "@/components/editorial-article";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export default async function EditorialArticlePage({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
+  await requireFeatureAccess();
   const { id } = await params;
   const { date, start } = await searchParams;
   return (

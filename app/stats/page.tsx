@@ -1,3 +1,4 @@
+import { requireFeatureAccess } from "@/lib/feature-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -140,6 +141,7 @@ async function loadSourceStats(): Promise<SourceStat[]> {
 }
 
 export default async function StatsPage() {
+  await requireFeatureAccess();
   const [counters, runs, sourceStats] = await Promise.all([
     loadCounters(),
     loadRecentRuns(),

@@ -1,6 +1,8 @@
+import { requireFeatureAccess } from "@/lib/feature-guard";
 import { MagazineDeck } from "@/components/magazine-deck";
 
-export default function MagazinesPage() {
+export default async function MagazinesPage() {
+  await requireFeatureAccess();
   return (
     <MagazineDeck
       group="patrika"

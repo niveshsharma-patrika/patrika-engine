@@ -7,6 +7,8 @@ import { LangProvider } from "@/lib/i18n/context";
 import { Shell } from "@/components/shell";
 import { getSession } from "@/lib/auth/session";
 import { confinedFor } from "@/lib/auth/confined";
+import { resolveFeatureFlags, canAccessFeature } from "@/lib/feature-flags";
+import { featureForPath } from "@/lib/features";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -52,6 +54,20 @@ export default async function RootLayout({
     redirect("/locked");
   }
 
+  // Feature visibility (Admin → Features): the sidebar is filtered by these, and
+  // a disabled / role-restricted page is blocked on direct access. Enforcement is
+  // scoped to the digital surface (print edition is already constrained by the
+  // middleware), and the dashboard "/" is never blocked so there's no redirect
+  // loop. Admins always keep the Features page (isProtected).
+  const flags = session ? await resolveFeatureFlags() : null;
+  if (session && !confined && pathname && pathname !== "/login") {
+    const feature = featureForPath(pathname);
+    const safeHome = session.edition === "print" ? "/today" : "/";
+    if (feature && feature.href !== safeHome && !canAccessFeature(flags?.[feature.key], feature, session.role, session.edition)) {
+      redirect(safeHome);
+    }
+  }
+
   return (
     <html
       lang="en"
@@ -59,7 +75,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full antialiased">
         <LangProvider>
-          <Shell edition={session?.edition ?? "digital"} role={session?.role ?? "writer"}>
+          <Shell edition={session?.edition ?? "digital"} role={session?.role ?? "writer"} flags={flags ?? undefined}>
             {children}
           </Shell>
         </LangProvider>

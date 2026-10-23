@@ -28,6 +28,7 @@ export const DICT = {
   navQuickBytes:      { en: "Quick Bytes",      hi: "क्विक बाइट्स" },
   navCategoryMapping: { en: "Category Mapping", hi: "कैटेगरी मैपिंग" },
   navWpPayloads:      { en: "WordPress Payloads", hi: "वर्डप्रेस पेलोड" },
+  navFeatures:        { en: "Features",         hi: "फ़ीचर कंट्रोल" },
   navContentGenerator: { en: "Content Generator", hi: "कंटेंट जनरेटर" },
   navOlloi:            { en: "Olloi Content",    hi: "Olloi कंटेंट" },
   navHoroscope:        { en: "Horoscopes",       hi: "राशिफल" },

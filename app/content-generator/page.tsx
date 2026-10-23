@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth/session";
+import { requireFeatureAccess } from "@/lib/feature-guard";
 import { ContentGenerator } from "@/components/content-generator";
 
 export const dynamic = "force-dynamic";
@@ -11,5 +12,6 @@ export const dynamic = "force-dynamic";
 export default async function ContentGeneratorPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  await requireFeatureAccess();
   return <ContentGenerator />;
 }
