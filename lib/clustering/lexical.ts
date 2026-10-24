@@ -338,16 +338,18 @@ export function inferCategory(input: SignalInput): string {
   const source = input.publisher.toLowerCase();
   const text = `${input.section || ""} ${input.title} ${input.keywords.join(" ")}`.toLowerCase();
   const combined = `${source} ${text}`;
-  if (/\b(espn|sportstar|cricket|ipl|bcci|sports?|football|hockey|kabaddi|tennis|match|t20|odi)\b/.test(combined)) return "sports";
-  if (/\b(bollywood|film|cinema|ott|actor|actress|movie|entertainment|celebrity|celeb|trailer|box office|reality show|television)\b/.test(text)) return "entertainment";
-  if (/\b(exam|school|college|university|education|neet|jee|cbse|result|admission|nta|paper leak)\b/.test(text)) return "education";
-  if (/\b(health|healthcare|hospital|doctor|medicine|medical|covid|disease|vaccine|virus|outbreak|screening|insurance)\b/.test(text)) return "health";
-  if (/\b(court|supreme court|high court|chief justice|judge|legal|law|plea|petition|bail)\b/.test(text)) return "courts";
-  if (/\b(crime|murder|police|arrest|rape|fraud|probe|investigation|fir|ed|cbi|racket)\b/.test(text)) return "crime";
-  if (/\b(election|bjp|congress|aap|tmc|dmk|parliament|minister|modi|rahul|politics|political|government|govt|cm|pm)\b/.test(text)) return "politics";
-  if (/\b(world|global|africa|trump|china|usa|russia|pakistan|israel|iran|ukraine|gaza|nepal|bangladesh|sri lanka)\b/.test(text)) return "world";
-  if (/\b(technology|startup|startups|artificial intelligence|telecom|iphone|android|smartphone|snapdragon|samsung|pixel|laptop|gadget|cyber|isro)\b/.test(text)) return "technology";
-  if (/\b(moneycontrol|economic times|business standard|mint|cnbc|financial express|business today|forbes|market|markets|sensex|nifty|stock|rupee|rbi|sebi|ipo|revenue|profit|bank|banking|economy|gdp|shares?)\b/.test(combined)) return "business";
+  // English keyword groups use \b word boundaries; Hindi (Devanagari) alternatives
+  // are matched as substrings (no \b in Devanagari) so Hindi copy classifies too.
+  if (/\b(espn|sportstar|cricket|ipl|bcci|sports?|football|hockey|kabaddi|tennis|match|t20|odi)\b|क्रिकेट|फुटबॉल|हॉकी|कबड्डी|खिलाड़ी|ओलंपिक|टूर्नामेंट|टीम इंडिया/.test(combined)) return "sports";
+  if (/\b(bollywood|film|cinema|ott|actor|actress|movie|entertainment|celebrity|celeb|trailer|box office|reality show|television)\b|बॉलीवुड|फिल्म|सिनेमा|अभिनेता|अभिनेत्री|गाना|सीरियल|वेब ?सीरीज|मनोरंजन/.test(text)) return "entertainment";
+  if (/\b(exam|school|college|university|education|neet|jee|cbse|result|admission|nta|paper leak)\b|परीक्षा|स्कूल|कॉलेज|विश्वविद्यालय|शिक्षा|रिजल्ट|परिणाम|दाखिला|प्रवेश|पेपर लीक/.test(text)) return "education";
+  if (/\b(health|healthcare|hospital|doctor|medicine|medical|covid|disease|vaccine|virus|outbreak|screening|insurance)\b|स्वास्थ्य|अस्पताल|डॉक्टर|बीमारी|दवा|कोरोना|वैक्सीन|मरीज|इलाज|संक्रमण/.test(text)) return "health";
+  if (/\b(court|supreme court|high court|chief justice|judge|legal|law|plea|petition|bail)\b|अदालत|कोर्ट|सुप्रीम कोर्ट|हाईकोर्ट|न्यायालय|न्यायाधीश|याचिका|जमानत|फैसला|सुनवाई/.test(text)) return "courts";
+  if (/\b(crime|murder|police|arrest|rape|fraud|probe|investigation|fir|ed|cbi|racket)\b|अपराध|पुलिस|गिरफ्तार|हत्या|मर्डर|चोरी|लूट|डकैती|दुष्कर्म|बलात्कार|रेप|ठगी|धोखाधड़ी|एफआईआर|सीबीआई|रिश्वत|तस्करी|हमला/.test(text)) return "crime";
+  if (/\b(election|bjp|congress|aap|tmc|dmk|parliament|minister|modi|rahul|politics|political|government|govt|cm|pm)\b|चुनाव|भाजपा|बीजेपी|कांग्रेस|सरकार|मंत्री|मोदी|राहुल|विधायक|सांसद|मुख्यमंत्री|सीएम|पीएम|संसद|विधानसभा|राजनीति|नेता/.test(text)) return "politics";
+  if (/\b(world|global|africa|trump|china|usa|russia|pakistan|israel|iran|ukraine|gaza|nepal|bangladesh|sri lanka)\b|दुनिया|वैश्विक|पाकिस्तान|चीन|अमेरिका|रूस|इजराइल|ईरान|यूक्रेन|नेपाल|बांग्लादेश|श्रीलंका|विश्व/.test(text)) return "world";
+  if (/\b(technology|startup|startups|artificial intelligence|telecom|iphone|android|smartphone|snapdragon|samsung|pixel|laptop|gadget|cyber|isro)\b|तकनीक|स्मार्टफोन|मोबाइल|इंटरनेट|एआई|साइबर|इसरो|गैजेट|सॉफ्टवेयर/.test(text)) return "technology";
+  if (/\b(moneycontrol|economic times|business standard|mint|cnbc|financial express|business today|forbes|market|markets|sensex|nifty|stock|rupee|rbi|sebi|ipo|revenue|profit|bank|banking|economy|gdp|shares?)\b|बाजार|सेंसेक्स|निफ्टी|शेयर|रुपया|बैंक|अर्थव्यवस्था|कारोबार|व्यापार|जीएसटी|महंगाई|निवेश/.test(combined)) return "business";
   return "national";
 }
 

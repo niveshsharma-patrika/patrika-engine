@@ -1,25 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Search, PenSquare, ExternalLink, MapPin, Clock } from "lucide-react";
+import { Loader2, Search, PenSquare, ExternalLink, MapPin, Clock, Globe2, Building2 } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
+import { CITY_HI } from "@/lib/geo/cities";
 
 type Story = {
-  id: string; title: string; snippet: string; url: string;
-  source_name: string; focus: string; desk: string | null;
-  location: string; category: string; image: string | null; published_at: string; sourceCount: number;
+  id: string; title: string; titleHi: string; snippet: string; url: string | null; image: string | null;
+  city: string; category: string; source: string; scope: string; published_at: string; sourceCount: number;
 };
-type Facets = { items: Story[]; sources: { id: string; name: string; focus: string }[]; locations: string[]; categories: string[] };
+type Data = { items: Story[]; cities: string[]; categories: string[] };
 
-const HOURS = [
-  { v: 24, en: "24h", hi: "24घं" },
-  { v: 48, en: "48h", hi: "48घं" },
-  { v: 168, en: "7 days", hi: "7 दिन" },
-];
-
-/** Classifier category → display label. */
 const CAT: Record<string, { en: string; hi: string }> = {
   crime: { en: "Crime", hi: "अपराध" },
   politics: { en: "Politics / Govt", hi: "राजनीति / सरकार" },
@@ -34,6 +27,7 @@ const CAT: Record<string, { en: string; hi: string }> = {
   technology: { en: "Tech", hi: "टेक" },
 };
 const catLabel = (k: string, hi: boolean) => (CAT[k] ? (hi ? CAT[k].hi : CAT[k].en) : k);
+const cityLabel = (c: string, hi: boolean) => (hi && CITY_HI[c] ? CITY_HI[c] : c);
 
 function timeLabel(ts: string, hi: boolean): string {
   const t = Date.parse(ts);
@@ -45,19 +39,16 @@ function timeLabel(ts: string, hi: boolean): string {
   return new Date(t).toLocaleDateString([], { day: "numeric", month: "short" });
 }
 
-export function LocalStories() {
+export function PrintStories() {
   const { lang } = useLang();
   const hi = lang === "hi";
   const router = useRouter();
 
-  const [source, setSource] = useState("");
-  const [local, setLocal] = useState(false);
-  const [location, setLocation] = useState("");
+  const [scope, setScope] = useState<"national" | "local">("national");
+  const [city, setCity] = useState("");
   const [category, setCategory] = useState("");
-  const [hours, setHours] = useState(24);
   const [q, setQ] = useState("");
-
-  const [data, setData] = useState<Facets | null>(null);
+  const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const runRef = useRef(0);
 
@@ -65,97 +56,92 @@ export function LocalStories() {
     const run = ++runRef.current;
     setLoading(true);
     try {
-      const p = new URLSearchParams({ hours: String(hours) });
-      if (source) p.set("source", source);
-      if (local) p.set("local", "1");
-      if (location) p.set("location", location);
+      const p = new URLSearchParams({ scope, hours: "48" });
+      if (city) p.set("city", city);
       if (category) p.set("category", category);
-      const r = await fetch(`/api/print/local-stories?${p.toString()}`, { cache: "no-store" });
+      if (q.trim()) p.set("q", q.trim());
+      const r = await fetch(`/api/print/stories?${p.toString()}`, { cache: "no-store" });
       const j = await r.json();
-      if (runRef.current !== run) return; // a newer filter change superseded this
-      setData(r.ok ? j : { items: [], sources: j.sources ?? [], locations: j.locations ?? [], categories: j.categories ?? [] });
+      if (runRef.current !== run) return;
+      setData(r.ok ? j : { items: [], cities: [], categories: [] });
     } catch {
-      if (runRef.current === run) setData({ items: [], sources: [], locations: [], categories: [] });
+      if (runRef.current === run) setData({ items: [], cities: [], categories: [] });
     } finally {
       if (runRef.current === run) setLoading(false);
     }
-  }, [source, local, location, category, hours]);
+  }, [scope, city, category, q]);
   useEffect(() => { load(); }, [load]);
+  // Reset filters when the scope changes.
+  useEffect(() => { setCity(""); setCategory(""); setQ(""); }, [scope]);
 
-  const shown = useMemo(() => {
-    const items = data?.items ?? [];
-    const query = q.trim().toLowerCase();
-    const list = query ? items.filter((s) => `${s.title} ${s.snippet} ${s.source_name}`.toLowerCase().includes(query)) : items;
-    return [...list].sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
-  }, [data, q]);
+  function write(s: Story) {
+    const title = hi ? s.titleHi || s.title : s.title;
+    const p = new URLSearchParams({ title });
+    if (s.snippet) p.set("summary", s.snippet);
+    if (s.url) p.set("url", s.url);
+    router.push(`/print/write?${p.toString()}`);
+  }
 
   const selectCls = "bg-white border border-[var(--border)] text-[13px] px-2.5 py-1.5 rounded outline-none focus:border-[var(--red)]";
+  const items = data?.items ?? [];
 
   return (
     <div className="p-6">
-      <h1 className="text-[22px] font-medium mb-1">{hi ? "लोकल ख़बरें" : "Local Stories"}</h1>
+      <h1 className="text-[22px] font-medium mb-1">{hi ? "स्टोरीज़" : "Stories"}</h1>
       <p className="text-[13px] text-[var(--text-3)] mb-4">
-        {hi ? "लाइव सोर्स से ख़बरें — सोर्स, कैटेगरी और समय से छाँटें। किसी पर 'लिखें' दबाकर स्टोरी तैयार करें।" : "Stories from live sources — filter by source, category and time. Hit 'Write' on any to draft it."}
+        {hi ? "राष्ट्रीय और लोकल ख़बरें — शहर और कैटेगरी से छाँटें। किसी पर 'लिखें' दबाकर रिसर्च के साथ स्टोरी तैयार करें।" : "National + local stories — filter by city and category. Hit 'Write' on any to research + draft it."}
       </p>
 
+      {/* Scope + filters */}
       <div className="flex flex-wrap items-center gap-2.5 mb-4">
-        <select value={source} onChange={(e) => setSource(e.target.value)} className={selectCls} aria-label={hi ? "सोर्स" : "Source"}>
-          <option value="">{hi ? "सभी सोर्स" : "All sources"}</option>
-          {(data?.sources ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        <div className="flex items-center gap-1 bg-white border border-[var(--border)] rounded-lg p-0.5">
+          {([["national", Globe2, hi ? "राष्ट्रीय" : "National"], ["local", Building2, hi ? "लोकल" : "Local"]] as const).map(([k, Icon, label]) => (
+            <button key={k} onClick={() => setScope(k)}
+              className={`text-[13px] font-medium px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 transition-colors ${scope === k ? "bg-[var(--red)] text-white" : "text-[var(--text-2)] hover:bg-[var(--surface-2)]"}`}>
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+        </div>
+        <select value={city} onChange={(e) => setCity(e.target.value)} className={selectCls} aria-label={hi ? "शहर" : "City"}>
+          <option value="">{hi ? "सभी शहर" : "All cities"}</option>
+          {(data?.cities ?? []).map((c) => <option key={c} value={c}>{cityLabel(c, hi)}</option>)}
         </select>
         <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectCls} aria-label={hi ? "कैटेगरी" : "Category"}>
           <option value="">{hi ? "सभी कैटेगरी" : "All categories"}</option>
           {(data?.categories ?? []).map((c) => <option key={c} value={c}>{catLabel(c, hi)}</option>)}
         </select>
-        <select value={location} onChange={(e) => setLocation(e.target.value)} className={selectCls} aria-label={hi ? "लोकेशन" : "Location"}>
-          <option value="">{hi ? "सभी लोकेशन" : "All locations"}</option>
-          {(data?.locations ?? []).map((l) => <option key={l} value={l}>{l}</option>)}
-        </select>
-        <div className="flex items-center gap-1">
-          {HOURS.map((h) => (
-            <button key={h.v} onClick={() => setHours(h.v)}
-              className={`text-[12px] font-medium px-2.5 py-1.5 rounded border transition-colors ${hours === h.v ? "bg-[var(--surface-2)] border-[var(--red)] text-[var(--text)]" : "bg-white border-[var(--border)] text-[var(--text-3)] hover:border-[var(--red)]"}`}>
-              {hi ? h.hi : h.en}
-            </button>
-          ))}
-        </div>
-        <button onClick={() => setLocal((v) => !v)}
-          className={`text-[12px] font-medium px-2.5 py-1.5 rounded border inline-flex items-center gap-1 transition-colors ${local ? "bg-[var(--red-soft)] border-[var(--red)] text-[var(--red)]" : "bg-white border-[var(--border)] text-[var(--text-3)] hover:border-[var(--red)]"}`}
-          title={hi ? "केवल क्षेत्रीय (रीजनल) सोर्स" : "Regional-focus sources only"}>
-          <MapPin size={12} /> {hi ? "लोकल" : "Local"}
-        </button>
         <div className="relative">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={hi ? "खोजें…" : "Search…"} className={`${selectCls} pl-8 w-[200px]`} />
         </div>
-        {!loading && <span className="text-[12px] text-[var(--text-3)] ml-auto">{shown.length} {hi ? "ख़बरें" : "stories"}</span>}
+        {!loading && <span className="text-[12px] text-[var(--text-3)] ml-auto">{items.length} {hi ? "ख़बरें" : "stories"}</span>}
       </div>
 
       {loading ? (
         <div className="flex items-center gap-2 text-[13px] text-[var(--text-3)] py-16 justify-center"><Loader2 size={16} className="animate-spin" /> {hi ? "लोड हो रहा है…" : "Loading…"}</div>
-      ) : shown.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="text-[13px] text-[var(--text-3)] py-16 text-center">{hi ? "इन फ़िल्टर के लिए कोई ख़बर नहीं मिली।" : "No stories for these filters."}</div>
       ) : (
         <ul className="space-y-2">
-          {shown.map((s) => (
+          {items.map((s) => (
             <li key={s.id} className="bg-white border border-[var(--border)] rounded-lg p-3 flex items-start gap-3">
               {s.image && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={s.image} alt="" loading="lazy" className="w-20 h-20 object-cover rounded shrink-0 bg-[var(--surface-2)]" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               )}
               <div className="flex-1 min-w-0">
-                <div className="text-[14px] font-medium text-[var(--text)] leading-snug">{s.title}</div>
+                <div className="text-[14px] font-medium text-[var(--text)] leading-snug">{hi ? s.titleHi || s.title : s.title}</div>
                 {s.snippet && <div className="text-[12px] text-[var(--text-2)] mt-1 leading-snug line-clamp-2">{s.snippet}</div>}
                 <div className="flex items-center gap-2 mt-1.5 text-[11px] text-[var(--text-3)] flex-wrap">
-                  <span className="font-medium text-[var(--text-2)]">{s.source_name}</span>
                   {s.category && <span className="bg-[var(--red-soft)] text-[var(--red)] px-1.5 py-0.5 rounded font-medium">{catLabel(s.category, hi)}</span>}
-                  {s.location && <span className="inline-flex items-center gap-0.5 text-[var(--text-2)]"><MapPin size={10} /> {s.location}</span>}
+                  {s.city && <span className="inline-flex items-center gap-0.5 text-[var(--text-2)]"><MapPin size={10} /> {cityLabel(s.city, hi)}</span>}
+                  {s.source && <span className="font-medium text-[var(--text-2)]">{s.source}</span>}
                   {s.sourceCount > 1 && <span>×{s.sourceCount} {hi ? "सोर्स" : "sources"}</span>}
                   <span className="inline-flex items-center gap-1"><Clock size={10} /> {timeLabel(s.published_at, hi)}</span>
                   {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[var(--text-3)] hover:text-[var(--red)]"><ExternalLink size={10} /> {hi ? "मूल" : "original"}</a>}
                 </div>
               </div>
-              <button onClick={() => router.push(`/print/write?title=${encodeURIComponent(s.title)}`)}
+              <button onClick={() => write(s)}
                 className="shrink-0 self-center bg-[var(--red)] hover:bg-[var(--red-hover)] text-white text-[12px] font-medium px-3 py-1.5 rounded flex items-center gap-1.5">
                 <PenSquare size={12} /> {hi ? "लिखें" : "Write"}
               </button>

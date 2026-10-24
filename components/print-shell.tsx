@@ -2,18 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Newspaper, Telescope, PenSquare, FileText, Languages, LogOut } from "lucide-react";
+import { Newspaper, Telescope, PenSquare, FileText, Languages, LogOut } from "lucide-react";
 
 import { useLang } from "@/lib/i18n/context";
 
 type Item = { href: string; icon: React.ReactNode; en: string; hi: string };
 
 const NAV: Item[] = [
-  { href: "/print",          icon: <LayoutGrid size={16} />, en: "Dashboard",     hi: "डैशबोर्ड" },
-  { href: "/print/stories",  icon: <Newspaper size={16} />,  en: "Local Stories", hi: "लोकल ख़बरें" },
-  { href: "/print/research", icon: <Telescope size={16} />,  en: "Research",      hi: "रिसर्च" },
-  { href: "/print/write",    icon: <PenSquare size={16} />,  en: "Write",         hi: "लिखें" },
-  { href: "/print/drafts",   icon: <FileText size={16} />,   en: "My Drafts",     hi: "मेरे ड्राफ़्ट" },
+  { href: "/print",          icon: <Newspaper size={16} />,  en: "Stories",   hi: "स्टोरीज़" },
+  { href: "/print/research", icon: <Telescope size={16} />,  en: "Research",  hi: "रिसर्च" },
+  { href: "/print/write",    icon: <PenSquare size={16} />,  en: "Write",     hi: "लिखें" },
+  { href: "/print/drafts",   icon: <FileText size={16} />,   en: "My Drafts", hi: "मेरे ड्राफ़्ट" },
 ];
 
 /** The print-desk surface shell — its own masthead + nav, separate from the
