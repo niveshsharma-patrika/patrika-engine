@@ -9,15 +9,31 @@ import { useLang } from "@/lib/i18n/context";
 type Story = {
   id: string; title: string; snippet: string; url: string;
   source_name: string; focus: string; desk: string | null;
-  section: string; image: string | null; published_at: string; sourceCount: number;
+  location: string; category: string; image: string | null; published_at: string; sourceCount: number;
 };
-type Facets = { items: Story[]; sources: { id: string; name: string; focus: string }[]; sections: string[] };
+type Facets = { items: Story[]; sources: { id: string; name: string; focus: string }[]; locations: string[]; categories: string[] };
 
 const HOURS = [
   { v: 24, en: "24h", hi: "24घं" },
   { v: 48, en: "48h", hi: "48घं" },
   { v: 168, en: "7 days", hi: "7 दिन" },
 ];
+
+/** Classifier category → display label. */
+const CAT: Record<string, { en: string; hi: string }> = {
+  crime: { en: "Crime", hi: "अपराध" },
+  politics: { en: "Politics / Govt", hi: "राजनीति / सरकार" },
+  courts: { en: "Courts", hi: "अदालत" },
+  national: { en: "National", hi: "राष्ट्रीय" },
+  world: { en: "World", hi: "दुनिया" },
+  business: { en: "Business", hi: "बिज़नेस" },
+  sports: { en: "Sports", hi: "खेल" },
+  entertainment: { en: "Entertainment", hi: "मनोरंजन" },
+  health: { en: "Health", hi: "स्वास्थ्य" },
+  education: { en: "Education", hi: "शिक्षा" },
+  technology: { en: "Tech", hi: "टेक" },
+};
+const catLabel = (k: string, hi: boolean) => (CAT[k] ? (hi ? CAT[k].hi : CAT[k].en) : k);
 
 function timeLabel(ts: string, hi: boolean): string {
   const t = Date.parse(ts);
@@ -36,7 +52,8 @@ export function LocalStories() {
 
   const [source, setSource] = useState("");
   const [local, setLocal] = useState(false);
-  const [section, setSection] = useState("");
+  const [location, setLocation] = useState("");
+  const [category, setCategory] = useState("");
   const [hours, setHours] = useState(24);
   const [q, setQ] = useState("");
 
@@ -51,17 +68,18 @@ export function LocalStories() {
       const p = new URLSearchParams({ hours: String(hours) });
       if (source) p.set("source", source);
       if (local) p.set("local", "1");
-      if (section) p.set("section", section);
+      if (location) p.set("location", location);
+      if (category) p.set("category", category);
       const r = await fetch(`/api/print/local-stories?${p.toString()}`, { cache: "no-store" });
       const j = await r.json();
       if (runRef.current !== run) return; // a newer filter change superseded this
-      setData(r.ok ? j : { items: [], sources: j.sources ?? [], sections: j.sections ?? [] });
+      setData(r.ok ? j : { items: [], sources: j.sources ?? [], locations: j.locations ?? [], categories: j.categories ?? [] });
     } catch {
-      if (runRef.current === run) setData({ items: [], sources: [], sections: [] });
+      if (runRef.current === run) setData({ items: [], sources: [], locations: [], categories: [] });
     } finally {
       if (runRef.current === run) setLoading(false);
     }
-  }, [source, local, section, hours]);
+  }, [source, local, location, category, hours]);
   useEffect(() => { load(); }, [load]);
 
   const shown = useMemo(() => {
@@ -85,9 +103,13 @@ export function LocalStories() {
           <option value="">{hi ? "सभी सोर्स" : "All sources"}</option>
           {(data?.sources ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <select value={section} onChange={(e) => setSection(e.target.value)} className={selectCls} aria-label={hi ? "कैटेगरी" : "Category"}>
+        <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectCls} aria-label={hi ? "कैटेगरी" : "Category"}>
           <option value="">{hi ? "सभी कैटेगरी" : "All categories"}</option>
-          {(data?.sections ?? []).map((s) => <option key={s} value={s}>{s}</option>)}
+          {(data?.categories ?? []).map((c) => <option key={c} value={c}>{catLabel(c, hi)}</option>)}
+        </select>
+        <select value={location} onChange={(e) => setLocation(e.target.value)} className={selectCls} aria-label={hi ? "लोकेशन" : "Location"}>
+          <option value="">{hi ? "सभी लोकेशन" : "All locations"}</option>
+          {(data?.locations ?? []).map((l) => <option key={l} value={l}>{l}</option>)}
         </select>
         <div className="flex items-center gap-1">
           {HOURS.map((h) => (
@@ -126,8 +148,8 @@ export function LocalStories() {
                 {s.snippet && <div className="text-[12px] text-[var(--text-2)] mt-1 leading-snug line-clamp-2">{s.snippet}</div>}
                 <div className="flex items-center gap-2 mt-1.5 text-[11px] text-[var(--text-3)] flex-wrap">
                   <span className="font-medium text-[var(--text-2)]">{s.source_name}</span>
-                  {s.focus === "regional" && <span className="inline-flex items-center gap-0.5 text-[var(--red)]"><MapPin size={10} /> {hi ? "क्षेत्रीय" : "Regional"}</span>}
-                  {s.section && <span className="bg-[var(--surface-2)] px-1.5 py-0.5 rounded">{s.section}</span>}
+                  {s.category && <span className="bg-[var(--red-soft)] text-[var(--red)] px-1.5 py-0.5 rounded font-medium">{catLabel(s.category, hi)}</span>}
+                  {s.location && <span className="inline-flex items-center gap-0.5 text-[var(--text-2)]"><MapPin size={10} /> {s.location}</span>}
                   {s.sourceCount > 1 && <span>×{s.sourceCount} {hi ? "सोर्स" : "sources"}</span>}
                   <span className="inline-flex items-center gap-1"><Clock size={10} /> {timeLabel(s.published_at, hi)}</span>
                   {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[var(--text-3)] hover:text-[var(--red)]"><ExternalLink size={10} /> {hi ? "मूल" : "original"}</a>}

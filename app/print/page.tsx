@@ -1,8 +1,9 @@
-import { PrintDashboard } from "@/components/print-dashboard";
+import DashboardPage from "@/app/page";
 
 export const dynamic = "force-dynamic";
 
-/** Print desk home — what's happening across live sources. */
+/** Print desk home — a replica of the digital dashboard (all tabs + stories),
+ *  with the composer in print mode (saves to drafts, no WordPress). */
 export default function PrintHomePage() {
-  return <PrintDashboard />;
+  return <DashboardPage printMode />;
 }

@@ -330,7 +330,7 @@ const FOCUS_TO_CATEGORY: Record<string, string> = {
   politics: "politics",
 };
 
-function inferCategory(input: SignalInput): string {
+export function inferCategory(input: SignalInput): string {
   if (input.focus) {
     const mapped = FOCUS_TO_CATEGORY[input.focus.trim().toLowerCase()];
     if (mapped) return mapped;

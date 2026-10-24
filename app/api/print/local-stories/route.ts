@@ -1,5 +1,6 @@
 import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import { inferCategory } from "@/lib/clustering/lexical";
 
 export const dynamic = "force-dynamic";
 
@@ -30,11 +31,13 @@ function effectiveMs(published: string | null, ingested: string | null, now: num
 }
 
 /**
- * GET /api/print/local-stories — the print desk's source-filtered story list,
- * read from the ingested `signals` joined to `sources` (news sources only).
- * Filters: source (source_id), local ("1" → regional-focus), section
- * (publisher_section/category), hours (recency), q (title search).
- * Note: no city/geo column exists — "local" = regional-focus sources.
+ * GET /api/print/local-stories — the print desk's story list, from the ingested
+ * `signals` ⋈ `sources` (news sources only).
+ *   - CATEGORY (crime / politics / sports / …) is derived per story by the same
+ *     keyword classifier the clusterer uses (inferCategory).
+ *   - LOCATION is the source's `publisher_section` (Patrika's area/edition name).
+ * Filters: source (source_id), local ("1" → regional-focus), location
+ * (publisher_section), category, hours (recency), q (title search).
  */
 export async function GET(req: Request) {
   if (!(await getSession())) return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -44,10 +47,10 @@ export async function GET(req: Request) {
   const hours = [24, 48, 168].includes(hoursRaw) ? hoursRaw : 24;
   const sourceId = (sp.get("source") ?? "").trim();
   const local = sp.get("local") === "1";
-  const section = (sp.get("section") ?? "").trim();
+  const location = (sp.get("location") ?? "").trim();
+  const category = (sp.get("category") ?? "").trim();
   const q = (sp.get("q") ?? "").trim().toLowerCase();
 
-  // $1 = hours window, $2 = the news source-type list.
   const where: string[] = [
     `s.published_at > now() - ($1 || ' hours')::interval`,
     `src.source_type = ANY($2)`,
@@ -55,10 +58,10 @@ export async function GET(req: Request) {
   const params: unknown[] = [String(hours), NEWS_TYPES];
   if (sourceId && /^[0-9a-f-]{10,}$/i.test(sourceId)) { params.push(sourceId); where.push(`src.id = $${params.length}`); }
   if (local) where.push(`src.focus = 'regional'`);
-  if (section) { params.push(section); where.push(`s.publisher_section = $${params.length}`); }
+  if (location) { params.push(location); where.push(`s.publisher_section = $${params.length}`); }
 
   try {
-    const [list, srcFacet, secFacet] = await Promise.all([
+    const [list, srcFacet, locFacet] = await Promise.all([
       pool.query<{
         id: string; source_id: string; content: string; url: string; published_at: string; ingested_at: string;
         description: string | null; publisher_section: string | null; image: string | null;
@@ -69,7 +72,7 @@ export async function GET(req: Request) {
            FROM signals s JOIN sources src ON src.id = s.source_id
           WHERE ${where.join(" AND ")}
           ORDER BY s.published_at DESC
-          LIMIT 500`,
+          LIMIT 600`,
         params
       ),
       pool.query<{ id: string; name: string; focus: string }>(
@@ -79,16 +82,17 @@ export async function GET(req: Request) {
       pool.query<{ publisher_section: string }>(
         `SELECT DISTINCT publisher_section FROM signals
           WHERE published_at > now() - interval '7 days' AND publisher_section <> '' AND publisher_section IS NOT NULL
-          ORDER BY publisher_section LIMIT 60`
+          ORDER BY publisher_section LIMIT 400`
       ),
     ]);
 
     const now = Date.now();
-    // Dedup by normalised title; count DISTINCT sources that carried it; drop filler.
-    const byTitle = new Map<string, {
+    type Item = {
       id: string; title: string; snippet: string; url: string; source_name: string; focus: string;
-      desk: string | null; section: string; image: string | null; published_at: string; _ms: number; _sources: Set<string>;
-    }>();
+      desk: string | null; location: string; category: string; image: string | null; published_at: string;
+      _ms: number; _sources: Set<string>;
+    };
+    const byTitle = new Map<string, Item>();
     for (const r of list.rows) {
       const title = (r.content || "").split(" — ")[0].trim() || (r.content || "").trim();
       if (title.length < 10 || isFiller(title)) continue;
@@ -97,20 +101,31 @@ export async function GET(req: Request) {
       const ms = effectiveMs(r.published_at, r.ingested_at, now);
       const existing = byTitle.get(key);
       if (existing) { existing._sources.add(r.source_id); continue; }
+      const snippet = (r.description || (r.content || "").split(" — ").slice(1).join(" — ")).trim();
       byTitle.set(key, {
-        id: r.id, title,
-        snippet: (r.description || (r.content || "").split(" — ").slice(1).join(" — ")).trim().slice(0, 240),
-        url: r.url, source_name: r.source_name, focus: r.focus, desk: r.desk,
-        section: r.publisher_section || "", image: r.image || null,
-        published_at: new Date(ms).toISOString(), _ms: ms, _sources: new Set([r.source_id]),
+        id: r.id, title, snippet: snippet.slice(0, 240), url: r.url, source_name: r.source_name, focus: r.focus, desk: r.desk,
+        location: r.publisher_section || "",
+        category: inferCategory({
+          id: r.id, title, excerpt: snippet, keywords: [], section: r.publisher_section, publisher: r.source_name,
+          publishedAtMs: ms, url: r.url, sourceId: r.source_id, topicId: null, language: null, focus: r.focus,
+        }),
+        image: r.image || null, published_at: new Date(ms).toISOString(), _ms: ms, _sources: new Set([r.source_id]),
       });
     }
 
-    const items = [...byTitle.values()]
+    let items = [...byTitle.values()];
+    const categories = [...new Set(items.map((i) => i.category))].sort();
+    if (category) items = items.filter((i) => i.category === category);
+    const out = items
       .sort((a, b) => b._ms - a._ms)
       .map(({ _ms, _sources, ...rest }) => { void _ms; return { ...rest, sourceCount: _sources.size }; });
 
-    return Response.json({ items, sources: srcFacet.rows, sections: secFacet.rows.map((s) => s.publisher_section) });
+    return Response.json({
+      items: out,
+      sources: srcFacet.rows,
+      locations: locFacet.rows.map((s) => s.publisher_section),
+      categories,
+    });
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : "Failed to load" }, { status: 500 });
   }

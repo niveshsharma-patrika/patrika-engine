@@ -80,7 +80,7 @@ const CATEGORIES: Array<{ key: SectionKey | "all"; en: string; hi: string }> = [
 ];
 
 // ─── Page ─────────────────────────────────────────────────────
-export default function DashboardPage() {
+export default function DashboardPage({ printMode }: { printMode?: boolean } = {}) {
   const { t, lang } = useLang();
   const [filter, setFilter] = useState<SectionKey | "all">("all");
   const [tab, setTab] = useState<BucketKey>("breaking");
@@ -297,6 +297,7 @@ export default function DashboardPage() {
           title={editorTitle}
           setTitle={setEditorTitle}
           onClose={() => setEditorOpen(false)}
+          printMode={printMode}
         />
       )}
     </>
@@ -463,7 +464,7 @@ function EnhGroup({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineFilter, olloi }: {
+export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineFilter, olloi, printMode }: {
   trend: Trend | null;
   title: string;
   setTitle: (v: string) => void;
@@ -476,6 +477,9 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
   // Olloi (cancer) desk: length is Full (~650, under 800) or Short (~200), and
   // the 800-word minimum does NOT apply.
   olloi?: boolean;
+  // Print desk: hide the "WordPress draft" action (print stories go to DB
+  // drafts, not to the website).
+  printMode?: boolean;
 }) {
   const { t, lang } = useLang();
   const [body, setBody] = useState("");
@@ -829,15 +833,17 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
                   )}
                 </span>
               )}
-              <button
-                onClick={handleWpDraft}
-                disabled={wpSaving || !body.trim()}
-                title={lang === "hi" ? "इस लेख को WordPress में ड्राफ्ट के रूप में सेव करें" : "Save this article to WordPress as a draft"}
-                className="bg-white border border-[var(--border)] hover:bg-[var(--surface-2)] disabled:opacity-50 text-[var(--text-2)] hover:text-[var(--text)] text-[13px] px-4 py-2 rounded font-medium flex items-center gap-1.5"
-              >
-                {wpSaving && <Loader2 size={13} className="animate-spin" />}
-                {wpSaving ? (lang === "hi" ? "भेज रहे…" : "Sending…") : (lang === "hi" ? "WordPress ड्राफ्ट" : "WordPress draft")}
-              </button>
+              {!printMode && (
+                <button
+                  onClick={handleWpDraft}
+                  disabled={wpSaving || !body.trim()}
+                  title={lang === "hi" ? "इस लेख को WordPress में ड्राफ्ट के रूप में सेव करें" : "Save this article to WordPress as a draft"}
+                  className="bg-white border border-[var(--border)] hover:bg-[var(--surface-2)] disabled:opacity-50 text-[var(--text-2)] hover:text-[var(--text)] text-[13px] px-4 py-2 rounded font-medium flex items-center gap-1.5"
+                >
+                  {wpSaving && <Loader2 size={13} className="animate-spin" />}
+                  {wpSaving ? (lang === "hi" ? "भेज रहे…" : "Sending…") : (lang === "hi" ? "WordPress ड्राफ्ट" : "WordPress draft")}
+                </button>
+              )}
             </>
           )}
           <button
