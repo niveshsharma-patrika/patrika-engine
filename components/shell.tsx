@@ -68,6 +68,7 @@ const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: E
   { href: "/admin/productivity", icon: <BarChart3 size={16} />,    key: "navProductivity", editions: ["digital"], roles: ["admin"] },
   { href: "/admin/categories",  icon: <Tags size={16} />,          key: "navCategoryMapping", editions: ["digital"], roles: ["admin"] },
   { href: "/admin/wordpress-payloads", icon: <ScrollText size={16} />, key: "navWpPayloads", editions: ["digital"], roles: ["admin"] },
+  { href: "/admin/translations", icon: <Languages size={16} />,     key: "navTranslations", editions: ["digital"], roles: ["admin"] },
 ];
 
 const NAV_BADGES: Record<string, string | undefined> = {};

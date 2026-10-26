@@ -11,6 +11,8 @@ import { confinedFor } from "@/lib/auth/confined";
  */
 const PUBLIC_PATHS = [
   "/login", "/api/auth/login", "/api/auth/logout",
+  // WordPress → translation API: no user session, authenticated by X-API-Key in the route.
+  "/api/v1/translate",
 ];
 
 export async function middleware(request: NextRequest) {
