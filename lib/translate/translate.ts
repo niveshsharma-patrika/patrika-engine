@@ -3,7 +3,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 
 import { getApiKey, getModelFor } from "@/lib/ai/provider";
-import { splitHtml, joinHtml, sameMarkup, stripTags, escapeText, type Piece } from "./html";
+import { splitHtml, joinHtml, mask, unmask, stripTags, escapeText, type Piece } from "./html";
 import { checkPair, type Flag } from "./checks";
 
 /**
@@ -39,7 +39,7 @@ STRICT RULES — accuracy over style:
 5. Keep certainty and attribution exactly: "पुलिस के अनुसार" → "according to police"; "बताया जा रहा है" → "reportedly"; "आरोप" → "alleged". Never turn a claim, allegation or possibility into a fact.
 6. Style: clear, neutral Indian English news style. Indian terms (tehsil, panchayat, SHO, gram sabha …) may be kept. No sensational words, no added adjectives, no editorialising.
 7. If something is unclear, translate it as literally as possible — never guess or fill gaps.
-8. Units may contain inline HTML tags (<strong>, <em>, <a href="…">, <br> …) and WordPress shortcodes like [caption …]. Keep EVERY tag and shortcode exactly as given — same attributes, same URLs — around the matching translated words. Never add, remove or alter a tag. Translate only the human-readable text.
+8. Units may contain markers like {{1}}, {{2}} — they stand for formatting (bold, links, line breaks). Keep EVERY marker exactly once, unchanged, around the matching translated words (a marker pair like {{3}}…{{4}} wraps the same words in English). Never add, remove, renumber or translate a marker.
 9. Unit "t" is the headline: a faithful English headline of the Hindi title — no clickbait, nothing added. Unit "e" is the summary: translate it faithfully.
 Return every unit id exactly once.`;
 
@@ -156,28 +156,34 @@ export async function translateArticle(src: SourceArticle): Promise<TranslationO
     ...contentUnits.map((u, i) => ({ id: u.id, html: u.html, label: `Paragraph ${i + 1}` })),
   ];
 
+  // The model sees markers instead of tags (see mask()).
+  const masks = new Map(units.map((u) => [u.id, mask(u.html)]));
+  const masked: Unit[] = units.map((u) => ({ ...u, html: masks.get(u.id)!.text }));
+
   const out = new Map<string, string>();
   if (units.length) {
-    const chunks = chunk(units);
+    const chunks = chunk(masked);
     const glossary = chunks.length > 1 ? await buildGlossary(model, `${src.title}\n${stripTags(src.content)}`) : "";
     const maps = await inBatches(chunks, PARALLEL, (c) => translateChunk(model, c, glossary));
     for (const m of maps) for (const [k, v] of m) out.set(k, v);
   }
 
   const flags: Flag[] = [];
-  // Coverage + markup. A paragraph whose tags came back altered is kept as
-  // plain text (its bold/link dropped) rather than risk broken HTML on the page.
+  // Coverage + markup. Put the original tags back in place of the markers; a
+  // paragraph whose markers came back wrong is kept as plain text (its
+  // bold/link dropped) rather than risk broken HTML on the page.
   for (const u of units) {
     const en = out.get(u.id);
     if (!en) {
       flags.push({ type: "untranslated", unit: u.id, detail: `${u.label}: could not be translated — the Hindi is kept in its place.` });
       continue;
     }
-    if (u.id === "t" || u.id === "e") { out.set(u.id, stripTags(en)); continue; } // plain-text fields
-    if (!sameMarkup(u.html, en)) {
-      out.set(u.id, plain ? stripTags(en) : escapeText(stripTags(en)));
-      if (!plain) flags.push({ type: "formatting", unit: u.id, detail: `${u.label}: formatting (bold/links) could not be kept — check this paragraph.` });
-    }
+    const restored = unmask(en, masks.get(u.id)!.tags);
+    if (u.id === "t" || u.id === "e") { out.set(u.id, stripTags(restored ?? en.replace(/\{\{\d+\}\}/g, ""))); continue; } // plain-text fields
+    if (restored !== null) { out.set(u.id, restored); continue; }
+    const text = stripTags(en.replace(/\{\{\d+\}\}/g, ""));
+    out.set(u.id, plain ? text : escapeText(text));
+    if (!plain) flags.push({ type: "formatting", unit: u.id, detail: `${u.label}: formatting (bold/links) could not be kept — check this paragraph.` });
   }
 
   // Instant deterministic checks on every aligned pair.

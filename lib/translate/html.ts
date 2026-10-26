@@ -73,16 +73,6 @@ export function joinHtml(pieces: Piece[], translated: Map<string, string>): stri
   return pieces.map((p) => (p.kind === "raw" ? p.html : translated.get(p.id) ?? p.html)).join("");
 }
 
-/** The markup a unit carries (tags + shortcodes), order-independent. */
-export function markupOf(html: string): string[] {
-  return [...(html.match(TAG) ?? []), ...(html.match(SHORTCODE) ?? [])].map((t) => t.replace(/\s+/g, " ")).sort();
-}
-
-export function sameMarkup(a: string, b: string): boolean {
-  const x = markupOf(a), y = markupOf(b);
-  return x.length === y.length && x.every((t, i) => t === y[i]);
-}
-
 export function stripTags(html: string): string {
   return html
     .replace(/<!--[\s\S]*?-->/g, " ")
@@ -96,6 +86,49 @@ export function stripTags(html: string): string {
     .replace(/&gt;/g, ">")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Swap a unit's tags + shortcodes for numbered markers ({{1}}, {{2}} …) so the
+ * model only ever sees short tokens — long URLs and attributes can't be
+ * altered because they are never sent. unmask() puts the originals back.
+ */
+export function mask(html: string): { text: string; tags: string[] } {
+  const tags: string[] = [];
+  const text = html.replace(new RegExp(`${TAG.source}|${SHORTCODE.source}`, "g"), (t) => {
+    tags.push(t);
+    return `{{${tags.length}}}`;
+  });
+  return { text, tags };
+}
+
+const VOID = new Set(["br", "wbr", "img", "hr"]);
+
+/**
+ * Restore the original tags. Returns null (caller falls back to plain text) if
+ * a marker is missing, duplicated or invented, or if the restored inline tags
+ * would not nest properly (e.g. a closing tag moved before its opening tag).
+ */
+export function unmask(text: string, tags: string[]): string | null {
+  const seen = new Set<number>();
+  let bad = false;
+  const html = text.replace(/\{\{(\d+)\}\}/g, (_, d: string) => {
+    const i = Number(d);
+    if (i < 1 || i > tags.length || seen.has(i)) { bad = true; return ""; }
+    seen.add(i);
+    return tags[i - 1];
+  });
+  if (bad || seen.size !== tags.length) return null;
+  const stack: string[] = [];
+  for (const t of html.match(TAG) ?? []) {
+    const m = /^<(\/?)([a-zA-Z][\w-]*)/.exec(t);
+    if (!m) continue;
+    const name = m[2].toLowerCase();
+    if (VOID.has(name) || t.endsWith("/>")) continue;
+    if (!m[1]) stack.push(name);
+    else if (stack.pop() !== name) return null;
+  }
+  return stack.length === 0 ? html : null;
 }
 
 /** Escape plain text for safe insertion as HTML (used when a unit's tags had to be dropped). */
