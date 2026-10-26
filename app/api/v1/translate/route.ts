@@ -1,26 +1,31 @@
 import { after } from "next/server";
 import { z } from "zod";
 
-import { checkApiKey, getTranslationCallbackUrl, resolveCallbackUrl } from "@/lib/translate/config";
-import { createJob, processJob, recentJobCount } from "@/lib/translate/jobs";
+import { checkApiKey } from "@/lib/translate/config";
+import { translateArticle, reviewTranslation } from "@/lib/translate/translate";
+import { startLog, finishLog, failLog, appendFlags, recentCount } from "@/lib/translate/log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const RATE_PER_MINUTE = 60;
 
-const Body = z.object({
-  id: z.union([z.string(), z.number()]).transform(String).pipe(z.string().min(1).max(100)),
-  title: z.string().trim().min(1).max(500),
-  excerpt: z.string().max(3000).optional().default(""),
-  content: z.string().min(1).max(150_000),
-  callback_url: z.string().max(1000).optional(),
-});
+const Body = z
+  .object({
+    title: z.string().max(500).optional().default(""),
+    content: z.string().max(150_000).optional().default(""),
+    excerpt: z.string().max(3000).optional().default(""),
+  })
+  .refine((b) => b.title.trim() || b.content.trim() || b.excerpt.trim(), { message: "Send at least one of title, content, excerpt." });
 
 /**
- * POST /api/v1/translate — WordPress sends a Hindi article (X-API-Key auth);
- * we reply 202 at once and POST the English translation to the callback URL
- * when it's ready (20–60 s). See deploy/TRANSLATION_API.md.
+ * POST /api/v1/translate — Hindi → English for WordPress.
+ *   Request:  { "title", "content", "excerpt" }  (Hindi; header X-API-Key)
+ *   Response: 200 { "title", "content", "excerpt" }  (English, same structure)
+ * Translated under the news-accuracy rules; the instant checks' verdict is in
+ * the X-Translation-Review header, and the independent AI review runs after
+ * the response — everything is logged in Admin → Translations.
+ * See deploy/TRANSLATION_API.md.
  */
 export async function POST(req: Request) {
   if (!(await checkApiKey(req.headers.get("x-api-key")))) {
@@ -30,31 +35,36 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    return Response.json({ error: `Invalid body: ${issue?.path.join(".") || "body"} — ${issue?.message ?? "bad value"}` }, { status: 400 });
+    const where = issue?.path.join(".");
+    return Response.json({ error: `Invalid request: ${where ? `${where} — ` : ""}${issue?.message ?? "bad body"}` }, { status: 400 });
   }
-  const { id, title, excerpt, content, callback_url } = parsed.data;
+  const src = parsed.data;
 
-  const callbackUrl = resolveCallbackUrl(callback_url ?? null, await getTranslationCallbackUrl());
-  if (!callbackUrl) {
-    return Response.json(
-      { error: callback_url ? "callback_url must be https and on the same site as the configured callback URL." : "No callback URL is configured on our side yet." },
-      { status: 400 }
-    );
-  }
-
-  if ((await recentJobCount()) >= RATE_PER_MINUTE) {
+  if ((await recentCount().catch(() => 0)) >= RATE_PER_MINUTE) {
     return Response.json({ error: "Too many requests — retry in a minute." }, { status: 429, headers: { "Retry-After": "60" } });
   }
 
+  const t0 = Date.now();
+  const logId = await startLog(src);
   try {
-    const job = await createJob(id, callbackUrl, { title, excerpt, content });
-    if (!job.duplicate) after(() => processJob(job.id).catch((e) => console.error("[translate] job failed", job.id, e)));
+    const out = await translateArticle(src);
+    await finishLog(logId, out.result, out.flags, out.model, Date.now() - t0);
+    // Independent AI accuracy review — after the response, so it adds no wait.
+    after(async () => {
+      try {
+        await appendFlags(logId, await reviewTranslation(out.pairs));
+      } catch (err) {
+        console.error("[translate] review failed", logId, err);
+      }
+    });
     return Response.json(
-      { job_id: job.id, id, status: "queued", duplicate: job.duplicate, status_url: `/api/v1/translate/${job.id}` },
-      { status: 202 }
+      { title: out.result.title, content: out.result.content, excerpt: out.result.excerpt },
+      { headers: { "X-Translation-Id": logId ?? "", "X-Translation-Review": out.flags.length ? "needs_review" : "ok" } }
     );
   } catch (err) {
-    console.error("[translate] could not queue", err);
-    return Response.json({ error: "Could not queue the translation — please retry." }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[translate] failed", logId, msg);
+    await failLog(logId, msg, Date.now() - t0);
+    return Response.json({ error: "Translation failed — please retry." }, { status: 502 });
   }
 }

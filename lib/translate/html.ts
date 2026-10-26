@@ -25,7 +25,17 @@ export function splitHtml(html: string): Piece[] {
   let buf = "";
   let n = 0;
 
-  const flush = () => {
+  // Plain text (no markup): one unit per line, line breaks kept exactly.
+  if (!/<[a-zA-Z!/]/.test(html)) {
+    for (const part of html.split(/(\n+)/)) {
+      if (!part) continue;
+      if (/^\n+$/.test(part)) pieces.push({ kind: "raw", html: part });
+      else { buf = part; flushText(); }
+    }
+    return pieces;
+  }
+
+  function flushText() {
     if (!buf) return;
     // Keep surrounding whitespace outside the unit; only text with Hindi in it
     // is sent for translation (English-only / numeric runs stay as they are).
@@ -38,7 +48,7 @@ export function splitHtml(html: string): Piece[] {
       pieces.push({ kind: "raw", html: buf });
     }
     buf = "";
-  };
+  }
 
   let last = 0;
   for (const match of html.matchAll(TOKEN)) {
@@ -49,13 +59,13 @@ export function splitHtml(html: string): Piece[] {
     if (name && INLINE.has(name) && !match[1]) {
       buf += tok;
     } else {
-      flush();
+      flushText();
       pieces.push({ kind: "raw", html: tok });
     }
     last = idx + tok.length;
   }
   buf += html.slice(last);
-  flush();
+  flushText();
   return pieces;
 }
 

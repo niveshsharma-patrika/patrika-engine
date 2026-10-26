@@ -9,19 +9,21 @@ import { checkPair, type Flag } from "./checks";
 /**
  * Hindi → English translation of an editorial article, under news-accuracy
  * rules: translate only — never add, drop or soften facts, figures, names,
- * quotes or attribution. Then verify: deterministic checks per paragraph
- * (figures, leftover Hindi, size drift, markup) plus an independent AI review
- * that compares each English paragraph with its Hindi source. Anything found
- * is returned as flags (review = "needs_review"); nothing is silently fixed.
+ * quotes or attribution. translateArticle() runs the instant deterministic
+ * checks per paragraph (figures, leftover Hindi, size drift, markup);
+ * reviewTranslation() is the independent AI review (each English paragraph vs
+ * its Hindi source), run after the response so it doesn't add to the wait.
+ * Findings are flags; nothing is silently "fixed".
  */
 
 export type SourceArticle = { title: string; excerpt: string; content: string };
-export type TranslatedArticle = { title: string; excerpt: string; content: string; slug: string };
+export type TranslatedArticle = { title: string; excerpt: string; content: string };
+export type AlignedPair = { id: string; label: string; hi: string; en: string };
 export type TranslationOutcome = {
   result: TranslatedArticle;
   flags: Flag[];
-  review: "ok" | "needs_review";
   model: string;
+  pairs: AlignedPair[]; // for reviewTranslation()
 };
 
 const CHUNK_CHARS = 7000;   // Hindi HTML per translation call
@@ -120,8 +122,8 @@ async function translateChunk(model: LanguageModel, units: Unit[], glossary: str
 }
 
 /** Independent AI review: compare each English paragraph with its Hindi source. */
-async function reviewChunk(model: LanguageModel, pairs: Array<{ unit: Unit; hi: string; en: string }>): Promise<Flag[]> {
-  const text = pairs.map((p) => `[${p.unit.id}] (${p.unit.label})\nHINDI: ${p.hi}\nENGLISH: ${p.en}`).join("\n\n");
+async function reviewChunk(model: LanguageModel, pairs: AlignedPair[]): Promise<Flag[]> {
+  const text = pairs.map((p) => `[${p.id}] (${p.label})\nHINDI: ${p.hi}\nENGLISH: ${p.en}`).join("\n\n");
   const { object } = await generateObject({
     model, temperature: 0, maxRetries: 2, abortSignal: AbortSignal.timeout(120_000),
     schema: REVIEW_SCHEMA,
@@ -137,38 +139,33 @@ ${text}`,
     .filter((i) => i.note.trim())
     .map((i) => {
       const type = ["added", "omitted", "changed"].includes(i.type) ? i.type : "changed";
-      const label = pairs.find((p) => p.unit.id === i.unit)?.unit.label ?? i.unit;
+      const label = pairs.find((p) => p.id === i.unit)?.label ?? i.unit;
       return { type: `review_${type}`, unit: i.unit, detail: `${label}: ${i.note.trim()}` };
     });
-}
-
-export function englishSlug(title: string): string {
-  const s = title.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  if (s.length <= 80) return s;
-  const cut = s.slice(0, 80);
-  return cut.slice(0, Math.max(cut.lastIndexOf("-"), 40)).replace(/-+$/, "");
 }
 
 export async function translateArticle(src: SourceArticle): Promise<TranslationOutcome> {
   const { model, label } = await resolveModel();
 
+  const plain = !/<[a-zA-Z!/]/.test(src.content);
   const pieces: Piece[] = splitHtml(src.content);
   const contentUnits = pieces.filter((p): p is Extract<Piece, { kind: "unit" }> => p.kind === "unit");
   const units: Unit[] = [
-    { id: "t", html: src.title.trim(), label: "Headline" },
-    ...(src.excerpt.trim() ? [{ id: "e", html: src.excerpt.trim(), label: "Summary" }] : []),
+    ...(src.title.trim() ? [{ id: "t", html: src.title.trim(), label: "Title" }] : []),
+    ...(src.excerpt.trim() ? [{ id: "e", html: src.excerpt.trim(), label: "Excerpt" }] : []),
     ...contentUnits.map((u, i) => ({ id: u.id, html: u.html, label: `Paragraph ${i + 1}` })),
   ];
 
-  const chunks = chunk(units);
-  const glossary = chunks.length > 1 ? await buildGlossary(model, stripTags(src.content)) : "";
-  const maps = await inBatches(chunks, PARALLEL, (c) => translateChunk(model, c, glossary));
   const out = new Map<string, string>();
-  for (const m of maps) for (const [k, v] of m) out.set(k, v);
+  if (units.length) {
+    const chunks = chunk(units);
+    const glossary = chunks.length > 1 ? await buildGlossary(model, `${src.title}\n${stripTags(src.content)}`) : "";
+    const maps = await inBatches(chunks, PARALLEL, (c) => translateChunk(model, c, glossary));
+    for (const m of maps) for (const [k, v] of m) out.set(k, v);
+  }
 
   const flags: Flag[] = [];
-  // Per-unit markup + coverage. A unit whose tags came back altered is kept as
+  // Coverage + markup. A paragraph whose tags came back altered is kept as
   // plain text (its bold/link dropped) rather than risk broken HTML on the page.
   for (const u of units) {
     const en = out.get(u.id);
@@ -176,41 +173,46 @@ export async function translateArticle(src: SourceArticle): Promise<TranslationO
       flags.push({ type: "untranslated", unit: u.id, detail: `${u.label}: could not be translated — the Hindi is kept in its place.` });
       continue;
     }
-    if (u.id !== "t" && u.id !== "e" && !sameMarkup(u.html, en)) {
-      out.set(u.id, escapeText(stripTags(en)));
-      flags.push({ type: "formatting", unit: u.id, detail: `${u.label}: formatting (bold/links) could not be kept — check this paragraph's formatting.` });
+    if (u.id === "t" || u.id === "e") { out.set(u.id, stripTags(en)); continue; } // plain-text fields
+    if (!sameMarkup(u.html, en)) {
+      out.set(u.id, plain ? stripTags(en) : escapeText(stripTags(en)));
+      if (!plain) flags.push({ type: "formatting", unit: u.id, detail: `${u.label}: formatting (bold/links) could not be kept — check this paragraph.` });
     }
   }
-  // Headline + summary are plain text.
-  const title = stripTags(out.get("t") ?? src.title);
-  const excerpt = src.excerpt.trim() ? stripTags(out.get("e") ?? src.excerpt) : "";
-  if (out.has("t")) out.set("t", title);
-  if (out.has("e")) out.set("e", excerpt);
 
-  // Deterministic checks on every aligned pair.
-  const pairs = units.filter((u) => out.has(u.id)).map((u) => ({ unit: u, hi: stripTags(u.html), en: stripTags(out.get(u.id)!) }));
-  for (const p of pairs) flags.push(...checkPair(p.unit.id, p.unit.label, p.hi, p.en));
+  // Instant deterministic checks on every aligned pair.
+  const pairs: AlignedPair[] = units
+    .filter((u) => out.has(u.id))
+    .map((u) => ({ id: u.id, label: u.label, hi: stripTags(u.html), en: stripTags(out.get(u.id)!) }));
+  for (const p of pairs) flags.push(...checkPair(p.id, p.label, p.hi, p.en));
 
-  // Independent AI review, chunked the same way.
-  const reviewChunks: Array<typeof pairs> = [];
-  let cur: typeof pairs = [];
+  return {
+    result: {
+      title: src.title.trim() ? out.get("t") ?? src.title : "",
+      excerpt: src.excerpt.trim() ? out.get("e") ?? src.excerpt : "",
+      content: joinHtml(pieces, out),
+    },
+    flags,
+    model: label,
+    pairs,
+  };
+}
+
+/** Independent AI accuracy review of a finished translation (added / omitted / changed). */
+export async function reviewTranslation(pairs: AlignedPair[]): Promise<Flag[]> {
+  if (pairs.length === 0) return [];
+  const { model } = await resolveModel();
+  const groups: AlignedPair[][] = [];
+  let cur: AlignedPair[] = [];
   let size = 0;
   for (const p of pairs) {
     const len = p.hi.length + p.en.length;
-    if (cur.length && size + len > CHUNK_CHARS * 2) { reviewChunks.push(cur); cur = []; size = 0; }
+    if (cur.length && size + len > CHUNK_CHARS * 2) { groups.push(cur); cur = []; size = 0; }
     cur.push(p); size += len;
   }
-  if (cur.length) reviewChunks.push(cur);
-  const reviewed = await inBatches(reviewChunks, PARALLEL, (c) =>
-    reviewChunk(model, c).catch(() => [{ type: "review_unavailable", detail: "The automatic accuracy review could not run for part of this article — please check it manually." }] as Flag[])
+  if (cur.length) groups.push(cur);
+  const reviewed = await inBatches(groups, PARALLEL, (g) =>
+    reviewChunk(model, g).catch(() => [{ type: "review_unavailable", detail: "The automatic accuracy review could not run for part of this article — please check it manually." }] as Flag[])
   );
-  for (const r of reviewed) flags.push(...r);
-
-  const content = joinHtml(pieces, out);
-  return {
-    result: { title, excerpt, content, slug: englishSlug(title) },
-    flags,
-    review: flags.length ? "needs_review" : "ok",
-    model: label,
-  };
+  return reviewed.flat();
 }
