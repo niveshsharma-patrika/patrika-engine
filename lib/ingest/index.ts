@@ -2,6 +2,7 @@ import { fetchRssFeed, type RawSignal } from "@/lib/sources/rss";
 import { fetchSitemapNews } from "@/lib/sources/sitemap-news";
 import { fetchGoogleNews } from "@/lib/sources/google-news";
 import { createAdminClient } from "@/lib/supabase/server";
+import { pool } from "@/lib/db";
 import { clusterAndTrend, type ClusterStats } from "@/lib/clustering";
 import { enrichPendingSignals, type EnrichStats } from "@/lib/enrich";
 import { getPipelineSettings } from "@/lib/pipeline-settings";
@@ -33,6 +34,7 @@ type SourceRow = {
   handle: string | null;
   desk: string | null;
   is_active: boolean;
+  scope: string | null;
 };
 
 export type IngestResult = {
@@ -87,7 +89,7 @@ export async function ingestAllRss(
     ? { data: [], error: null }
     : await supabase
         .from("sources")
-        .select("id, name, source_type, url, handle, desk, is_active")
+        .select("id, name, source_type, url, handle, desk, is_active, scope")
         .eq("is_active", true)
         .in("source_type", ["rss", "twitter", "google_news", "sitemap_news", "reddit", "youtube"]);
 
@@ -110,20 +112,27 @@ export async function ingestAllRss(
             ? await fetchGoogleNews(source.url, source.name)
             : await fetchRssFeed(source.url, source.name);
 
-        // URL-level dedup across all sources. The DB unique index is
+        // URL-level dedup across sources. The DB unique index is
         // (source_id, external_id) which lets the same article slip in
         // twice if it arrives via two source paths. We filter BEFORE
-        // insert by checking which URLs already exist anywhere.
+        // insert by checking which URLs already exist — within the same
+        // SIDE only: print-desk city feeds (scope='print') and the shared
+        // pipeline each keep their own copy, so neither steals the other's
+        // article (the digital side never sees print signals and vice versa).
         const urls = raw.map((s) => s.url).filter((u): u is string => Boolean(u));
         const existingUrls = new Set<string>();
+        const isPrint = source.scope === "print";
         if (urls.length > 0) {
           for (let i = 0; i < urls.length; i += 200) {
             const chunk = urls.slice(i, i + 200);
-            const { data: existing } = await supabase
-              .from("signals")
-              .select("url")
-              .in("url", chunk);
-            for (const row of (existing as { url: string }[] | null) ?? []) {
+            const { rows: existing } = await pool.query<{ url: string }>(
+              `SELECT s.url FROM signals s
+                 LEFT JOIN sources src ON src.id = s.source_id
+                WHERE s.url = ANY($1::text[])
+                  AND (COALESCE(src.scope, 'shared') = 'print') = $2`,
+              [chunk, isPrint]
+            );
+            for (const row of existing) {
               if (row.url) existingUrls.add(row.url);
             }
           }

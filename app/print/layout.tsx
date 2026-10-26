@@ -5,11 +5,13 @@ import { PrintShell } from "@/components/print-shell";
 
 export const dynamic = "force-dynamic";
 
-/** The print-desk surface. Only edition=print users live here; everyone else is
- *  sent to the digital app (the middleware enforces the split too). */
+/** The print-desk surface. Only edition=print users live here (plus admins,
+ *  who manage both surfaces); everyone else is sent to the digital app. Uses
+ *  the LIVE edition from getSession() (not the JWT) so a flipped edition takes
+ *  effect without re-login. */
 export default async function PrintLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.edition !== "print") redirect("/");
-  return <PrintShell>{children}</PrintShell>;
+  if (session.edition !== "print" && session.role !== "admin") redirect("/");
+  return <PrintShell role={session.role}>{children}</PrintShell>;
 }

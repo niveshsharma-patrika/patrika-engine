@@ -68,6 +68,13 @@ export type FlagLike = { enabled: boolean; roles: readonly string[]; editions: r
 
 /** Can a NON-confined user see / open this feature? Pure — shared by the server
  *  gate and the client sidebar backstop. Confined roles use their own mechanism. */
+/** The surface a user's digital-side checks run as. Admins work BOTH surfaces
+ *  (they manage editions, so they must never be locked onto the print side):
+ *  on the digital app they always count as digital, whatever their edition. */
+export function digitalEdition<E extends string>(role: string, edition: E): E | "digital" {
+  return role === "admin" ? "digital" : edition;
+}
+
 export function canAccessFeature(flag: FlagLike | undefined, feature: Feature, role: string, edition: string): boolean {
   if (feature.isProtected) return role === "admin";
   if (feature.isHome) return true; // dashboard — always reachable (redirect fallback)

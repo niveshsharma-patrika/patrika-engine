@@ -11,6 +11,7 @@ async function loadSources(): Promise<SourceRow[]> {
   const { data } = await supabase
     .from("sources")
     .select("id, name, source_type, url, handle, desk, focus, language, is_active, last_sync, signals_24h")
+    .neq("scope", "print") // print-desk city feeds are managed under /print/admin/sources
     .order("is_active", { ascending: false })
     .order("focus", { ascending: true })
     .order("name", { ascending: true });

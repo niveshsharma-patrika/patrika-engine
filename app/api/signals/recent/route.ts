@@ -9,7 +9,7 @@ type SignalRow = {
   content: string;
   published_at: string;
   url: string | null;
-  sources: { source_type: string; name: string } | null;
+  sources: { source_type: string; name: string; scope: string | null } | null;
 };
 
 /**
@@ -31,10 +31,10 @@ export async function GET(req: Request) {
     .from("signals")
     .select(
       `id, author, content, published_at, url,
-       sources ( source_type, name )`
+       sources ( source_type, name, scope )`
     )
     .order("published_at", { ascending: false })
-    .limit(30);
+    .limit(90);
 
   type Item = {
     author: string;
@@ -44,7 +44,11 @@ export async function GET(req: Request) {
     url: string | null;
   };
 
-  const items: Item[] = ((data as SignalRow[] | null) ?? []).map((s) => {
+  // Print-desk city feeds are print-only local news — keep them off the shared ticker.
+  const rows = ((data as SignalRow[] | null) ?? [])
+    .filter((s) => (Array.isArray(s.sources) ? s.sources[0] : s.sources)?.scope !== "print")
+    .slice(0, 30);
+  const items: Item[] = rows.map((s) => {
     const srcRel = Array.isArray(s.sources) ? s.sources[0] : s.sources;
     const isWatchlist = srcRel?.source_type === "twitter";
 

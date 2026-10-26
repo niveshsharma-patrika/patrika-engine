@@ -26,7 +26,7 @@ export type ResearchResult = {
   sources: ResearchSource[];
   found: boolean;
 };
-export type ArticleResult = { headline: string; body: string };
+export type ArticleResult = { headline: string; body: string; deck?: string };
 
 const SEARCH_MODEL = process.env.TOPIC_SEARCH_MODEL ?? "gpt-4o";
 
@@ -143,8 +143,12 @@ export async function writeArticle(opts: {
   angle?: string;
   targetWords: number;
   research: ResearchResult;
+  /** House-style note injected into the rules (e.g. the print desk directive). */
+  styleNote?: string;
+  /** Also produce a deck / subhead (print copy). */
+  withDeck?: boolean;
 }): Promise<ArticleResult> {
-  const { incident, lang, angle, targetWords, research } = opts;
+  const { incident, lang, angle, targetWords, research, styleNote, withDeck } = opts;
   const isHi = lang === "hi";
   const langName = isHi ? "Hindi" : "English";
 
@@ -158,7 +162,7 @@ export async function writeArticle(opts: {
   const maxOutputTokens = Math.min(16000, Math.ceil(targetWords * (isHi ? 14 : 4)) + 1000);
 
   const rules = (web: boolean) => `RULES:
-- Write in ${langName}, in simple everyday language for the common reader.
+- Write in ${langName}, in simple everyday language for the common reader.${styleNote ? `\n- HOUSE STYLE (follow strictly): ${styleNote.trim().slice(0, 1500)}` : ""}
 - Ground every specific (names, quotes, numbers, dates, places, the current status) in the RESEARCH / reporter's account${web ? " or your own web verification" : ""}. NEVER invent a person, quote, statistic or proper noun; if a specific isn't supported, keep it general rather than guess.
 - Report the CURRENT status / outcome as of ${todayIN()}; don't freeze the story at its announcement.
 - Clean prose: a short engaging intro (2–3 sentences), then the body; a few plain-text subheadings if genuinely helpful (no #, no **). Do NOT print source URLs and do NOT name other news outlets.
@@ -207,25 +211,40 @@ ${rules(web)}`;
   body = isHi ? normalizeHindiTypography(body) : body;
   if (!body) throw new Error("Could not generate the article — try again.");
 
-  // Headline from the finished body.
+  // Headline (+ an optional deck / subhead for print copy) from the finished body.
   let headline = "";
+  let deck = "";
   const hmodel = await getModelFor("headline");
   if (hmodel) {
     try {
-      const { object } = await generateObject({
-        model: hmodel.model,
-        temperature: 0.4,
-        maxRetries: 1,
-        abortSignal: AbortSignal.timeout(30_000),
-        schema: z.object({ headline: z.string() }),
-        prompt: `Write ONE strong, accurate ${langName} news headline (no surrounding quotes, no label) for this article:\n\n${body.slice(0, 2000)}`,
-      });
-      headline = (object.headline || "").trim();
+      if (withDeck) {
+        const { object } = await generateObject({
+          model: hmodel.model,
+          temperature: 0.4,
+          maxRetries: 1,
+          abortSignal: AbortSignal.timeout(30_000),
+          schema: z.object({ headline: z.string(), deck: z.string() }),
+          prompt: `For this ${langName} print news article, write ONE strong, accurate headline and ONE deck — a single-sentence subhead (12–25 words) that adds the key fact or angle. No quotes, no labels.\n\n${body.slice(0, 2000)}`,
+        });
+        headline = (object.headline || "").trim();
+        deck = (object.deck || "").trim();
+      } else {
+        const { object } = await generateObject({
+          model: hmodel.model,
+          temperature: 0.4,
+          maxRetries: 1,
+          abortSignal: AbortSignal.timeout(30_000),
+          schema: z.object({ headline: z.string() }),
+          prompt: `Write ONE strong, accurate ${langName} news headline (no surrounding quotes, no label) for this article:\n\n${body.slice(0, 2000)}`,
+        });
+        headline = (object.headline || "").trim();
+      }
     } catch {
       /* headline optional */
     }
   }
   headline = isHi ? normalizeHindiTypography(headline) : headline;
+  deck = isHi ? normalizeHindiTypography(deck) : deck;
 
-  return { headline, body };
+  return withDeck ? { headline, body, deck } : { headline, body };
 }

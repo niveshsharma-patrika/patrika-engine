@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Search,
   Languages,
+  Printer,
   Activity,
   Users,
   BarChart3,
@@ -160,6 +161,17 @@ export function Shell({ children, edition, role, flags }: { children: React.Reac
           {/* Pipeline controls ("Run now" + last-sync stats) are operational,
               not editorial — admins only. */}
           {role === "admin" && <IngestStatus />}
+
+          {/* Admins work both surfaces — jump to the print desk. */}
+          {role === "admin" && (
+            <Link
+              href="/print"
+              className="flex items-center gap-1.5 bg-[var(--surface-2)] hover:bg-white border border-[var(--border)] hover:border-[var(--border-2)] rounded px-3 py-1.5 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)]"
+            >
+              <Printer size={13} />
+              {lang === "hi" ? "प्रिंट डेस्क" : "Print Desk"}
+            </Link>
+          )}
 
           <button
             onClick={() => setLang(lang === "en" ? "hi" : "en")}

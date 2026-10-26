@@ -723,6 +723,8 @@ export function Editor({ trend, title, setTitle, onClose, magazineKey, magazineF
           body,
           status,
           desk: trend?.desk ?? null,
+          // On /print/national this editor files into the print desk's drafts.
+          surface: printMode ? "print" : "digital",
           meta: {
             tone,
             readability: READABILITY_OPTS[readability],

@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/auth/session";
 import { writeArticle, WORDS, type Lang, type ResearchResult } from "@/lib/research";
+import { getPrintSetting } from "@/lib/print/settings";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
@@ -34,14 +35,22 @@ export async function POST(req: Request) {
   const lang: Lang = body?.lang === "en" ? "en" : "hi";
   const angle = typeof body?.angle === "string" ? body.angle.trim().slice(0, 300) : "";
   const lengthKey = typeof body?.length === "string" && body.length in WORDS ? body.length : "standard";
-  const targetWords = WORDS[lengthKey];
+  // Print copy passes an exact word target (brief / standard / lead) + print=true
+  // for a deck and the desk's house-style directive.
+  const wordsRaw = Number(body?.words);
+  const targetWords = Number.isFinite(wordsRaw) && wordsRaw >= 100 && wordsRaw <= 1500 ? Math.round(wordsRaw) : WORDS[lengthKey];
+  const print = body?.print === true;
+  const styleNote = print ? await getPrintSetting("directive") : "";
   const research = coerceResearch(body?.research);
   if (incident.length < 10) {
     return Response.json({ error: "Missing the incident details." }, { status: 400 });
   }
 
   try {
-    const article = await writeArticle({ incident, lang, angle: angle || undefined, targetWords, research });
+    const article = await writeArticle({
+      incident, lang, angle: angle || undefined, targetWords, research,
+      withDeck: print, styleNote: styleNote || undefined,
+    });
     return Response.json(article);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Generation failed.";

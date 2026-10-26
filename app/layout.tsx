@@ -8,7 +8,7 @@ import { Shell } from "@/components/shell";
 import { getSession } from "@/lib/auth/session";
 import { confinedFor } from "@/lib/auth/confined";
 import { resolveFeatureFlags, canAccessFeature } from "@/lib/feature-flags";
-import { featureForPath } from "@/lib/features";
+import { featureForPath, digitalEdition } from "@/lib/features";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -57,9 +57,10 @@ export default async function RootLayout({
   // Hard surface split by LIVE edition (both sides read getSession, so they can
   // never disagree → no redirect loop, and an edition change applies at once).
   // Print-edition users live only under /print/*; the print layout bounces
-  // digital users the other way.
+  // digital users the other way. Admins are exempt — they use both surfaces.
   const onPrintSurface = pathname === "/print" || pathname.startsWith("/print/");
-  if (session && session.edition === "print" && !confined && pathname && pathname !== "/login" && !onPrintSurface) {
+  const edition = session ? digitalEdition(session.role, session.edition) : "digital";
+  if (session && edition === "print" && !confined && pathname && pathname !== "/login" && !onPrintSurface) {
     redirect("/print");
   }
 
@@ -71,8 +72,8 @@ export default async function RootLayout({
   const flags = session ? await resolveFeatureFlags() : null;
   if (session && !confined && pathname && pathname !== "/login") {
     const feature = featureForPath(pathname);
-    const safeHome = session.edition === "print" ? "/print" : "/";
-    if (feature && feature.href !== safeHome && !canAccessFeature(flags?.[feature.key], feature, session.role, session.edition)) {
+    const safeHome = edition === "print" ? "/print" : "/";
+    if (feature && feature.href !== safeHome && !canAccessFeature(flags?.[feature.key], feature, session.role, edition)) {
       redirect(safeHome);
     }
   }
@@ -84,7 +85,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full antialiased">
         <LangProvider>
-          <Shell edition={session?.edition ?? "digital"} role={session?.role ?? "writer"} flags={flags ?? undefined}>
+          <Shell edition={edition} role={session?.role ?? "writer"} flags={flags ?? undefined}>
             {children}
           </Shell>
         </LangProvider>

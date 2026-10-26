@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth/session";
 import { confinedFor } from "@/lib/auth/confined";
-import { featureForPath } from "@/lib/features";
+import { featureForPath, digitalEdition } from "@/lib/features";
 import { resolveFeatureFlags, canAccessFeature } from "@/lib/feature-flags";
 
 /**
@@ -25,11 +25,12 @@ export async function requireFeatureAccess(): Promise<void> {
   const feature = featureForPath(pathname);
   if (!feature) return;
 
-  const safeHome = session.edition === "print" ? "/print" : "/";
+  const edition = digitalEdition(session.role, session.edition);
+  const safeHome = edition === "print" ? "/print" : "/";
   if (feature.href === safeHome) return; // always-reachable landing — no loop
 
   const flags = await resolveFeatureFlags();
-  if (!canAccessFeature(flags[feature.key], feature, session.role, session.edition)) {
+  if (!canAccessFeature(flags[feature.key], feature, session.role, edition)) {
     redirect(safeHome);
   }
 }

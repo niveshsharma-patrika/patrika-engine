@@ -28,7 +28,8 @@ export default function LoginPage() {
         // A confined user (print / olloi) can only use one section — send them
         // straight there rather than to a dashboard they'd only see locked.
         const confined = confinedFor(json.user?.role);
-        const dest = confined ? confined.home : next.startsWith("/") ? next : "/";
+        // Same-origin paths only: "//evil.example" and "/\\evil" also start with "/".
+        const dest = confined ? confined.home : /^\/(?![/\\])/.test(next) ? next : "/";
         router.replace(dest);
         router.refresh();
       } else {
