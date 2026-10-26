@@ -1,4 +1,3 @@
-import { requireFeatureAccess } from "@/lib/feature-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -73,7 +72,7 @@ async function loadCounters(): Promise<Counters> {
     sig().not("topic_id", "is", null),
     supabase.from("trends").select("id", { count: "exact", head: true }).eq("status", "active"),
     supabase.from("trends").select("id", { count: "exact", head: true }).eq("status", "archived"),
-    supabase.from("sources").select("id", { count: "exact", head: true }).eq("is_active", true).neq("scope", "print"),
+    supabase.from("sources").select("id", { count: "exact", head: true }).eq("is_active", true),
   ]);
 
   return {
@@ -108,7 +107,6 @@ async function loadSourceStats(): Promise<SourceStat[]> {
     .from("sources")
     .select("id, name, language, last_sync")
     .eq("is_active", true)
-    .neq("scope", "print")
     .order("name", { ascending: true });
   const sources = (srcs as Array<{ id: string; name: string; language: string | null; last_sync: string | null }> | null) ?? [];
 
@@ -142,7 +140,6 @@ async function loadSourceStats(): Promise<SourceStat[]> {
 }
 
 export default async function StatsPage() {
-  await requireFeatureAccess();
   const [counters, runs, sourceStats] = await Promise.all([
     loadCounters(),
     loadRecentRuns(),

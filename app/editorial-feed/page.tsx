@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth/session";
-import { requireFeatureAccess } from "@/lib/feature-guard";
 import { DATE_RE } from "@/lib/editorial-feed";
 import { EditorialFeed } from "@/components/editorial-feed";
 
@@ -24,7 +23,6 @@ export default async function EditorialFeedPage({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  await requireFeatureAccess();
   const { date } = await searchParams;
   const initialDate = typeof date === "string" && DATE_RE.test(date) ? date : newsroomToday();
   return <EditorialFeed initialDate={initialDate} />;

@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { pool } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -16,15 +15,11 @@ export const dynamic = "force-dynamic";
 const Body = z.object({
   draftId: z.string().uuid().nullish(),
   trendId: z.string().uuid().nullish(),
-  title: z.string().min(1).max(500),
-  body: z.string().max(200_000).default(""),
+  title: z.string().min(1),
+  body: z.string().default(""),
   status: z.enum(["in_progress", "awaiting_review"]).default("in_progress"),
   desk: z.string().nullish(),
   meta: z.any().optional(),
-  // Which surface the draft belongs to (print drafts never go to WordPress) and
-  // the print city / edition it is filed under. Omitted → the user's edition.
-  surface: z.enum(["digital", "print"]).nullish(),
-  city: z.string().max(80).nullish(),
 });
 
 export async function POST(req: Request) {
@@ -40,25 +35,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { draftId, trendId, title, body, status, desk, meta, city } = parsed.data;
-  const surface = parsed.data.surface ?? (session.edition === "print" ? "print" : "digital");
-
-  // Updating: it must be the caller's own draft, and an approved/published
-  // print story is frozen (the desk signed it off) — enforced here, not just in
-  // the UI, so a stale tab can't overwrite or un-approve it.
-  if (draftId) {
-    const { rows } = await pool.query<{ author_id: string; status: string; surface: string }>(
-      `SELECT author_id, status, surface FROM drafts WHERE id = $1`,
-      [draftId]
-    );
-    const existing = rows[0];
-    if (!existing || existing.author_id !== session.userId) {
-      return Response.json({ error: "Draft not found — you can only edit your own drafts." }, { status: 404 });
-    }
-    if (existing.surface === "print" && (existing.status === "approved" || existing.status === "published")) {
-      return Response.json({ error: "This story is approved by the desk and can no longer be edited." }, { status: 409 });
-    }
-  }
+  const { draftId, trendId, title, body, status, desk, meta } = parsed.data;
 
   const supabase = createAdminClient();
   const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
@@ -74,8 +51,6 @@ export async function POST(req: Request) {
     body,
     status,
     desk: desk ?? null,
-    surface,
-    city: city ?? null,
     word_count: wordCount,
     image_url: image,
     generation_metadata: metaObj,

@@ -1,4 +1,3 @@
-import { requireFeatureAccess } from "@/lib/feature-guard";
 import { SourceTable, type SourceRow } from "@/components/source-table";
 import { SocialSources } from "@/components/social-sources";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -11,7 +10,6 @@ async function loadSources(): Promise<SourceRow[]> {
   const { data } = await supabase
     .from("sources")
     .select("id, name, source_type, url, handle, desk, focus, language, is_active, last_sync, signals_24h")
-    .neq("scope", "print") // print-desk city feeds are managed under /print/admin/sources
     .order("is_active", { ascending: false })
     .order("focus", { ascending: true })
     .order("name", { ascending: true });
@@ -48,7 +46,6 @@ async function loadSignalCounts(
 }
 
 export default async function SourcesPage() {
-  await requireFeatureAccess();
   const sources = await loadSources();
   const counts = await loadSignalCounts(sources.map((s) => s.id));
 

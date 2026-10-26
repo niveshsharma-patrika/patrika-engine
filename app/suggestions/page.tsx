@@ -1,4 +1,3 @@
-import { requireFeatureAccess } from "@/lib/feature-guard";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +38,6 @@ const SECTION_COLORS: Record<string, string> = {
 };
 
 export default async function SuggestionsPage() {
-  await requireFeatureAccess();
   const trends = await loadTrends();
 
   return (

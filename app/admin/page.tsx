@@ -1,4 +1,3 @@
-import { requireFeatureAccess } from "@/lib/feature-guard";
 import {
   PipelineSwitches,
   type PipelineRow,
@@ -58,7 +57,6 @@ const PROVIDER_ENV: Record<string, string> = {
 const PIPELINE_ORDER: PipelineRow["key"][] = ["fetch", "enrich", "cluster"];
 
 export default async function AdminPage() {
-  await requireFeatureAccess();
   const { providers, models, usage, pipeline } = await loadData();
   const overrides = envOverrides();
 

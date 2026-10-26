@@ -15,10 +15,6 @@ export const maxDuration = 45;
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  // Print-desk stories never go to the website (the print UI hides this too).
-  if (session.edition === "print" && session.role !== "admin") {
-    return Response.json({ error: "Print desk accounts can't publish to WordPress." }, { status: 403 });
-  }
 
   const body = await req.json().catch(() => null);
   const title = typeof body?.title === "string" ? body.title.trim().slice(0, 300) : "";

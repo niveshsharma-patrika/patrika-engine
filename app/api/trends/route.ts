@@ -424,7 +424,7 @@ async function newswireResponse(
   const { data, error } = await supabase
     .from("signals")
     .select(
-      "id, content, author, published_at, ingested_at, url, metadata, publisher_section, sources(source_type, name, scope)"
+      "id, content, author, published_at, ingested_at, url, metadata, publisher_section, sources(source_type, name)"
     )
     .is("topic_id", null)
     .gte("published_at", sinceIso)
@@ -448,8 +448,8 @@ async function newswireResponse(
     metadata: Record<string, unknown> | null;
     publisher_section: string | null;
     sources:
-      | { source_type: string; name: string; scope: string | null }
-      | { source_type: string; name: string; scope: string | null }[]
+      | { source_type: string; name: string }
+      | { source_type: string; name: string }[]
       | null;
   };
 
@@ -468,7 +468,6 @@ async function newswireResponse(
     if (r.url && seenUrl.has(r.url)) continue;
 
     const srcRel = Array.isArray(r.sources) ? r.sources[0] : r.sources;
-    if (srcRel?.scope === "print") continue; // print-desk city feeds stay on the print Local view
     const pubName = (r.author ?? srcRel?.name ?? "Source").trim();
     const pubKey = canonicalPublisherKey(pubName);
     const titleKey =

@@ -81,7 +81,6 @@ export async function GET() {
          FROM signals s
          LEFT JOIN sources src ON src.id = s.source_id
         WHERE COALESCE(s.published_at, s.ingested_at) >= $1
-          AND src.scope IS DISTINCT FROM 'print'
         ORDER BY COALESCE(s.published_at, s.ingested_at) DESC
         LIMIT 12000`,
       [sinceIso]

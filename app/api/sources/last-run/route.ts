@@ -65,7 +65,6 @@ export async function GET() {
     .from("sources")
     .select("id, name, source_type, last_sync, is_active")
     .eq("is_active", true)
-    .neq("scope", "print")
     .order("name", { ascending: true });
 
   // Window: all articles published since today's IST midnight.

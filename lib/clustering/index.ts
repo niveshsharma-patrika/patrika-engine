@@ -199,8 +199,8 @@ type SignalRow = {
   url: string | null;
   metadata: Record<string, unknown> | null;
   sources:
-    | { name: string; language: string | null; desk: string | null; source_type: string | null; scope: string | null }
-    | { name: string; language: string | null; desk: string | null; source_type: string | null; scope: string | null }[]
+    | { name: string; language: string | null; desk: string | null; source_type: string | null }
+    | { name: string; language: string | null; desk: string | null; source_type: string | null }[]
     | null;
 };
 
@@ -220,7 +220,7 @@ async function loadRecentSignals(
     const { data, error } = await supabase
       .from("signals")
       .select(
-        "id, content, description, keywords, publisher_section, published_at, author, source_id, topic_id, url, metadata, sources(name, language, desk, source_type, scope)"
+        "id, content, description, keywords, publisher_section, published_at, author, source_id, topic_id, url, metadata, sources(name, language, desk, source_type)"
       )
       .gte("published_at", sinceIso)
       .order("published_at", { ascending: false })
@@ -236,9 +236,6 @@ async function loadRecentSignals(
       // Social signals (reddit/youtube/twitter) feed only the Social firehose,
       // never the news clusters — skip them here.
       if (src?.source_type && SOCIAL_SOURCE_TYPES.has(src.source_type)) continue;
-      // Print-desk city feeds (scope='print') are local news for the print
-      // desk's Local view only — never clustered into the shared national trends.
-      if (src?.scope === "print") continue;
       // The real publisher is the article's author (the <source> name for
       // Google News, the feed/sitemap publisher otherwise) — NOT our feed
       // name, which would treat "Google News · Business" as one publisher.

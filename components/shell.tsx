@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
   CalendarDays,
@@ -15,7 +14,6 @@ import {
   ShieldCheck,
   Search,
   Languages,
-  Printer,
   Activity,
   Users,
   BarChart3,
@@ -32,53 +30,45 @@ import {
   Moon,
   Zap,
   Tags,
-  ToggleLeft,
   Lock,
   LogOut,
 } from "lucide-react";
 
 import type { Edition, Role } from "@/lib/auth/jwt";
-import { FEATURES, featureForPath, canAccessFeature } from "@/lib/features";
 import { confinedFor } from "@/lib/auth/confined";
 import { useLang } from "@/lib/i18n/context";
 import { IngestStatus } from "@/components/ingest-status";
 import { LiveTicker } from "@/components/live-ticker";
 import { KairosMark } from "@/components/kairos-logo";
 
-// Icon per feature key. The feature metadata (href, default roles/editions)
-// lives in lib/features.ts so the server (layout gate + admin page) shares it;
-// visibility is resolved from the DB flags passed in as `flags`.
-const ICONS: Record<string, React.ReactNode> = {
-  navDashboard: <LayoutGrid size={16} />,
-  navToday: <CalendarDays size={16} />,
-  navAllStories: <Newspaper size={16} />,
-  navEditorialFeed: <FileStack size={16} />,
-  navResearch: <Telescope size={16} />,
-  navGenerated: <FileText size={16} />,
-  navSuggestions: <Lightbulb size={16} />,
-  navSources: <Rss size={16} />,
-  navLastRun: <History size={16} />,
-  navStats: <Activity size={16} />,
-  navStyle: <Type size={16} />,
-  navDirectives: <SlidersHorizontal size={16} />,
-  navMagazines: <BookOpen size={16} />,
-  navQuickBytes: <Zap size={16} />,
-  navContentGenerator: <Wand2 size={16} />,
-  navOlloi: <Ribbon size={16} />,
-  navHoroscope: <Moon size={16} />,
-  navTwitter: <AtSign size={16} />,
-  navSocial: <TrendingUp size={16} />,
-  navFeedback: <MessageSquare size={16} />,
-  navAdmin: <ShieldCheck size={16} />,
-  navUsers: <Users size={16} />,
-  navProductivity: <BarChart3 size={16} />,
-  navCategoryMapping: <Tags size={16} />,
-  navWpPayloads: <ScrollText size={16} />,
-  navFeatures: <ToggleLeft size={16} />,
-};
-
-/** DB-resolved visibility flags, passed from the server layout. */
-type Flags = Record<string, { enabled: boolean; roles: string[]; editions: string[] }>;
+// `roles` omitted = visible to everyone; otherwise only those roles see it.
+const NAV: Array<{ href: string; icon: React.ReactNode; key: string; editions: Edition[]; roles?: Role[] }> = [
+  { href: "/",                  icon: <LayoutGrid size={16} />,    key: "navDashboard",   editions: ["digital"] },
+  { href: "/today",             icon: <CalendarDays size={16} />,  key: "navToday",       editions: ["digital", "print"] },
+  { href: "/all-stories",       icon: <Newspaper size={16} />,     key: "navAllStories",  editions: ["digital", "print"] },
+  { href: "/editorial-feed",    icon: <FileStack size={16} />,     key: "navEditorialFeed", editions: ["digital", "print"] },
+  { href: "/research",          icon: <Telescope size={16} />,     key: "navResearch",    editions: ["digital", "print"] },
+  { href: "/generated",         icon: <FileText size={16} />,      key: "navGenerated",   editions: ["digital", "print"] },
+  { href: "/suggestions",       icon: <Lightbulb size={16} />,     key: "navSuggestions", editions: ["digital"] },
+  { href: "/sources",           icon: <Rss size={16} />,           key: "navSources",     editions: ["digital"], roles: ["admin"] },
+  { href: "/sources/last-run",  icon: <History size={16} />,       key: "navLastRun",     editions: ["digital"] },
+  { href: "/stats",             icon: <Activity size={16} />,      key: "navStats",       editions: ["digital"], roles: ["admin"] },
+  { href: "/style",             icon: <Type size={16} />,          key: "navStyle",       editions: ["digital"], roles: ["admin"] },
+  { href: "/directives",        icon: <SlidersHorizontal size={16} />, key: "navDirectives", editions: ["digital"], roles: ["admin"] },
+  { href: "/magazines",         icon: <BookOpen size={16} />,      key: "navMagazines",   editions: ["digital"] },
+  { href: "/quick-bytes",       icon: <Zap size={16} />,           key: "navQuickBytes",  editions: ["digital"] },
+  { href: "/content-generator", icon: <Wand2 size={16} />,         key: "navContentGenerator", editions: ["digital"] },
+  { href: "/olloi",             icon: <Ribbon size={16} />,        key: "navOlloi",       editions: ["digital"] },
+  { href: "/horoscope",         icon: <Moon size={16} />,          key: "navHoroscope",   editions: ["digital"] },
+  { href: "/twitter",           icon: <AtSign size={16} />,        key: "navTwitter",     editions: ["digital"], roles: ["admin", "editor"] },
+  { href: "/social",            icon: <TrendingUp size={16} />,    key: "navSocial",      editions: ["digital"], roles: ["admin", "editor"] },
+  { href: "/feedback",          icon: <MessageSquare size={16} />, key: "navFeedback",    editions: ["digital", "print"] },
+  { href: "/admin",             icon: <ShieldCheck size={16} />,   key: "navAdmin",       editions: ["digital"], roles: ["admin"] },
+  { href: "/admin/users",       icon: <Users size={16} />,         key: "navUsers",       editions: ["digital"], roles: ["admin"] },
+  { href: "/admin/productivity", icon: <BarChart3 size={16} />,    key: "navProductivity", editions: ["digital"], roles: ["admin"] },
+  { href: "/admin/categories",  icon: <Tags size={16} />,          key: "navCategoryMapping", editions: ["digital"], roles: ["admin"] },
+  { href: "/admin/wordpress-payloads", icon: <ScrollText size={16} />, key: "navWpPayloads", editions: ["digital"], roles: ["admin"] },
+];
 
 const NAV_BADGES: Record<string, string | undefined> = {};
 
@@ -89,45 +79,19 @@ const SYSTEM_ROWS: Array<[string, string, "live" | "warn"]> = [
   ["Style module", "v2.4", "live"],
 ];
 
-export function Shell({ children, edition, role, flags }: { children: React.ReactNode; edition: Edition; role: Role; flags?: Flags }) {
+export function Shell({ children, edition, role }: { children: React.ReactNode; edition: Edition; role: Role }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { lang, setLang, t } = useLang();
   // A confined user (print / olloi) sees the standard (non-admin) tabs but every
   // one except their own section is locked — shown with a lock icon and taken to
   // the locked screen on click. Edition doesn't gate them.
   const confined = confinedFor(role);
-  // Visibility comes from the DB-resolved flags (Admin → Features). Confined
-  // users see the confined-visible tabs that are still enabled; everyone else
-  // sees features their role + edition is allowed and that are enabled. The
-  // Features page (isProtected) always shows for admins.
-  const nav = FEATURES.filter((f) => {
-    const fl = flags?.[f.key];
-    // Confined users keep their own home link even if the feature is disabled,
-    // so they're never left with a sidebar of only locked rows.
-    if (confined) return f.confinedVisible && (f.href === confined.home || (fl?.enabled ?? true));
-    if (f.isProtected) return role === "admin";
-    if (!fl) return false;
-    return fl.enabled && fl.roles.includes(role) && fl.editions.includes(edition);
-  }).map((f) => ({ href: f.href, key: f.key, icon: ICONS[f.key] }));
+  const nav = confined
+    ? NAV.filter((n) => !n.roles)
+    : NAV.filter((n) => n.editions.includes(edition) && (!n.roles || n.roles.includes(role)));
 
-  // Client-side backstop for soft navigation. Client-component pages have no
-  // server render on in-app navigation, so the server guard can't run for them;
-  // the sidebar re-renders on nav (usePathname), so enforce flag visibility here
-  // too. The server layout + per-page guards remain the real gate (hard loads,
-  // typed URLs, and all server pages). Confined roles use their own mechanism.
-  useEffect(() => {
-    if (confined || !flags) return;
-    const f = featureForPath(pathname);
-    if (!f) return;
-    const home = edition === "print" ? "/print" : "/";
-    if (f.href === home) return;
-    if (!canAccessFeature(flags[f.key], f, role, edition)) router.replace(home);
-  }, [pathname, flags, role, edition, confined, router]);
-
-  // Standalone surfaces render with no digital chrome: the login page, and the
-  // dedicated print desk (which supplies its own shell via app/print/layout).
-  if (pathname === "/login" || pathname === "/print" || pathname.startsWith("/print/")) {
+  // Standalone pages render with no masthead / sidebar chrome: the login page.
+  if (pathname === "/login") {
     return <>{children}</>;
   }
 
@@ -161,17 +125,6 @@ export function Shell({ children, edition, role, flags }: { children: React.Reac
           {/* Pipeline controls ("Run now" + last-sync stats) are operational,
               not editorial — admins only. */}
           {role === "admin" && <IngestStatus />}
-
-          {/* Admins work both surfaces — jump to the print desk. */}
-          {role === "admin" && (
-            <Link
-              href="/print"
-              className="flex items-center gap-1.5 bg-[var(--surface-2)] hover:bg-white border border-[var(--border)] hover:border-[var(--border-2)] rounded px-3 py-1.5 text-[12px] font-medium text-[var(--text-2)] hover:text-[var(--text)]"
-            >
-              <Printer size={13} />
-              {lang === "hi" ? "प्रिंट डेस्क" : "Print Desk"}
-            </Link>
-          )}
 
           <button
             onClick={() => setLang(lang === "en" ? "hi" : "en")}

@@ -72,11 +72,25 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request: { headers } });
   }
 
-  // Note: the print/digital SURFACE split is enforced in the layouts (app/layout
-  // + app/print/layout) using the LIVE edition from getSession — NOT here — so an
-  // admin's edition change takes effect immediately and the edge (stale-JWT) vs
-  // live (DB) edition can never disagree and loop. The middleware only keeps the
-  // role/auth gates below; APIs are shared by both surfaces.
+  // Print-edition users get a reduced surface — only Trends today + All Stories
+  // (plus the APIs their pages call). Any other page redirects to /today.
+  if (session.edition === "print" && !pathname.startsWith("/api/")) {
+    const printOk =
+      pathname === "/today" ||
+      pathname === "/all-stories" ||
+      pathname === "/generated" ||
+      pathname === "/feedback" ||
+      pathname.startsWith("/today/") ||
+      pathname.startsWith("/all-stories/") ||
+      pathname.startsWith("/generated/") ||
+      pathname.startsWith("/feedback/");
+    if (!printOk) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/today";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
 
   // Role gate — admin-only / editor-only sections are enforced here (server-side)
   // so a hidden nav item can't be reached by typing the URL. APIs enforce their
